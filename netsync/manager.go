@@ -11,14 +11,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/mempool"
-	peerpkg "github.com/btcsuite/btcd/peer"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/blockchain"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/mempool"
+	peerpkg "github.com/drcsuite/drc/peer"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -108,7 +108,6 @@ type processBlockResponse struct {
 	isOrphan bool
 	err      error
 }
-
 
 // processBlockMsg是一种通过消息通道发送的消息类型，用于处理请求的块。
 // 注意，这个调用不同于上面的块msg，因为块msg是为来自对等点并具有额外处理的块而设计的，而这个消息实际上只是在内部块链实例上调用ProcessBlock的一种并发安全方法。
@@ -378,7 +377,6 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 	return true
 }
 
-
 // handleNewPeerMsg与新同行的交易表明，它们可能被视为同步同行(它们已经成功谈判)。
 // 如果需要，它还会开始同步。它是从syncHandler goroutine调用的。
 // handleNewPeerMsg deals with new peers that have signalled they may
@@ -451,7 +449,6 @@ func (sm *SyncManager) handleDonePeerMsg(peer *peerpkg.Peer) {
 		sm.startSync()
 	}
 }
-
 
 // handleTxMsg处理来自所有对等点的事务消息。
 // handleTxMsg handles transaction messages from all peers.
@@ -545,7 +542,6 @@ func (sm *SyncManager) current() bool {
 	}
 	return true
 }
-
 
 // handleBlockMsg处理来自所有对等点的块消息。
 // handleBlockMsg handles block messages from all peers.
@@ -750,7 +746,6 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		return
 	}
 }
-
 
 // fetchHeaderBlocks创建一个请求，并向syncPeer发送一个请求，根据当前头列表下载下一个块列表。
 // fetchHeaderBlocks creates and sends a request to the syncPeer for the next
@@ -1265,7 +1260,6 @@ out:
 	sm.wg.Done()
 	log.Trace("Block handler done")
 }
-
 
 // handleblockchain通知处理来自区块链的通知。它做的事情包括请求孤立块父块和将接受的块转发给连接的对等点。
 // handleBlockchainNotification handles notifications from blockchain.  It does

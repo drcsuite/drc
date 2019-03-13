@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
 )
 
 const (
@@ -58,7 +58,6 @@ func (invtype InvType) String() string {
 
 	return fmt.Sprintf("Unknown InvType (%d)", uint32(invtype))
 }
-
 
 // InvVect定义了一个比特币库存向量，该向量用于描述一个对等点想要、拥有或不需要另一个对等点的数据(由Type字段指定)。
 // InvVect defines a bitcoin inventory vector which is used to describe data,

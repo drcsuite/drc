@@ -12,7 +12,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
 )
 
 const (
@@ -684,7 +684,6 @@ func randomUint64(r io.Reader) (uint64, error) {
 	}
 	return rv, nil
 }
-
 
 // RandomUint64返回一个加密的随机uint64值。
 // RandomUint64 returns a cryptographically random uint64 value.

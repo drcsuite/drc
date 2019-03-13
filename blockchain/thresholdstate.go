@@ -7,7 +7,7 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
 )
 
 // ThresholdState define the various threshold states used when voting on
@@ -111,6 +111,7 @@ func (c *thresholdStateCache) Lookup(hash *chainhash.Hash) (ThresholdState, bool
 func (c *thresholdStateCache) Update(hash *chainhash.Hash, state ThresholdState) {
 	c.entries[*hash] = state
 }
+
 // newthreshold oldcache返回一个新的缓存数组，用于计算阈值状态。
 // newThresholdCaches returns a new array of caches to be used when calculating
 // threshold states.
@@ -123,6 +124,7 @@ func newThresholdCaches(numCaches uint32) []thresholdStateCache {
 	}
 	return caches
 }
+
 //阈值状态返回给定节点和部署ID之后块的当前规则更改阈值状态。
 // thresholdState returns the current rule change threshold state for the block
 // AFTER the given node and deployment ID.  The cache is used to ensure the

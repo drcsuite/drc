@@ -18,12 +18,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/drcsuite/drc/blockchain"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -1172,7 +1172,6 @@ func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd st
 	}
 }
 
-
 // 为对等点处理失速检测。这需要跟踪预期的响应，并在计算回调时间的同时为它们分配截止日期。它必须像goroutine一样运行。
 // stallHandler handles stall detection for the peer.  This entails keeping
 // track of expected responses and assigning them deadlines while accounting for
@@ -1722,7 +1721,6 @@ func (p *Peer) shouldLogWriteError(err error) bool {
 	return true
 }
 
-
 // 为对等方处理所有传出消息。它必须像goroutine一样运行。它使用缓冲通道序列化输出消息，同时允许发送方继续异步运行。
 // outHandler handles all outgoing messages for the peer.  It must be run as a
 // goroutine.  It uses a buffered channel to serialize output messages while
@@ -1802,7 +1800,6 @@ cleanup:
 	log.Tracef("Peer output handler done for %s", p)
 }
 
-
 // pingHandler定期ping对等程序。它必须作为goroutine运行。
 // pingHandler periodically pings the peer.  It must be run as a goroutine.
 func (p *Peer) pingHandler() {
@@ -1832,7 +1829,6 @@ out:
 func (p *Peer) QueueMessage(msg wire.Message, doneChan chan<- struct{}) {
 	p.QueueMessageWithEncoding(msg, doneChan, wire.BaseEncoding)
 }
-
 
 // QueueMessageWithEncoding将传递的比特币消息添加到对等发送队列。
 // QueueMessageWithEncoding adds the passed bitcoin message to the peer send
@@ -2121,7 +2117,6 @@ func (p *Peer) start() error {
 		return errors.New("protocol negotiation timeout")
 	}
 	log.Debugf("Connected to %s", p.Addr())
-
 
 	// 协议协商成功，开始处理输入和输出消息。
 	// The protocol has been negotiated successfully so start processing input

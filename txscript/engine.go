@@ -9,11 +9,11 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"fmt"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/drcsuite/drc/wire"
 	"math/big"
 
-	"github.com/btcsuite/btcd/btcec"
-	//"github.com/btcsuite/btcd/wire"
+	"github.com/drcsuite/drc/btcec"
+	//"github.com/drcsuite/drc/wire"
 )
 
 // ScriptFlags is a bitmask defining additional operations or tests that will be

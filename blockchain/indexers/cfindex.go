@@ -7,14 +7,14 @@ package indexers
 import (
 	"errors"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/gcs"
 	"github.com/btcsuite/btcutil/gcs/builder"
+	"github.com/drcsuite/drc/blockchain"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -54,6 +54,7 @@ var (
 	// for convenience.
 	zeroHash chainhash.Hash
 )
+
 // dbFetchFilterIdxEntry从筛选器索引数据库检索一个数据blob。条目的缺失不被认为是错误。
 // dbFetchFilterIdxEntry retrieves a data blob from the filter index database.
 // An entry's absence is not considered an error.
@@ -61,12 +62,14 @@ func dbFetchFilterIdxEntry(dbTx database.Tx, key []byte, h *chainhash.Hash) ([]b
 	idx := dbTx.Metadata().Bucket(cfIndexParentBucketKey).Bucket(key)
 	return idx.Get(h[:]), nil
 }
+
 // dbStoreFilterIdxEntry在筛选器索引数据库中存储一个数据blob。
 // dbStoreFilterIdxEntry stores a data blob in the filter index database.
 func dbStoreFilterIdxEntry(dbTx database.Tx, key []byte, h *chainhash.Hash, f []byte) error {
 	idx := dbTx.Metadata().Bucket(cfIndexParentBucketKey).Bucket(key)
 	return idx.Put(h[:], f)
 }
+
 // dbDeleteFilterIdxEntry从筛选器索引数据库中删除一个数据blob。
 // dbDeleteFilterIdxEntry deletes a data blob from the filter index database.
 func dbDeleteFilterIdxEntry(dbTx database.Tx, key []byte, h *chainhash.Hash) error {
@@ -85,6 +88,7 @@ var _ Indexer = (*CfIndex)(nil)
 
 // Ensure the CfIndex type implements the NeedsInputser interface.
 var _ NeedsInputser = (*CfIndex)(nil)
+
 // needsinput表示索引需要引用的输入，以便正确地创建索引。
 // NeedsInputs signals that the index requires the referenced inputs in order
 // to properly create the index.
@@ -93,24 +97,28 @@ var _ NeedsInputser = (*CfIndex)(nil)
 func (idx *CfIndex) NeedsInputs() bool {
 	return true
 }
+
 // 初始化基于散列的cf索引。这是Indexer接口的一部分。
 // Init initializes the hash-based cf index. This is part of the Indexer
 // interface.
 func (idx *CfIndex) Init() error {
 	return nil // Nothing to do.
 }
+
 //键以字节片的形式返回用于索引的数据库键。
 // Key returns the database key to use for the index as a byte slice. This is
 // part of the Indexer interface.
 func (idx *CfIndex) Key() []byte {
 	return cfIndexParentBucketKey
 }
+
 // Name返回人类可读的索引名。
 // Name returns the human-readable name of the index. This is part of the
 // Indexer interface.
 func (idx *CfIndex) Name() string {
 	return cfIndexName
 }
+
 // Create在索引管理器确定需要首次创建索引时调用。
 // Create is invoked when the indexer manager determines the index needs to
 // be created for the first time. It creates buckets for the two hash-based cf
@@ -146,6 +154,7 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 
 	return nil
 }
+
 //storeFilter存储给定的过滤器，并执行生成过滤器头部所需的步骤。
 // storeFilter stores a given filter, and performs the steps needed to
 // generate the filter's header.
@@ -205,6 +214,7 @@ func storeFilter(dbTx database.Tx, block *btcutil.Block, f *gcs.Filter,
 	}
 	return dbStoreFilterIdxEntry(dbTx, hkey, h, fh[:])
 }
+
 // ConnectBlock由索引管理器在连接到主链的新块时调用。
 // ConnectBlock is invoked by the index manager when a new block has been
 // connected to the main chain. This indexer adds a hash-to-cf mapping for
@@ -224,6 +234,7 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 
 	return storeFilter(dbTx, block, f, wire.GCSFilterRegular)
 }
+
 //当一个块从主链断开时，索引管理器调用DisconnectBlock。
 // DisconnectBlock is invoked by the index manager when a block has been
 // disconnected from the main chain.  This indexer removes the hash-to-cf
@@ -254,6 +265,7 @@ func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 
 	return nil
 }
+
 // entryByBlockHash获取特定类型的筛选器索引项
 // entryByBlockHash fetches a filter index entry of a particular type
 // (eg. filter, filter header, etc) for a filter type and block hash.
@@ -273,6 +285,7 @@ func (idx *CfIndex) entryByBlockHash(filterTypeKeys [][]byte,
 	})
 	return entry, err
 }
+
 // entriesByBlockHashes批处理获取特定类型的筛选器索引项
 // entriesByBlockHashes batch fetches a filter index entry of a particular type
 // (eg. filter, filter header, etc) for a filter type and slice of block hashes.
@@ -297,6 +310,7 @@ func (idx *CfIndex) entriesByBlockHashes(filterTypeKeys [][]byte,
 	})
 	return entries, err
 }
+
 // FilterByBlockHash返回块的基本过滤器或提交过滤器的序列化内容。
 // FilterByBlockHash returns the serialized contents of a block's basic or
 // committed filter.
@@ -304,6 +318,7 @@ func (idx *CfIndex) FilterByBlockHash(h *chainhash.Hash,
 	filterType wire.FilterType) ([]byte, error) {
 	return idx.entryByBlockHash(cfIndexKeys, filterType, h)
 }
+
 // FiltersByBlockHashes通过散列返回一组块的基本过滤器或提交过滤器的序列化内容。
 // FiltersByBlockHashes returns the serialized contents of a block's basic or
 // committed filter for a set of blocks by hash.
@@ -311,6 +326,7 @@ func (idx *CfIndex) FiltersByBlockHashes(blockHashes []*chainhash.Hash,
 	filterType wire.FilterType) ([][]byte, error) {
 	return idx.entriesByBlockHashes(cfIndexKeys, filterType, blockHashes)
 }
+
 // FilterHeaderByBlockHash返回一个块的基本提交过滤器头的序列化内容。
 // FilterHeaderByBlockHash returns the serialized contents of a block's basic
 // committed filter header.
@@ -325,6 +341,7 @@ func (idx *CfIndex) FilterHeadersByBlockHashes(blockHashes []*chainhash.Hash,
 	filterType wire.FilterType) ([][]byte, error) {
 	return idx.entriesByBlockHashes(cfHeaderKeys, filterType, blockHashes)
 }
+
 // FilterHashByBlockHash返回一个块的基本提交过滤器散列的序列化内容。
 // FilterHashByBlockHash returns the serialized contents of a block's basic
 // committed filter hash.
@@ -332,6 +349,7 @@ func (idx *CfIndex) FilterHashByBlockHash(h *chainhash.Hash,
 	filterType wire.FilterType) ([]byte, error) {
 	return idx.entryByBlockHash(cfHashKeys, filterType, h)
 }
+
 // filterhashesbyblockhash根据哈希值返回一组块的基本提交的筛选器哈希的序列化内容。
 // FilterHashesByBlockHashes returns the serialized contents of a block's basic
 // committed filter hash for a set of blocks by hash.
@@ -339,6 +357,7 @@ func (idx *CfIndex) FilterHashesByBlockHashes(blockHashes []*chainhash.Hash,
 	filterType wire.FilterType) ([][]byte, error) {
 	return idx.entriesByBlockHashes(cfHashKeys, filterType, blockHashes)
 }
+
 //NewCfIndex返回一个索引器的新实例，该实例用于创建一个映射，将区块链中所有块的散列映射到各自提交的过滤器。
 // NewCfIndex returns a new instance of an indexer that is used to create a
 // mapping of the hashes of all blocks in the blockchain to their respective
@@ -350,6 +369,7 @@ func (idx *CfIndex) FilterHashesByBlockHashes(blockHashes []*chainhash.Hash,
 func NewCfIndex(db database.DB, chainParams *chaincfg.Params) *CfIndex {
 	return &CfIndex{db: db, chainParams: chainParams}
 }
+
 // DropCfIndex如果存在，则从提供的数据库中删除CF索引。
 // DropCfIndex drops the CF index from the provided database if exists.
 func DropCfIndex(db database.DB, interrupt <-chan struct{}) error {
