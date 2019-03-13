@@ -7,8 +7,8 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcutil"
 	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/drcutil"
 )
 
 // 可能会接受一个区块进入区块链,如果接受，返回是否在主链上。它执行取决于它在区块链中的位置的几个验证检查
@@ -26,7 +26,7 @@ import (
 //
 //此函数必须在持有链状态锁的情况下调用(用于写操作)。
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags) (bool, error) {
+func (b *BlockChain) maybeAcceptBlock(block *drcutil.Block, flags BehaviorFlags) (bool, error) {
 	// The height of this block is one more than the referenced previous
 	// block.
 	//这个块的高度比前面引用的块高1。

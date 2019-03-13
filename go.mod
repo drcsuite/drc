@@ -2,7 +2,7 @@ module github.com/btcsuite/btcd
 
 require (
 	github.com/aead/siphash v1.0.1 // indirect
-	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
+	github.com/drcsuite/drc/btclog v0.0.0-20170628155309-84c8d2346e9f
 	github.com/btcsuite/btcutil v0.0.0-20180706230648-ab6388e0c60a
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd
 	github.com/btcsuite/goleveldb v0.0.0-20160330041536-7834afc9e8cd

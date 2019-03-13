@@ -10,15 +10,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/btcsuite/btcutil"
 	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/database"
 	_ "github.com/drcsuite/drc/database/ffldb"
+	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/wire"
 )
 
 var (
-	btcdHomeDir     = btcutil.AppDataDir("btcd", false)
+	btcdHomeDir     = drcutil.AppDataDir("btcd", false)
 	knownDbTypes    = database.SupportedDrivers()
 	activeNetParams = &chaincfg.MainNetParams
 

@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/btcsuite/btclog"
 	"github.com/drcsuite/drc/blockchain"
 	"github.com/drcsuite/drc/blockchain/indexers"
+	"github.com/drcsuite/drc/btclog"
 	"github.com/drcsuite/drc/database"
 	"github.com/drcsuite/drc/limits"
 )

@@ -10,10 +10,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/btcsuite/btcutil"
 	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/database"
 	_ "github.com/drcsuite/drc/database/ffldb"
+	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/wire"
 )
 
@@ -136,7 +136,7 @@ func Example_blockStorageAndRetrieval() {
 	// and example.
 	err = db.Update(func(tx database.Tx) error {
 		genesisBlock := chaincfg.MainNetParams.GenesisBlock
-		return tx.StoreBlock(btcutil.NewBlock(genesisBlock))
+		return tx.StoreBlock(drcutil.NewBlock(genesisBlock))
 	})
 	if err != nil {
 		fmt.Println(err)
