@@ -12,13 +12,12 @@ func computeNodes(vb *VoteBlock) uint32 {
 
 // 新块验证投票
 
-
 //func BlockVote(p *peer.Peer, msg *VoteBlock,pri *btcec.PrivateKey,pub *btcec.PublicKey) {
 //
 //
 //	if checkBlock(msg,pub) {
 //
-//		// 计算本节点的weight，确认是否有投票资格
+// 计算本节点的weight，确认是否有投票资格
 //		nodeNumber := computeNodes(msg)
 //
 //var weight uint32
