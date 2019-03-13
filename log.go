@@ -22,7 +22,7 @@ import (
 	"github.com/drcsuite/drc/peer"
 	"github.com/drcsuite/drc/txscript"
 
-	"github.com/btcsuite/btclog"
+	"github.com/drcsuite/drc/btclog"
 	"github.com/jrick/logrotate/rotator"
 )
 
