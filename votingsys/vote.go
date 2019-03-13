@@ -12,6 +12,7 @@ return  vb.Header.Nonce
 
 // 新块验证投票
 
+
 //func BlockVote(p *peer.Peer, msg *VoteBlock,pri *btcec.PrivateKey,pub *btcec.PublicKey) {
 //
 //
