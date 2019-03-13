@@ -15,11 +15,10 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 
-	"github.com/btcsuite/btcd/blockchain/indexers"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/limits"
+	"github.com/drcsuite/drc/blockchain/indexers"
 )
-
 
 const (
 	// blockDbNamePrefix is the prefix for the block database name.  The
@@ -35,7 +34,6 @@ var (
 // winServiceMain is only invoked on Windows.  It detects when btcd is running
 // as a service and reacts accordingly.
 var winServiceMain func() (bool, error)
-
 
 // btcdMain是btcd真正的主要功能。当调用os.Exit()时，延迟函数不运行，这是必须解决的问题。
 // 可选的serverChan参数主要由服务代码使用，一旦服务器被设置，
