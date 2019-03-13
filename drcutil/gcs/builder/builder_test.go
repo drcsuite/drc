@@ -9,13 +9,13 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/drcsuite/drc/drcutilutil"
-	"github.com/drcsuite/drc/drcutilutil/gcs"
-	"github.com/drcsuite/drc/drcutilutil/gcs/builder"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/drcutil"
+	"github.com/drcsuite/drc/drcutil/gcs"
+	"github.com/drcsuite/drc/drcutil/gcs/builder"
+	"github.com/drcsuite/drc/txscript"
+	"github.com/drcsuite/drc/wire"
 )
 
 var (
