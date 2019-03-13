@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/blockchain"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/txscript"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -139,6 +139,7 @@ var (
 // fetchBlockHashFunc defines a callback function to use in order to convert a
 // serialized block ID to an associated block hash.
 type fetchBlockHashFunc func(serializedID []byte) (*chainhash.Hash, error)
+
 // serializeAddrIndexEntry按照上面详细描述的格式序列化提供的块id和事务位置。
 // serializeAddrIndexEntry serializes the provided block id and transaction
 // location according to the format described in detail above.
@@ -170,6 +171,7 @@ func deserializeAddrIndexEntry(serialized []byte, region *database.BlockRegion, 
 	region.Len = byteOrder.Uint32(serialized[8:12])
 	return nil
 }
+
 // keyForLevel返回地址索引项中特定地址和级别的键。
 // keyForLevel returns the key for a specific address and level in the address
 // index entry.
@@ -179,6 +181,7 @@ func keyForLevel(addrKey [addrKeySize]byte, level uint8) [levelKeySize]byte {
 	key[levelOffset] = level
 	return key
 }
+
 // dbPutAddrIndexEntry根据上面详细描述的基于级别的方案更新地址索引，以包含提供的条目。
 // dbPutAddrIndexEntry updates the address index to include the provided entry
 // according to the level-based scheme described in detail above.
@@ -248,6 +251,7 @@ func dbPutAddrIndexEntry(bucket internalBucket, addrKey [addrKeySize]byte, block
 	// Finally, insert the new entry into level 0 now that it is empty.
 	return bucket.Put(level0Key[:], newData)
 }
+
 // dbFetchAddrIndexEntries返回所引用的事务的块区域
 //给定的地址键和可能跳过的条目数
 //如果条目总数少于所请求的条目，则为less
@@ -333,6 +337,7 @@ func dbFetchAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte, n
 
 	return results, numToSkip, nil
 }
+
 // minEntriesToReachLevel返回达到给定地址索引级别所需的最小条目数。
 // minEntriesToReachLevel returns the minimum number of entries that are
 // required to reach the given address index level.
@@ -345,6 +350,7 @@ func minEntriesToReachLevel(level uint8) int {
 	}
 	return minRequired
 }
+
 // maxEntriesForLevel返回给定地址索引级别允许的最大条目数。
 // maxEntriesForLevel returns the maximum number of entries allowed for the
 // given address index level.
@@ -355,6 +361,7 @@ func maxEntriesForLevel(level uint8) int {
 	}
 	return numEntries
 }
+
 // dbRemoveAddrIndexEntries从提供的密钥的地址索引中删除指定数量的条目。
 // dbRemoveAddrIndexEntries removes the specified number of entries from from
 // the address index for the provided key.  An assertion error will be returned
@@ -527,6 +534,7 @@ func dbRemoveAddrIndexEntries(bucket internalBucket, addrKey [addrKeySize]byte, 
 	// Apply the pending updates.
 	return applyPending()
 }
+
 // addrToKey将已知地址类型转换为addrindex键。对于不受支持的类型，将返回一个错误。
 // addrToKey converts known address types to an addrindex key.  An error is
 // returned for unsupported types.
@@ -611,6 +619,7 @@ var _ Indexer = (*AddrIndex)(nil)
 
 // Ensure the AddrIndex type implements the NeedsInputser interface.
 var _ NeedsInputser = (*AddrIndex)(nil)
+
 // needsinput表示索引需要引用的输入，以便正确地创建索引。
 // NeedsInputs signals that the index requires the referenced inputs in order
 // to properly create the index.
@@ -619,6 +628,7 @@ var _ NeedsInputser = (*AddrIndex)(nil)
 func (idx *AddrIndex) NeedsInputs() bool {
 	return true
 }
+
 // Init仅用于满足Indexer接口，因为该索引无需初始化。
 // Init is only provided to satisfy the Indexer interface as there is nothing to
 // initialize for this index.
@@ -628,6 +638,7 @@ func (idx *AddrIndex) Init() error {
 	// Nothing to do.
 	return nil
 }
+
 //键以字节片的形式返回用于索引的数据库键。
 // Key returns the database key to use for the index as a byte slice.
 //
@@ -635,6 +646,7 @@ func (idx *AddrIndex) Init() error {
 func (idx *AddrIndex) Key() []byte {
 	return addrIndexKey
 }
+
 // Name返回人类可读的索引名。
 // Name returns the human-readable name of the index.
 //
@@ -642,6 +654,7 @@ func (idx *AddrIndex) Key() []byte {
 func (idx *AddrIndex) Name() string {
 	return addrIndexName
 }
+
 // Create在索引管理器确定需要首次创建索引时调用。
 // Create is invoked when the indexer manager determines the index needs
 // to be created for the first time.  It creates the bucket for the address
@@ -658,6 +671,7 @@ func (idx *AddrIndex) Create(dbTx database.Tx) error {
 // that involve the address in block.  It is ordered so the transactions can be
 // stored in the order they appear in the block.
 type writeIndexData map[[addrKeySize]byte][]int
+
 //indexPkScript从传递的公钥脚本中提取所有标准地址，并使用传递的映射将它们映射到关联的事务。
 // indexPkScript extracts all standard addresses from the passed public key
 // script and maps each of them to the associated transaction using the passed
@@ -691,6 +705,7 @@ func (idx *AddrIndex) indexPkScript(data writeIndexData, pkScript []byte, txIdx 
 		data[addrKey] = indexedTxns
 	}
 }
+
 //indexBlock从传递的块中的所有事务中提取所有标准地址，并使用传递的映射将每个标准地址映射到关联的事务。
 // indexBlock extract all of the standard addresses from all of the transactions
 // in the passed block and maps each of them to the associated transaction using
@@ -723,6 +738,7 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block *btcutil.Block,
 		}
 	}
 }
+
 // ConnectBlock由索引管理器在连接到主链的新块时调用。
 // ConnectBlock is invoked by the index manager when a new block has been
 // connected to the main chain.  This indexer adds a mapping for each address
@@ -763,6 +779,7 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 
 	return nil
 }
+
 //当一个块从主链断开时，索引管理器调用DisconnectBlock。
 // DisconnectBlock is invoked by the index manager when a block has been
 // disconnected from the main chain.  This indexer removes the address mappings
@@ -787,6 +804,7 @@ func (idx *AddrIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 
 	return nil
 }
+
 // TxRegionsForAddress返回块区域的一个切片，该切片根据要跳过的指定编号、请求的编号以及是否应该反转结果来标识涉及传递的地址的每个事务。
 // TxRegionsForAddress returns a slice of block regions which identify each
 // transaction that involves the passed address according to the specified
@@ -825,6 +843,7 @@ func (idx *AddrIndex) TxRegionsForAddress(dbTx database.Tx, addr btcutil.Address
 
 	return regions, skipped, err
 }
+
 // indexunconfirmedaddress修改未经确认的(仅内存)地址索引，以包含通过传递到事务的公钥脚本编码的地址的映射。
 // indexUnconfirmedAddresses modifies the unconfirmed (memory-only) address
 // index to include mappings for the addresses encoded by the passed public key
@@ -863,6 +882,7 @@ func (idx *AddrIndex) indexUnconfirmedAddresses(pkScript []byte, tx *btcutil.Tx)
 		idx.unconfirmedLock.Unlock()
 	}
 }
+
 // AddUnconfirmedTx将所有与事务相关的地址添加到未确认的(仅内存)地址索引中。
 // AddUnconfirmedTx adds all addresses related to the transaction to the
 // unconfirmed (memory-only) address index.
@@ -895,6 +915,7 @@ func (idx *AddrIndex) AddUnconfirmedTx(tx *btcutil.Tx, utxoView *blockchain.Utxo
 		idx.indexUnconfirmedAddresses(txOut.PkScript, tx)
 	}
 }
+
 // RemoveUnconfirmedTx从未确认(仅内存)的地址索引中删除传递的事务。
 // RemoveUnconfirmedTx removes the passed transaction from the unconfirmed
 // (memory-only) address index.
@@ -917,6 +938,7 @@ func (idx *AddrIndex) RemoveUnconfirmedTx(hash *chainhash.Hash) {
 	// Remove the entry from the transaction to address lookup map as well.
 	delete(idx.addrsByTx, *hash)
 }
+
 // UnconfirmedTxnsForAddress返回当前未确认(仅内存)地址索引中涉及已传递地址的所有事务。
 // UnconfirmedTxnsForAddress returns all transactions currently in the
 // unconfirmed (memory-only) address index that involve the passed address.
@@ -946,6 +968,7 @@ func (idx *AddrIndex) UnconfirmedTxnsForAddress(addr btcutil.Address) []*btcutil
 
 	return nil
 }
+
 // NewAddrIndex返回一个indexer的新实例，该实例用于创建一个将区块链中的所有地址映射到相关事务的映射。
 // NewAddrIndex returns a new instance of an indexer that is used to create a
 // mapping of all addresses in the blockchain to the respective transactions
@@ -962,6 +985,7 @@ func NewAddrIndex(db database.DB, chainParams *chaincfg.Params) *AddrIndex {
 		addrsByTx:   make(map[chainhash.Hash]map[[addrKeySize]byte]struct{}),
 	}
 }
+
 //如果地址索引存在，DropAddrIndex将从提供的数据库中删除地址索引。
 // DropAddrIndex drops the address index from the provided database if it
 // exists.

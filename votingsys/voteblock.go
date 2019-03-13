@@ -1,8 +1,8 @@
 package votingsys
 
 import (
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/drcsuite/drc/btcec"
+	"github.com/drcsuite/drc/wire"
 	"io"
 )
 

@@ -7,7 +7,7 @@ package blockchain
 import (
 	"math"
 
-	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/drcsuite/drc/chaincfg"
 )
 
 const (
@@ -50,6 +50,7 @@ type bitConditionChecker struct {
 // Ensure the bitConditionChecker type implements the thresholdConditionChecker
 // interface.
 var _ thresholdConditionChecker = bitConditionChecker{}
+
 //BeginTime返回unix中值块时间戳，从中值块时间开始(在下一个窗口)对规则更改进行投票。
 // BeginTime returns the unix timestamp for the median block time after which
 // voting on a rule change starts (at the next window).
@@ -74,6 +75,7 @@ func (c bitConditionChecker) BeginTime() uint64 {
 func (c bitConditionChecker) EndTime() uint64 {
 	return math.MaxUint64
 }
+
 // RuleChangeActivationThreshold是条件必须为真才能锁定规则更改的块的数量。
 // RuleChangeActivationThreshold is the number of blocks for which the condition
 // must be true in order to lock in a rule change.
@@ -85,6 +87,7 @@ func (c bitConditionChecker) EndTime() uint64 {
 func (c bitConditionChecker) RuleChangeActivationThreshold() uint32 {
 	return c.chain.chainParams.RuleChangeActivationThreshold
 }
+
 // MinerConfirmationWindow是每个阈值状态重目标窗口中的块数。
 // MinerConfirmationWindow is the number of blocks in each threshold state
 // retarget window.
@@ -96,6 +99,7 @@ func (c bitConditionChecker) RuleChangeActivationThreshold() uint32 {
 func (c bitConditionChecker) MinerConfirmationWindow() uint32 {
 	return c.chain.chainParams.MinerConfirmationWindow
 }
+
 //当与检查器关联的特定位被设置时， Condition返回true，并且它不应该根据基于已知部署和链的当前状态的预期版本。
 // Condition returns true when the specific bit associated with the checker is
 // set and it's not supposed to be according to the expected version based on
@@ -132,6 +136,7 @@ type deploymentChecker struct {
 // Ensure the deploymentChecker type implements the thresholdConditionChecker
 // interface.
 var _ thresholdConditionChecker = deploymentChecker{}
+
 //BeginTime返回unix中值块时间戳，从中值块时间开始(在下一个窗口)对规则更改进行投票。
 // BeginTime returns the unix timestamp for the median block time after which
 // voting on a rule change starts (at the next window).
@@ -155,6 +160,7 @@ func (c deploymentChecker) BeginTime() uint64 {
 func (c deploymentChecker) EndTime() uint64 {
 	return c.deployment.ExpireTime
 }
+
 // RuleChangeActivationThreshold是条件必须为真才能锁定规则更改的块的数量。
 // RuleChangeActivationThreshold is the number of blocks for which the condition
 // must be true in order to lock in a rule change.
@@ -166,6 +172,7 @@ func (c deploymentChecker) EndTime() uint64 {
 func (c deploymentChecker) RuleChangeActivationThreshold() uint32 {
 	return c.chain.chainParams.RuleChangeActivationThreshold
 }
+
 // MinerConfirmationWindow是每个阈值状态重目标窗口中的块数。
 // MinerConfirmationWindow is the number of blocks in each threshold state
 // retarget window.
@@ -177,6 +184,7 @@ func (c deploymentChecker) RuleChangeActivationThreshold() uint32 {
 func (c deploymentChecker) MinerConfirmationWindow() uint32 {
 	return c.chain.chainParams.MinerConfirmationWindow
 }
+
 //当与检查器关联的部署定义的特定位被设置时， Condition返回true。
 // Condition returns true when the specific bit defined by the deployment
 // associated with the checker is set.
@@ -188,6 +196,7 @@ func (c deploymentChecker) Condition(node *blockNode) (bool, error) {
 	return (version&vbTopMask == vbTopBits) && (version&conditionMask != 0),
 		nil
 }
+
 // calcNextBlockVersion根据规则更改部署中启动和锁定的状态，计算在传递前一个块节点之后的块的预期版本。
 // calcNextBlockVersion calculates the expected version of the block after the
 // passed previous block node based on the state of started and locked in
@@ -217,6 +226,7 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 	}
 	return int32(expectedVersion), nil
 }
+
 // CalcNextBlockVersion根据规则更改部署中启动和锁定的状态，计算当前最佳链结束后块的预期版本。
 // CalcNextBlockVersion calculates the expected version of the block after the
 // end of the current best chain based on the state of started and locked in
@@ -229,6 +239,7 @@ func (b *BlockChain) CalcNextBlockVersion() (int32, error) {
 	b.chainLock.Unlock()
 	return version, err
 }
+
 //当任何未知的新规则即将激活或已经激活时，warnUnknownRuleActivations将显示一个警告。
 // warnUnknownRuleActivations displays a warning when any unknown new rules are
 // either about to activate or have been activated.  This will only happen once
@@ -265,6 +276,7 @@ func (b *BlockChain) warnUnknownRuleActivations(node *blockNode) error {
 
 	return nil
 }
+
 //如果最后一个块中有足够多的块具有意外版本，warnUnknownVersions会记录一个警告。
 // warnUnknownVersions logs a warning if a high enough percentage of the last
 // blocks have unexpected versions.

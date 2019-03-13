@@ -8,11 +8,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/blockchain"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -110,6 +110,7 @@ func dbPutBlockIDIndexEntry(dbTx database.Tx, hash *chainhash.Hash, id uint32) e
 	idIndex := meta.Bucket(hashByIDIndexBucketName)
 	return idIndex.Put(serializedID[:], hash[:])
 }
+
 // dbRemoveBlockIDIndexEntry使用现有的数据库事务将索引项从散列删除到id，并将id删除到提供的散列的散列映射。
 // dbRemoveBlockIDIndexEntry uses an existing database transaction remove index
 // entries from the hash to id and id to hash mappings for the provided hash.
@@ -129,6 +130,7 @@ func dbRemoveBlockIDIndexEntry(dbTx database.Tx, hash *chainhash.Hash) error {
 	idIndex := meta.Bucket(hashByIDIndexBucketName)
 	return idIndex.Delete(serializedID)
 }
+
 //dbFetchBlockIDByHash使用现有数据库事务从索引中检索提供的散列的块id。
 // dbFetchBlockIDByHash uses an existing database transaction to retrieve the
 // block id for the provided hash from the index.
@@ -141,6 +143,7 @@ func dbFetchBlockIDByHash(dbTx database.Tx, hash *chainhash.Hash) (uint32, error
 
 	return byteOrder.Uint32(serializedID), nil
 }
+
 //dbFetchBlockHashBySerializedID使用现有数据库事务从索引中检索提供的序列化块id的散列。
 // dbFetchBlockHashBySerializedID uses an existing database transaction to
 // retrieve the hash for the provided serialized block id from the index.
@@ -155,6 +158,7 @@ func dbFetchBlockHashBySerializedID(dbTx database.Tx, serializedID []byte) (*cha
 	copy(hash[:], hashBytes)
 	return &hash, nil
 }
+
 // dbFetchBlockHashByID使用现有数据库事务从索引中检索提供的块id的散列。
 // dbFetchBlockHashByID uses an existing database transaction to retrieve the
 // hash for the provided block id from the index.
@@ -163,6 +167,7 @@ func dbFetchBlockHashByID(dbTx database.Tx, id uint32) (*chainhash.Hash, error) 
 	byteOrder.PutUint32(serializedID[:], id)
 	return dbFetchBlockHashBySerializedID(dbTx, serializedID[:])
 }
+
 // putTxIndexEntry根据事务索引项描述的格式序列化提供的值。
 // putTxIndexEntry serializes the provided values according to the format
 // described about for a transaction index entry.  The target byte slice must
@@ -221,6 +226,7 @@ func dbFetchTxIndexEntry(dbTx database.Tx, txHash *chainhash.Hash) (*database.Bl
 
 	return &region, nil
 }
+
 //dbAddTxIndexEntries使用一个现有的数据库事务为传递的块中的每个事务添加一个事务索引条目。
 // dbAddTxIndexEntries uses an existing database transaction to add a
 // transaction index entry for every transaction in the passed block.
@@ -288,6 +294,7 @@ type TxIndex struct {
 
 // Ensure the TxIndex type implements the Indexer interface.
 var _ Indexer = (*TxIndex)(nil)
+
 //初始化基于哈希的事务索引。
 // Init initializes the hash-based transaction index.  In particular, it finds
 // the highest used block ID and stores it for later use when connecting or
@@ -351,6 +358,7 @@ func (idx *TxIndex) Init() error {
 	log.Debugf("Current internal block ID: %d", idx.curBlockID)
 	return nil
 }
+
 //键以字节片的形式返回用于索引的数据库键。
 // Key returns the database key to use for the index as a byte slice.
 //
@@ -365,6 +373,7 @@ func (idx *TxIndex) Key() []byte {
 func (idx *TxIndex) Name() string {
 	return txIndexName
 }
+
 // Create在索引管理器确定需要首次创建索引时调用。
 // Create is invoked when the indexer manager determines the index needs
 // to be created for the first time.  It creates the buckets for the hash-based
@@ -382,6 +391,7 @@ func (idx *TxIndex) Create(dbTx database.Tx) error {
 	_, err := meta.CreateBucket(txIndexKey)
 	return err
 }
+
 // ConnectBlock由索引管理器在连接到主链的新块时调用。
 // ConnectBlock is invoked by the index manager when a new block has been
 // connected to the main chain.  This indexer adds a hash-to-transaction mapping
@@ -407,6 +417,7 @@ func (idx *TxIndex) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 	idx.curBlockID = newBlockID
 	return nil
 }
+
 //当一个块从主链断开时，索引管理器调用DisconnectBlock。
 // DisconnectBlock is invoked by the index manager when a block has been
 // disconnected from the main chain.  This indexer removes the
@@ -429,6 +440,7 @@ func (idx *TxIndex) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 	idx.curBlockID--
 	return nil
 }
+
 // TxBlockRegion从事务索引中返回提供的事务散列的块区域。
 // TxBlockRegion returns the block region for the provided transaction hash
 // from the transaction index.  The block region can in turn be used to load the
@@ -445,6 +457,7 @@ func (idx *TxIndex) TxBlockRegion(hash *chainhash.Hash) (*database.BlockRegion, 
 	})
 	return region, err
 }
+
 //NewTxIndex返回一个indexer的新实例，该实例用于创建一个映射，将区块链中所有事务的散列映射到相应的块、块中的位置和事务的大小。
 // NewTxIndex returns a new instance of an indexer that is used to create a
 // mapping of the hashes of all transactions in the blockchain to the respective
@@ -456,6 +469,7 @@ func (idx *TxIndex) TxBlockRegion(hash *chainhash.Hash) (*database.BlockRegion, 
 func NewTxIndex(db database.DB) *TxIndex {
 	return &TxIndex{db: db}
 }
+
 // dropBlockIDIndex删除内部块id索引。
 // dropBlockIDIndex drops the internal block id index.
 func dropBlockIDIndex(db database.DB) error {
@@ -469,6 +483,7 @@ func dropBlockIDIndex(db database.DB) error {
 		return meta.DeleteBucket(hashByIDIndexBucketName)
 	})
 }
+
 //如果存在事务索引，DropTxIndex将从提供的数据库中删除该事务索引。
 // DropTxIndex drops the transaction index from the provided database if it
 // exists.  Since the address index relies on it, the address index will also be

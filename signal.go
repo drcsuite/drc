@@ -11,6 +11,7 @@ import (
 
 // shutdownRequestChannel is used to initiate shutdown from one of the
 // subsystems using the same code paths as when an interrupt signal is received.
+
 var shutdownRequestChannel = make(chan struct{})
 
 // interruptSignals defines the default signals to catch in order to do a proper

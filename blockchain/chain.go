@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/txscript"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -232,6 +232,7 @@ func (b *BlockChain) IsKnownOrphan(hash *chainhash.Hash) bool {
 
 	return exists
 }
+
 // GetOrphanRoot从孤立块的映射中返回提供的散列的链的头。
 // GetOrphanRoot returns the head of the chain for the provided hash from the
 // map of orphan blocks.
@@ -355,6 +356,7 @@ type SequenceLock struct {
 	Seconds     int64
 	BlockHeight int32
 }
+
 // CalcSequenceLock使用传递的utxoview为传递的事务计算一个相对的锁时间SequenceLock，以获得包含Tx的引用输入的块的过去中值时间
 // CalcSequenceLock computes a relative lock-time SequenceLock for the passed
 // transaction using the passed UtxoViewpoint to obtain the past median time
@@ -1282,6 +1284,7 @@ func (b *BlockChain) IsCurrent() bool {
 
 	return b.isCurrent()
 }
+
 // BestSnapshot返回关于当前最佳链块的信息以及当前时间点的相关状态。返回的实例必须被视为不可变的，因为它是由所有调用者共享的。
 // BestSnapshot returns information about the current best chain block and
 // related state as of the current point in time.  The returned instance must be

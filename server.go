@@ -22,22 +22,22 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/addrmgr"
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/blockchain/indexers"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/connmgr"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/mempool"
-	"github.com/btcsuite/btcd/mining"
-	"github.com/btcsuite/btcd/mining/cpuminer"
-	"github.com/btcsuite/btcd/netsync"
-	"github.com/btcsuite/btcd/peer"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
+	"github.com/drcsuite/drc/addrmgr"
+	"github.com/drcsuite/drc/blockchain"
+	"github.com/drcsuite/drc/blockchain/indexers"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/connmgr"
+	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/mempool"
+	"github.com/drcsuite/drc/mining"
+	"github.com/drcsuite/drc/mining/cpuminer"
+	"github.com/drcsuite/drc/netsync"
+	"github.com/drcsuite/drc/peer"
+	"github.com/drcsuite/drc/txscript"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -550,7 +550,8 @@ func (sp *serverPeer) OnMemPool(_ *peer.Peer, msg *wire.MsgMemPool) {
 	}
 }
 
-// 当对等方接收到tx比特币消息时调用OnTx。
+// 当对等方接收到tx比特币消息时调用OnTx。它会阻止比特币交易，直到比特币交易完成。
+// 解锁块处理程序这不是通过一个线程序列化所有事务的事务不依赖于前一个线性方式像块。
 // OnTx is invoked when a peer receives a tx bitcoin message.  It blocks
 // until the bitcoin transaction has been fully processed.  Unlock the block
 // handler this does not serialize all transactions through a single thread
@@ -562,6 +563,7 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTx) {
 		return
 	}
 
+	//将事务添加到对等方的已知库存中。将原始MsgTx转换为btcutil。它提供了一些方便的方法和东西，如哈希缓存。
 	// Add the transaction to the known inventory for the peer.
 	// Convert the raw MsgTx to a btcutil.Tx which provides some convenience
 	// methods and things such as hash caching.
@@ -569,6 +571,8 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTx) {
 	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
 	sp.AddKnownInventory(iv)
 
+	//将事务排队等待sync manager处理，并故意阻止进一步接收，直到事务被完全处理并知道是好是坏。
+	// 这有助于防止恶意对等程序在断开连接(或断开连接)和浪费内存之前排队执行一堆错误的事务。
 	// Queue the transaction up to be handled by the sync manager and
 	// intentionally block further receives until the transaction is fully
 	// processed and known good or bad.  This helps prevent a malicious peer
@@ -1413,7 +1417,6 @@ func (s *server) TransactionConfirmed(tx *btcutil.Tx) {
 	s.RemoveRebroadcastInventory(iv)
 }
 
-
 // pushTxMsg将提供的事务散列的tx消息发送到连接的对等点。如果不知道事务散列，则返回错误。
 // pushTxMsg sends a tx message for the provided transaction hash to the
 // connected peer.  An error is returned if the transaction hash is not known.
@@ -1443,7 +1446,6 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 
 	return nil
 }
-
 
 // pushBlockMsg将提供的块散列的块消息发送到连接的对等点。如果不知道块散列，则返回错误。
 // pushBlockMsg sends a block message for the provided block hash to the
@@ -2028,7 +2030,6 @@ func (s *server) inboundPeerConnected(conn net.Conn) {
 	sp.AssociateConnection(conn)
 	go s.peerDoneHandler(sp)
 }
-
 
 // 当建立新的出站连接时，连接管理器将调用outboundPeerConnected。
 // outboundPeerConnected is invoked by the connection manager when a new
@@ -3144,7 +3145,6 @@ func (s checkpointSorter) Swap(i, j int) {
 func (s checkpointSorter) Less(i, j int) bool {
 	return s[i].Height < s[j].Height
 }
-
 
 // 返回合并到一个片中的两个检查点片，以便按高度对检查点进行排序。
 // 如果附加检查点包含与默认检查点具有相同高度的检查点，则附加检查点将优先并覆盖默认检查点。

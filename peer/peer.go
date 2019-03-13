@@ -18,12 +18,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/drcsuite/drc/blockchain"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -513,6 +513,7 @@ func (p *Peer) UpdateLastAnnouncedBlock(blkHash *chainhash.Hash) {
 	p.statsMtx.Unlock()
 }
 
+// AddKnownInventory将传递的库存添加到对等节点的已知库存缓存中。
 // AddKnownInventory adds the passed inventory to the cache of known inventory
 // for the peer.
 //
@@ -845,6 +846,7 @@ func (p *Peer) PushAddrMsg(addresses []*wire.NetAddress) ([]*wire.NetAddress, er
 	return msg.AddrList, nil
 }
 
+// PushGetBlocksMsg为提供的块定位器发送getblocks消息并停止散列。它将忽略背对背的重复请求。
 // PushGetBlocksMsg sends a getblocks message for the provided block locator
 // and stop hash.  It will ignore back-to-back duplicate requests.
 //
@@ -889,6 +891,7 @@ func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *chain
 	return nil
 }
 
+// PushGetHeadersMsg为提供的块定位器发送getblocks消息并停止散列。它将忽略背对背的重复请求。
 // PushGetHeadersMsg sends a getblocks message for the provided block locator
 // and stop hash.  It will ignore back-to-back duplicate requests.
 //
@@ -1172,7 +1175,6 @@ func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd st
 	}
 }
 
-
 // 为对等点处理失速检测。这需要跟踪预期的响应，并在计算回调时间的同时为它们分配截止日期。它必须像goroutine一样运行。
 // stallHandler handles stall detection for the peer.  This entails keeping
 // track of expected responses and assigning them deadlines while accounting for
@@ -1342,7 +1344,7 @@ out:
 		// Read a message and stop the idle timer as soon as the read
 		// is done.  The timer is reset below for the next iteration if
 		// needed.
-		rmsg, buf, err := p.readMessage(p.wireEncoding)
+		rmsg, buf, err := p.readMessage(p.wireEncoding) // 获取msg
 		idleTimer.Stop()
 		if err != nil {
 			// In order to allow regression tests with malformed messages, don't
@@ -1378,6 +1380,7 @@ out:
 		atomic.StoreInt64(&p.lastRecv, time.Now().Unix())
 		p.stallControl <- stallControlMsg{sccReceiveMessage, rmsg}
 
+		// 处理每种受支持的消息类型。
 		// Handle each supported message type.
 		p.stallControl <- stallControlMsg{sccHandlerStart, rmsg}
 		switch msg := rmsg.(type) {
@@ -1722,7 +1725,6 @@ func (p *Peer) shouldLogWriteError(err error) bool {
 	return true
 }
 
-
 // 为对等方处理所有传出消息。它必须像goroutine一样运行。它使用缓冲通道序列化输出消息，同时允许发送方继续异步运行。
 // outHandler handles all outgoing messages for the peer.  It must be run as a
 // goroutine.  It uses a buffered channel to serialize output messages while
@@ -1802,7 +1804,6 @@ cleanup:
 	log.Tracef("Peer output handler done for %s", p)
 }
 
-
 // pingHandler定期ping对等程序。它必须作为goroutine运行。
 // pingHandler periodically pings the peer.  It must be run as a goroutine.
 func (p *Peer) pingHandler() {
@@ -1832,7 +1833,6 @@ out:
 func (p *Peer) QueueMessage(msg wire.Message, doneChan chan<- struct{}) {
 	p.QueueMessageWithEncoding(msg, doneChan, wire.BaseEncoding)
 }
-
 
 // QueueMessageWithEncoding将传递的比特币消息添加到对等发送队列。
 // QueueMessageWithEncoding adds the passed bitcoin message to the peer send
@@ -2121,7 +2121,6 @@ func (p *Peer) start() error {
 		return errors.New("protocol negotiation timeout")
 	}
 	log.Debugf("Connected to %s", p.Addr())
-
 
 	// 协议协商成功，开始处理输入和输出消息。
 	// The protocol has been negotiated successfully so start processing input
