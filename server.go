@@ -550,7 +550,8 @@ func (sp *serverPeer) OnMemPool(_ *peer.Peer, msg *wire.MsgMemPool) {
 	}
 }
 
-// 当对等方接收到tx比特币消息时调用OnTx。
+// 当对等方接收到tx比特币消息时调用OnTx。它会阻止比特币交易，直到比特币交易完成。
+// 解锁块处理程序这不是通过一个线程序列化所有事务的事务不依赖于前一个线性方式像块。
 // OnTx is invoked when a peer receives a tx bitcoin message.  It blocks
 // until the bitcoin transaction has been fully processed.  Unlock the block
 // handler this does not serialize all transactions through a single thread
@@ -562,6 +563,7 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTx) {
 		return
 	}
 
+	//将事务添加到对等方的已知库存中。将原始MsgTx转换为btcutil。它提供了一些方便的方法和东西，如哈希缓存。
 	// Add the transaction to the known inventory for the peer.
 	// Convert the raw MsgTx to a btcutil.Tx which provides some convenience
 	// methods and things such as hash caching.
@@ -569,6 +571,8 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTx) {
 	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
 	sp.AddKnownInventory(iv)
 
+	//将事务排队等待sync manager处理，并故意阻止进一步接收，直到事务被完全处理并知道是好是坏。
+	// 这有助于防止恶意对等程序在断开连接(或断开连接)和浪费内存之前排队执行一堆错误的事务。
 	// Queue the transaction up to be handled by the sync manager and
 	// intentionally block further receives until the transaction is fully
 	// processed and known good or bad.  This helps prevent a malicious peer

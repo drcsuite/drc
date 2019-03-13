@@ -513,6 +513,7 @@ func (p *Peer) UpdateLastAnnouncedBlock(blkHash *chainhash.Hash) {
 	p.statsMtx.Unlock()
 }
 
+// AddKnownInventory将传递的库存添加到对等节点的已知库存缓存中。
 // AddKnownInventory adds the passed inventory to the cache of known inventory
 // for the peer.
 //
@@ -845,6 +846,7 @@ func (p *Peer) PushAddrMsg(addresses []*wire.NetAddress) ([]*wire.NetAddress, er
 	return msg.AddrList, nil
 }
 
+// PushGetBlocksMsg为提供的块定位器发送getblocks消息并停止散列。它将忽略背对背的重复请求。
 // PushGetBlocksMsg sends a getblocks message for the provided block locator
 // and stop hash.  It will ignore back-to-back duplicate requests.
 //
@@ -889,6 +891,7 @@ func (p *Peer) PushGetBlocksMsg(locator blockchain.BlockLocator, stopHash *chain
 	return nil
 }
 
+// PushGetHeadersMsg为提供的块定位器发送getblocks消息并停止散列。它将忽略背对背的重复请求。
 // PushGetHeadersMsg sends a getblocks message for the provided block locator
 // and stop hash.  It will ignore back-to-back duplicate requests.
 //
@@ -1341,7 +1344,7 @@ out:
 		// Read a message and stop the idle timer as soon as the read
 		// is done.  The timer is reset below for the next iteration if
 		// needed.
-		rmsg, buf, err := p.readMessage(p.wireEncoding)
+		rmsg, buf, err := p.readMessage(p.wireEncoding) // 获取msg
 		idleTimer.Stop()
 		if err != nil {
 			// In order to allow regression tests with malformed messages, don't
@@ -1377,6 +1380,7 @@ out:
 		atomic.StoreInt64(&p.lastRecv, time.Now().Unix())
 		p.stallControl <- stallControlMsg{sccReceiveMessage, rmsg}
 
+		// 处理每种受支持的消息类型。
 		// Handle each supported message type.
 		p.stallControl <- stallControlMsg{sccHandlerStart, rmsg}
 		switch msg := rmsg.(type) {
