@@ -7,9 +7,9 @@ package main
 import (
 	"sync/atomic"
 
-	"github.com/btcsuite/btcutil"
 	"github.com/drcsuite/drc/blockchain"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/mempool"
 	"github.com/drcsuite/drc/netsync"
 	"github.com/drcsuite/drc/peer"
@@ -247,7 +247,7 @@ func (b *rpcSyncMgr) IsCurrent() bool {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
-func (b *rpcSyncMgr) SubmitBlock(block *btcutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
+func (b *rpcSyncMgr) SubmitBlock(block *drcutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
 	return b.syncMgr.ProcessBlock(block, flags)
 }
 

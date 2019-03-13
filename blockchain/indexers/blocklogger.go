@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btclog"
-	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/drcutil"
 )
 
 // blockProgressLogger provides periodic logging for other services in order
@@ -24,6 +24,7 @@ type blockProgressLogger struct {
 	progressAction  string
 	sync.Mutex
 }
+
 // newBlockProgressLogger返回一个新的block progress logger。
 // newBlockProgressLogger returns a new block progress logger.
 // The progress message is templated as follows:
@@ -36,11 +37,12 @@ func newBlockProgressLogger(progressMessage string, logger btclog.Logger) *block
 		subsystemLogger:  logger,
 	}
 }
+
 // LogBlockHeight将一个新的块高度记录为一个信息消息，向用户显示进度。
 // LogBlockHeight logs a new block height as an information message to show
 // progress to the user. In order to prevent spam, it limits logging to one
 // message every 10 seconds with duration and totals included.
-func (b *blockProgressLogger) LogBlockHeight(block *btcutil.Block) {
+func (b *blockProgressLogger) LogBlockHeight(block *drcutil.Block) {
 	b.Lock()
 	defer b.Unlock()
 

@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/txscript"
 	"github.com/drcsuite/drc/wire"
 )
@@ -19,7 +19,7 @@ import (
 type txValidateItem struct {
 	txInIndex int
 	txIn      *wire.TxIn
-	tx        *btcutil.Tx
+	tx        *drcutil.Tx
 	sigHashes *txscript.TxSigHashes
 }
 
@@ -193,7 +193,7 @@ func newTxValidator(utxoView *UtxoViewpoint, flags txscript.ScriptFlags,
 // ValidateTransactionScripts使用多个goroutine验证传递的事务的脚本。
 // ValidateTransactionScripts validates the scripts for the passed transaction
 // using multiple goroutines.
-func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
+func ValidateTransactionScripts(tx *drcutil.Tx, utxoView *UtxoViewpoint,
 	flags txscript.ScriptFlags, sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) error {
 
@@ -246,7 +246,7 @@ func ValidateTransactionScripts(tx *btcutil.Tx, utxoView *UtxoViewpoint,
 // checkBlockScripts使用多个goroutine执行并验证传递块中所有事务的脚本。
 // checkBlockScripts executes and validates the scripts for all transactions in
 // the passed block using multiple goroutines.
-func checkBlockScripts(block *btcutil.Block, utxoView *UtxoViewpoint,
+func checkBlockScripts(block *drcutil.Block, utxoView *UtxoViewpoint,
 	scriptFlags txscript.ScriptFlags, sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) error {
 

@@ -5,10 +5,10 @@
 package netsync
 
 import (
-	"github.com/btcsuite/btcutil"
 	"github.com/drcsuite/drc/blockchain"
 	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/mempool"
 	"github.com/drcsuite/drc/peer"
 	"github.com/drcsuite/drc/wire"
@@ -24,7 +24,7 @@ type PeerNotifier interface {
 
 	RelayInventory(invVect *wire.InvVect, data interface{})
 
-	TransactionConfirmed(tx *btcutil.Tx)
+	TransactionConfirmed(tx *drcutil.Tx)
 }
 
 // Config is a configuration struct used to initialize a new SyncManager.
