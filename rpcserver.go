@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/websocket"
 	"github.com/drcsuite/drc/blockchain"
 	"github.com/drcsuite/drc/blockchain/indexers"
 	"github.com/drcsuite/drc/btcec"
@@ -41,6 +40,7 @@ import (
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/peer"
 	"github.com/drcsuite/drc/txscript"
+	"github.com/drcsuite/drc/websocket"
 	"github.com/drcsuite/drc/wire"
 )
 

@@ -18,11 +18,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/go-socks/socks"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/drcsuite/drc/blockchain"
 	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/go-socks/socks"
 	"github.com/drcsuite/drc/wire"
 )
 

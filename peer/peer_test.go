@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/go-socks/socks"
 	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/go-socks/socks"
 	"github.com/drcsuite/drc/peer"
 	"github.com/drcsuite/drc/wire"
 )
