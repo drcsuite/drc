@@ -20,6 +20,7 @@ import (
 	"github.com/btcsuite/btcd/limits"
 )
 
+
 const (
 	// blockDbNamePrefix is the prefix for the block database name.  The
 	// database type is appended to this value to form the full block
