@@ -17,7 +17,7 @@ func computeNodes(vb *VoteBlock) uint32 {
 //
 //	if checkBlock(msg,pub) {
 //
-//		// 计算本节点的weight，确认是否有投票资格
+// 计算本节点的weight，确认是否有投票资格
 //		nodeNumber := computeNodes(msg)
 //
 //var weight uint32
