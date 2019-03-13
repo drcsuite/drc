@@ -11,11 +11,11 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/txscript"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -69,6 +69,7 @@ func isNullOutpoint(outpoint *wire.OutPoint) bool {
 	}
 	return false
 }
+
 //ShouldHaveSerializedBlockHeight确定一个块是否应该在其coinbase事务的scriptSig中嵌入序列化的块高度。
 // ShouldHaveSerializedBlockHeight determines if a block should have a
 // serialized block height embedded within the scriptSig of its
@@ -78,6 +79,7 @@ func isNullOutpoint(outpoint *wire.OutPoint) bool {
 func ShouldHaveSerializedBlockHeight(header *wire.BlockHeader) bool {
 	return header.Version >= serializedHeightVersion
 }
+
 // IsCoinBaseTx确定一个事务是否是coinbase。
 // IsCoinBaseTx determines whether or not a transaction is a coinbase.  A coinbase
 // is a special transaction created by miners that has no inputs.  This is
@@ -132,6 +134,7 @@ func SequenceLockActive(sequenceLock *SequenceLock, blockHeight int32,
 
 	return true
 }
+
 // IsFinalizedTransaction确定事务是否已完成。
 // IsFinalizedTransaction determines whether or not a transaction is finalized.
 func IsFinalizedTransaction(tx *btcutil.Tx, blockHeight int32, blockTime time.Time) bool {
@@ -167,6 +170,7 @@ func IsFinalizedTransaction(tx *btcutil.Tx, blockHeight int32, blockTime time.Ti
 	}
 	return true
 }
+
 // isbip0030节点返回传递的节点是否表示违反防止事务覆盖旧节点的BIP0030规则的两个块之一。
 // isBIP0030Node returns whether or not the passed node represents one of the
 // two blocks that violate the BIP0030 rule which prevents transactions from
@@ -182,6 +186,7 @@ func isBIP0030Node(node *blockNode) bool {
 
 	return false
 }
+
 // CalcBlockSubsidy返回在给定高度的块应该具有的补贴金额。
 // CalcBlockSubsidy returns the subsidy amount a block at the provided height
 // should have. This is mainly used for determining how much the coinbase for
@@ -201,6 +206,7 @@ func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) int64 {
 	// Equivalent to: baseSubsidy / 2^(height/subsidyHalvingInterval)
 	return baseSubsidy >> uint(height/chainParams.SubsidyReductionInterval)
 }
+
 //CheckTransactionSanity对事务执行一些初步检查，以确保它是健全的。这些检查与上下文无关。
 // CheckTransactionSanity performs some preliminary checks on a transaction to
 // ensure it is sane.  These checks are context free.
@@ -338,6 +344,7 @@ func checkProofOfWork(header *wire.BlockHeader, powLimit *big.Int, flags Behavio
 
 	return nil
 }
+
 // CheckProofOfWork确保块头位表示目标难度在最小/最大范围内，并且块哈希值小于所声称的目标难度。
 // CheckProofOfWork ensures the block header bits which indicate the target
 // difficulty is in min/max range and that the block hash is less than the
@@ -345,6 +352,7 @@ func checkProofOfWork(header *wire.BlockHeader, powLimit *big.Int, flags Behavio
 func CheckProofOfWork(block *btcutil.Block, powLimit *big.Int) error {
 	return checkProofOfWork(&block.MsgBlock().Header, powLimit, BFNone)
 }
+
 // CountSigOps返回所提供的事务中所有事务输入和输出脚本的签名操作的数量。
 // CountSigOps returns the number of signature operations for all transaction
 // input and output scripts in the provided transaction.  This uses the
@@ -370,6 +378,7 @@ func CountSigOps(tx *btcutil.Tx) int {
 
 	return totalSigOps
 }
+
 // CountP2SHSigOps返回属于支付到脚本散列类型的所有输入事务的签名操作数。
 // CountP2SHSigOps returns the number of signature operations for all input
 // transactions which are of the pay-to-script-hash type.  This uses the
@@ -423,6 +432,7 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 
 	return totalSigOps, nil
 }
+
 // checkBlockHeaderSanity对块头执行一些初步检查，以确保它在继续处理之前是清醒的。
 // checkBlockHeaderSanity performs some preliminary checks on a block header to
 // ensure it is sane before continuing with processing.  These checks are
@@ -461,6 +471,7 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSou
 
 	return nil
 }
+
 // checkBlockSanity在继续进行块处理之前，对一个块执行一些初步检查，以确保它是健全的。
 // checkBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
@@ -571,12 +582,14 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 
 	return nil
 }
+
 // CheckBlockSanity在继续进行块处理之前，对一个块执行一些初步检查，以确保它是健全的。
 // CheckBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
 func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource MedianTimeSource) error {
 	return checkBlockSanity(block, powLimit, timeSource, BFNone)
 }
+
 // ExtractCoinbaseHeight尝试从coinbase事务的scriptSig中提取块的高度。
 // ExtractCoinbaseHeight attempts to extract the height of the block from the
 // scriptSig of a coinbase transaction.  Coinbase heights are only present in
@@ -618,6 +631,7 @@ func ExtractCoinbaseHeight(coinbaseTx *btcutil.Tx) (int32, error) {
 
 	return int32(serializedHeight), nil
 }
+
 // checkSerializedHeight检查传递的事务中的签名脚本是否以wantHeight的序列化块高度开始。
 // checkSerializedHeight checks if the signature script in the passed
 // transaction starts with the serialized block height of wantHeight.
@@ -635,6 +649,7 @@ func checkSerializedHeight(coinbaseTx *btcutil.Tx, wantHeight int32) error {
 	}
 	return nil
 }
+
 // checkBlockHeaderContext对块头执行几个验证检查，这取决于它在块链中的位置。
 // checkBlockHeaderContext performs several validation checks on the block header
 // which depend on its position within the block chain.
@@ -714,6 +729,7 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 
 	return nil
 }
+
 // checkBlockContext对块进行多次验证检查，这取决于它在块链中的位置。
 // checkBlockContext peforms several validation checks on the block which depend
 // on its position within the block chain.
@@ -820,6 +836,7 @@ func (b *BlockChain) checkBlockContext(block *btcutil.Block, prevNode *blockNode
 
 	return nil
 }
+
 // checkBIP0030确保块不包含重复的事务，这些事务会“覆盖”未完全使用的旧事务。
 // checkBIP0030 ensures blocks do not contain duplicate transactions which
 // 'overwrite' older transactions that are not fully spent.  This prevents an
@@ -862,6 +879,7 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block, view *U
 
 	return nil
 }
+
 //checktransactioninput对事务的输入执行一系列检查，以确保它们是有效的。
 // CheckTransactionInputs performs a series of checks on the inputs to a
 // transaction to ensure they are valid.  An example of some of the checks
@@ -967,6 +985,7 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 	txFeeInSatoshi := totalSatoshiIn - totalSatoshiOut
 	return txFeeInSatoshi, nil
 }
+
 // checkConnectBlock执行几个检查，以确认将传递的块连接到传递的视图所表示的链没有违反任何规则。
 // checkConnectBlock performs several checks to confirm connecting the passed
 // block to the chain represented by the passed view does not violate any rules.
@@ -1240,6 +1259,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 
 	return nil
 }
+
 // CheckConnectBlockTemplate完全验证将传递的块连接到主链不违反任何一致规则，除了工作需求的证明。块必须连接到主链的当前顶端。
 // CheckConnectBlockTemplate fully validates that connecting the passed block to
 // the main chain does not violate any consensus rules, aside from the proof of

@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -1132,6 +1132,7 @@ func (b *BlockChain) createChainState() error {
 	})
 	return err
 }
+
 // initChainState尝试从数据库加载和初始化链状态。
 // initChainState attempts to load and initialize the chain state from the
 // database.  When the db does not yet contain any chain state, both it and the

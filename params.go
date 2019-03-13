@@ -5,12 +5,9 @@
 package main
 
 import (
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/wire"
 )
-
-
-
 
 // activeNetParams is a pointer to the parameters specific to the
 // currently active bitcoin network.

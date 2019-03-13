@@ -11,9 +11,9 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/blockchain"
+	"github.com/drcsuite/drc/database"
 )
 
 var (
@@ -97,6 +97,7 @@ type internalBucket interface {
 	Put(key []byte, value []byte) error
 	Delete(key []byte) error
 }
+
 // interruptRequested在关闭所提供的通道时返回true。
 //这稍微简化了早期关机，因为调用者可以使用if
 //语句而不是select语句。

@@ -7,11 +7,11 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/txscript"
+	"github.com/drcsuite/drc/wire"
 )
 
 // txoFlags is a bitmask defining additional information and state for a
@@ -58,6 +58,7 @@ type UtxoEntry struct {
 func (entry *UtxoEntry) isModified() bool {
 	return entry.packedFlags&tfModified == tfModified
 }
+
 // IsCoinBase返回输出是否包含在coinbase事务中。
 // IsCoinBase returns whether or not the output was contained in a coinbase
 // transaction.
@@ -77,6 +78,7 @@ func (entry *UtxoEntry) BlockHeight() int32 {
 func (entry *UtxoEntry) IsSpent() bool {
 	return entry.packedFlags&tfSpent == tfSpent
 }
+
 // Spend将输出标记为已花费。
 // Spend marks the output as spent.  Spending an output that is already spent
 // has no effect.
@@ -89,16 +91,19 @@ func (entry *UtxoEntry) Spend() {
 	// Mark the output as spent and modified.
 	entry.packedFlags |= tfSpent | tfModified
 }
+
 // Amount返回输出的值。
 // Amount returns the amount of the output.
 func (entry *UtxoEntry) Amount() int64 {
 	return entry.amount
 }
+
 //PkScript返回输出的公钥脚本。
 // PkScript returns the public key script for the output.
 func (entry *UtxoEntry) PkScript() []byte {
 	return entry.pkScript
 }
+
 // Clone返回utxo条目的一个浅拷贝。
 // Clone returns a shallow copy of the utxo entry.
 func (entry *UtxoEntry) Clone() *UtxoEntry {
@@ -125,18 +130,21 @@ type UtxoViewpoint struct {
 	entries  map[wire.OutPoint]*UtxoEntry
 	bestHash chainhash.Hash
 }
+
 // BestHash返回视图当前刷新的链中最好的块的散列。
 // BestHash returns the hash of the best block in the chain the view currently
 // respresents.
 func (view *UtxoViewpoint) BestHash() *chainhash.Hash {
 	return &view.bestHash
 }
+
 // SetBestHash设置视图当前刷新的链中最好的块的散列。
 // SetBestHash sets the hash of the best block in the chain the view currently
 // respresents.
 func (view *UtxoViewpoint) SetBestHash(hash *chainhash.Hash) {
 	view.bestHash = *hash
 }
+
 // LookupEntry根据视图的当前状态返回关于给定事务输出的信息。
 // LookupEntry returns information about a given transaction output according to
 // the current state of the view.  It will return nil if the passed output does
@@ -145,6 +153,7 @@ func (view *UtxoViewpoint) SetBestHash(hash *chainhash.Hash) {
 func (view *UtxoViewpoint) LookupEntry(outpoint wire.OutPoint) *UtxoEntry {
 	return view.entries[outpoint]
 }
+
 // addTxOut将指定的输出添加到视图，如果该输出不是不可用的。
 // addTxOut adds the specified output to the view if it is not provably
 // unspendable.  When the view already has an entry for the output, it will be
@@ -262,6 +271,7 @@ func (view *UtxoViewpoint) connectTransaction(tx *btcutil.Tx, blockHeight int32,
 	view.AddTxOuts(tx, blockHeight)
 	return nil
 }
+
 // connectTransactions更新视图，方法是在传递的块中添加由所有事务创建的所有新utxos，将事务花费的所有utxos标记为已花费，并将视图的最佳散列设置为传递的块。
 // connectTransactions updates the view by adding all new utxos created by all
 // of the transactions in the passed block, marking all utxos the transactions
@@ -281,6 +291,7 @@ func (view *UtxoViewpoint) connectTransactions(block *btcutil.Block, stxos *[]Sp
 	view.SetBestHash(block.Hash())
 	return nil
 }
+
 // fetchEntryByHash试图通过搜索给定散列的所有可能输出来查找给定散列的任何可用utxo。
 // fetchEntryByHash attempts to find any available utxo for the given hash by
 // searching the entire set of possible outputs for the given hash.  It checks
@@ -307,6 +318,7 @@ func (view *UtxoViewpoint) fetchEntryByHash(db database.DB, hash *chainhash.Hash
 	})
 	return entry, err
 }
+
 // disconnectTransactions通过删除传递的块创建的所有事务来更新视图，
 // 通过使用提供的已使用的txo信息来恢复所使用的所有utxos事务，并在传递的块之前将视图的最佳散列设置为块。
 // disconnectTransactions updates the view by removing all of the transactions
@@ -442,6 +454,7 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil
 	view.SetBestHash(&block.MsgBlock().Header.PrevBlock)
 	return nil
 }
+
 // RemoveEntry从视图的当前状态删除给定的事务输出。
 // RemoveEntry removes the given transaction output from the current state of
 // the view.  It will have no effect if the passed output does not exist in the
@@ -449,11 +462,13 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil
 func (view *UtxoViewpoint) RemoveEntry(outpoint wire.OutPoint) {
 	delete(view.entries, outpoint)
 }
+
 //条目返回存储所有utxo条目的底层映射。
 // Entries returns the underlying map that stores of all the utxo entries.
 func (view *UtxoViewpoint) Entries() map[wire.OutPoint]*UtxoEntry {
 	return view.entries
 }
+
 // commit删除所有标记为已修改的条目，这些条目现在已被完全使用，并将所有条目标记为未修改。
 // commit prunes all entries marked modified that are now fully spent and marks
 // all entries as unmodified.
@@ -467,6 +482,7 @@ func (view *UtxoViewpoint) commit() {
 		entry.packedFlags ^= tfModified
 	}
 }
+
 // fetchUtxosMain从调用时主链末端的角度获取关于提供的一组outpoints的未使用事务输出数据。
 // fetchUtxosMain fetches unspent transaction output data about the provided
 // set of outpoints from the point of view of the end of the main chain at the
@@ -501,6 +517,7 @@ func (view *UtxoViewpoint) fetchUtxosMain(db database.DB, outpoints map[wire.Out
 		return nil
 	})
 }
+
 // fetchUtxos根据需要将提供的输出集的未使用事务输出加载到视图中，除非它们已经存在于视图中，在这种情况下它们将被忽略。
 // fetchUtxos loads the unspent transaction outputs for the provided set of
 // outputs into the view from the database as needed unless they already exist
@@ -581,6 +598,7 @@ func (view *UtxoViewpoint) fetchInputUtxos(db database.DB, block *btcutil.Block)
 	// Request the input utxos from the database.
 	return view.fetchUtxosMain(db, neededSet)
 }
+
 // newutxoview返回一个新的空的未使用事务输出视图。
 // NewUtxoViewpoint returns a new empty unspent transaction output view.
 func NewUtxoViewpoint() *UtxoViewpoint {

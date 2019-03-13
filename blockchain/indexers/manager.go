@@ -8,11 +8,11 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/blockchain"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/wire"
 )
 
 var (
@@ -45,6 +45,7 @@ func dbPutIndexerTip(dbTx database.Tx, idxKey []byte, hash *chainhash.Hash, heig
 	indexesBucket := dbTx.Metadata().Bucket(indexTipsBucketName)
 	return indexesBucket.Put(idxKey, serialized)
 }
+
 // dbFetchIndexerTip使用现有的数据库事务来检索
 //提供索引的当前提示的散列和高度。
 // dbFetchIndexerTip uses an existing database transaction to retrieve the
@@ -65,6 +66,7 @@ func dbFetchIndexerTip(dbTx database.Tx, idxKey []byte) (*chainhash.Hash, int32,
 	height := int32(byteOrder.Uint32(serialized[chainhash.HashSize:]))
 	return &hash, height, nil
 }
+
 // dbIndexConnectBlock使用提供的索引器添加与给定块关联的所有索引项，并相应地更新索引器的提示。
 // dbIndexConnectBlock adds all of the index entries associated with the
 // given block using the provided indexer and updates the tip of the indexer
@@ -95,6 +97,7 @@ func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *btcutil.Block
 	// Update the current index tip.
 	return dbPutIndexerTip(dbTx, idxKey, block.Hash(), block.Height())
 }
+
 // dbIndexDisconnectBlock使用提供的索引器删除与给定块关联的所有索引项，并相应地更新索引器的提示。
 // dbIndexDisconnectBlock removes all of the index entries associated with the
 // given block using the provided indexer and updates the tip of the indexer
@@ -138,6 +141,7 @@ type Manager struct {
 
 // Ensure the Manager type implements the blockchain.IndexManager interface.
 var _ blockchain.IndexManager = (*Manager)(nil)
+
 // indexDropKey返回一个索引的键，该键指示该索引正在被删除。
 // indexDropKey returns the key for an index which indicates it is in the
 // process of being dropped.
@@ -147,6 +151,7 @@ func indexDropKey(idxKey []byte) []byte {
 	copy(dropKey[1:], idxKey)
 	return dropKey
 }
+
 // maybeFinishDrops确定是否每个启用的索引都在被删除的过程中，并在被删除时完成删除。
 // maybeFinishDrops determines if each of the enabled indexes are in the middle
 // of being dropped and finishes dropping them when the are.  This is necessary
@@ -197,6 +202,7 @@ func (m *Manager) maybeFinishDrops(interrupt <-chan struct{}) error {
 
 	return nil
 }
+
 // maybeCreateIndexes确定是否已经创建了每个启用的索引，如果没有，则创建它们。
 // maybeCreateIndexes determines if each of the enabled indexes have already
 // been created and creates them if not.
@@ -226,6 +232,7 @@ func (m *Manager) maybeCreateIndexes(dbTx database.Tx) error {
 
 	return nil
 }
+
 //初始化启用的索引。
 // Init initializes the enabled indexes.  This is called during chain
 // initialization and primarily consists of catching up all indexes to the
@@ -457,6 +464,7 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 	log.Infof("Indexes caught up to height %d", bestHeight)
 	return nil
 }
+
 // indexneedsinput返回索引是否需要访问被索引的事务输入引用的txout。
 // indexNeedsInputs returns whether or not the index needs access to the txouts
 // referenced by the transaction inputs being indexed.
@@ -467,6 +475,7 @@ func indexNeedsInputs(index Indexer) bool {
 
 	return false
 }
+
 //dbFetchTx在事务索引中查找传递的事务散列，并从数据库加载它。
 // dbFetchTx looks up the passed transaction hash in the transaction index and
 // loads it from the database.
@@ -495,6 +504,7 @@ func dbFetchTx(dbTx database.Tx, hash *chainhash.Hash) (*wire.MsgTx, error) {
 
 	return &msgTx, nil
 }
+
 //当一个块扩展主链时，必须调用ConnectBlock。
 // ConnectBlock must be invoked when a block is extending the main chain.  It
 // keeps track of the state of each index it is managing, performs some sanity
@@ -514,6 +524,7 @@ func (m *Manager) ConnectBlock(dbTx database.Tx, block *btcutil.Block,
 	}
 	return nil
 }
+
 //当一个块从主链的末端断开时，必须调用DisconnectBlock。
 // DisconnectBlock must be invoked when a block is being disconnected from the
 // end of the main chain.  It keeps track of the state of each index it is
@@ -534,6 +545,7 @@ func (m *Manager) DisconnectBlock(dbTx database.Tx, block *btcutil.Block,
 	}
 	return nil
 }
+
 // NewManager返回启用了所提供的索引的新索引管理器。
 // NewManager returns a new index manager with the provided indexes enabled.
 //
@@ -545,6 +557,7 @@ func NewManager(db database.DB, enabledIndexes []Indexer) *Manager {
 		enabledIndexes: enabledIndexes,
 	}
 }
+
 // dropIndex从数据库中删除传递的索引。
 // dropIndex drops the passed index from the database.  Since indexes can be
 // massive, it deletes the index in multiple database transactions in order to

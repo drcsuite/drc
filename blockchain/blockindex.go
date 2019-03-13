@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/wire"
 )
 
 // 块状态是表示块的验证状态的位字段。
@@ -163,7 +163,6 @@ func (node *blockNode) Header() wire.BlockHeader {
 	}
 }
 
-
 // 祖先通过从这个节点向后跟踪链，返回提供高度的祖先块节点。当请求的高度在传递节点的高度之后或小于零时，返回的块将为nil。
 // Ancestor returns the ancestor block node at the provided height by following
 // the chain backwards from this node.  The returned block will be nil when a
@@ -193,6 +192,7 @@ func (node *blockNode) Ancestor(height int32) *blockNode {
 func (node *blockNode) RelativeAncestor(distance int32) *blockNode {
 	return node.Ancestor(node.height - distance)
 }
+
 // CalcPastMedianTime计算块节点之前的前几个块的中值时间。
 // CalcPastMedianTime calculates the median time of the previous few blocks
 // prior to, and including, the block node.
@@ -265,6 +265,7 @@ func newBlockIndex(db database.DB, chainParams *chaincfg.Params) *blockIndex {
 		dirty:       make(map[*blockNode]struct{}),
 	}
 }
+
 // 返回块索引是否包含所提供的散列。
 // HaveBlock returns whether or not the block index contains the provided hash.
 //

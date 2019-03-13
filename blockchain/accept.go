@@ -7,8 +7,8 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/database"
 )
 
 // 可能会接受一个区块进入区块链,如果接受，返回是否在主链上。它执行取决于它在区块链中的位置的几个验证检查

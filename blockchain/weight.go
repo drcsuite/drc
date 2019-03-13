@@ -7,9 +7,9 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/txscript"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -44,6 +44,7 @@ const (
 	// can be in a block of max weight size.
 	MaxOutputsPerBlock = MaxBlockWeight / MinTxOutputWeight
 )
+
 // GetBlockWeight计算给定块的权值度量。目前，权值度量只是块的序列化大小的和
 // GetBlockWeight computes the value of the weight metric for a given block.
 // Currently the weight metric is simply the sum of the block's serialized size
@@ -58,6 +59,7 @@ func GetBlockWeight(blk *btcutil.Block) int64 {
 	// (baseSize * 3) + totalSize
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
 }
+
 //GetTransactionWeight计算给定事务的权值度量。
 // GetTransactionWeight computes the value of the weight metric for a given
 // transaction. Currently the weight metric is simply the sum of the
@@ -73,6 +75,7 @@ func GetTransactionWeight(tx *btcutil.Tx) int64 {
 	// (baseSize * 3) + totalSize
 	return int64((baseSize * (WitnessScaleFactor - 1)) + totalSize)
 }
+
 // GetSigOpCost返回已传递事务的统一sig op成本，该事务涉及修改sig op成本计算的当前活动软分支。
 // GetSigOpCost returns the unified sig op cost for the passed transaction
 // respecting current active soft-forks which modified sig op cost counting.

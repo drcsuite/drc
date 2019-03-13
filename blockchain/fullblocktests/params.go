@@ -9,10 +9,11 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/wire"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/wire"
 )
+
 // newHashFromStr将传递的big-endian十六进制字符串转换为wire.Hash。
 // newHashFromStr converts the passed big-endian hex string into a
 // wire.Hash.  It only differs from the one available in chainhash in that

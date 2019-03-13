@@ -18,13 +18,13 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/btcsuite/btcd/blockchain"
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/drcsuite/drc/blockchain"
+	"github.com/drcsuite/drc/btcec"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/txscript"
+	"github.com/drcsuite/drc/wire"
 )
 
 const (
@@ -130,6 +130,7 @@ type ExpectedTip struct {
 
 // Ensure ExpectedTip implements the TestInstance interface.
 var _ TestInstance = ExpectedTip{}
+
 // FullBlockTestInstance只允许将ExpectedTip作为TestInstance处理。
 // FullBlockTestInstance only exists to allow ExpectedTip to be treated as a
 // TestInstance.
@@ -144,6 +145,7 @@ type RejectedNonCanonicalBlock struct {
 	RawBlock []byte
 	Height   int32
 }
+
 // FullBlockTestInstance只允许RejectedNonCanonicalBlock作为TestInstance来处理。
 // FullBlockTestInstance only exists to allow RejectedNonCanonicalBlock to be treated as
 // a TestInstance.
@@ -157,6 +159,7 @@ type spendableOut struct {
 	prevOut wire.OutPoint
 	amount  btcutil.Amount
 }
+
 // makeSpendableOutForTx返回给定事务的可使用输出和事务中的事务输出索引。
 // makeSpendableOutForTx returns a spendable output for the given transaction
 // and transaction output index within the transaction.
@@ -169,6 +172,7 @@ func makeSpendableOutForTx(tx *wire.MsgTx, txOutIndex uint32) spendableOut {
 		amount: btcutil.Amount(tx.TxOut[txOutIndex].Value),
 	}
 }
+
 // makeSpendableOut返回给定块的可使用输出、块中的事务索引和事务中的事务输出索引
 // makeSpendableOut returns a spendable output for the given block, transaction
 // index within the block, and transaction output index within the transaction.
@@ -195,6 +199,7 @@ type testGenerator struct {
 	// Common key for any tests which require signed transactions.
 	privKey *btcec.PrivateKey
 }
+
 //makeTestGenerator返回一个使用genesis块作为提示初始化的测试生成器实例。
 // makeTestGenerator returns a test generator instance initialized with the
 // genesis block as the tip.
@@ -213,6 +218,7 @@ func makeTestGenerator(params *chaincfg.Params) (testGenerator, error) {
 		privKey:      privKey,
 	}, nil
 }
+
 // payToScriptHashScript为提供的赎回脚本返回一个标准的payto -script散列。
 // payToScriptHashScript returns a standard pay-to-script-hash for the provided
 // redeem script.
@@ -226,6 +232,7 @@ func payToScriptHashScript(redeemScript []byte) []byte {
 	}
 	return script
 }
+
 // pushDataScript返回一个脚本，其中提供的项被单独推入堆栈。
 // pushDataScript returns a script with the provided items individually pushed
 // to the stack.
@@ -240,6 +247,7 @@ func pushDataScript(items ...[]byte) []byte {
 	}
 	return script
 }
+
 // standardCoinbaseScript返回一个适合用作新块coinbase事务的签名脚本的标准脚本。
 // standardCoinbaseScript returns a standard script suitable for use as the
 // signature script of the coinbase transaction of a new block.  In particular,
@@ -248,6 +256,7 @@ func standardCoinbaseScript(blockHeight int32, extraNonce uint64) ([]byte, error
 	return txscript.NewScriptBuilder().AddInt64(int64(blockHeight)).
 		AddInt64(int64(extraNonce)).Script()
 }
+
 // opReturnScript使用提供的数据返回一个可修剪的OP_RETURN脚本。
 // opReturnScript returns a provably-pruneable OP_RETURN script with the
 // provided data.
@@ -259,6 +268,7 @@ func opReturnScript(data []byte) []byte {
 	}
 	return script
 }
+
 // uniqueOpReturnScript返回一个标准的可证明可修剪的OP_RETURN脚本，该脚本的数据编码为随机uint64。
 // uniqueOpReturnScript returns a standard provably-pruneable OP_RETURN script
 // with a random uint64 encoded as the data.
@@ -272,6 +282,7 @@ func uniqueOpReturnScript() []byte {
 	binary.LittleEndian.PutUint64(data[0:8], rand)
 	return opReturnScript(data)
 }
+
 // createCoinbaseTx返回一个coinbase事务，该事务根据传递的块高度支付适当的补贴
 // createCoinbaseTx returns a coinbase transaction paying an appropriate
 // subsidy based on the passed block height.  The coinbase signature script
@@ -298,6 +309,7 @@ func (g *testGenerator) createCoinbaseTx(blockHeight int32) *wire.MsgTx {
 	})
 	return tx
 }
+
 // calcMerkleRoot从事务片创建一个merkle树，并返回树的根。
 // calcMerkleRoot creates a merkle tree from the slice of transactions and
 // returns the root of the tree.
@@ -313,6 +325,7 @@ func calcMerkleRoot(txns []*wire.MsgTx) chainhash.Hash {
 	merkles := blockchain.BuildMerkleTreeStore(utilTxns, false)
 	return *merkles[len(merkles)-1]
 }
+
 // solveBlock尝试查找一个nonce，该nonce使传递的块头哈希值小于目标难度。
 // solveBlock attempts to find a nonce which makes the passed block header hash
 // to a value less than the target difficulty.  When a successful solution is
@@ -378,6 +391,7 @@ func solveBlock(header *wire.BlockHeader) bool {
 
 	return false
 }
+
 // additionalCoinbase返回一个函数，该函数本身接受一个块，并通过将提供的金额添加到coinbase补贴中来修改它。
 // additionalCoinbase returns a function that itself takes a block and
 // modifies it by adding the provided amount to coinbase subsidy.
@@ -388,6 +402,7 @@ func additionalCoinbase(amount btcutil.Amount) func(*wire.MsgBlock) {
 		b.Transactions[0].TxOut[0].Value += int64(amount)
 	}
 }
+
 // additionalSpendFee返回一个函数，该函数本身接受一个块，并通过将提供的费用添加到支出事务中来修改它。
 // additionalSpendFee returns a function that itself takes a block and modifies
 // it by adding the provided fee to the spending transaction.
@@ -406,6 +421,7 @@ func additionalSpendFee(fee btcutil.Amount) func(*wire.MsgBlock) {
 		b.Transactions[1].TxOut[0].Value -= int64(fee)
 	}
 }
+
 // replaceSpendScript返回一个函数，该函数本身接受一个块，并通过替换支出事务的公钥脚本对其进行修改。
 // replaceSpendScript returns a function that itself takes a block and modifies
 // it by replacing the public key script of the spending transaction.
@@ -414,6 +430,7 @@ func replaceSpendScript(pkScript []byte) func(*wire.MsgBlock) {
 		b.Transactions[1].TxOut[0].PkScript = pkScript
 	}
 }
+
 // replaceCoinbaseSigScript返回一个函数，该函数本身接受一个块，并通过替换coinbase的签名键脚本对其进行修改。
 // replaceCoinbaseSigScript returns a function that itself takes a block and
 // modifies it by replacing the signature key script of the coinbase.
@@ -431,6 +448,7 @@ func additionalTx(tx *wire.MsgTx) func(*wire.MsgBlock) {
 		b.AddTransaction(tx)
 	}
 }
+
 // createSpendTx创建一个事务，该事务使用提供的可使用输出，并包含一个额外的惟一OP_RETURN输出，以确保事务以惟一的散列结束。
 // createSpendTx creates a transaction that spends from the provided spendable
 // output and includes an additional unique OP_RETURN output to ensure the
@@ -450,6 +468,7 @@ func createSpendTx(spend *spendableOut, fee btcutil.Amount) *wire.MsgTx {
 
 	return spendTx
 }
+
 // createSpendTxForTx创建一个事务，该事务使用提供的事务的第一个输出，并包含一个额外的惟一OP_RETURN输出，以确保事务以惟一的散列结束。
 // createSpendTxForTx creates a transaction that spends from the first output of
 // the provided transaction and includes an additional unique OP_RETURN output
@@ -460,6 +479,7 @@ func createSpendTxForTx(tx *wire.MsgTx, fee btcutil.Amount) *wire.MsgTx {
 	spend := makeSpendableOutForTx(tx, 0)
 	return createSpendTx(&spend, fee)
 }
+
 // nextBlock构建一个新块，该块扩展与生成器关联的当前提示，并将生成器的提示更新到新生成的块。
 // nextBlock builds a new block that extends the current tip associated with the
 // generator and updates the generator's tip to the newly generated block.
@@ -571,6 +591,7 @@ func (g *testGenerator) updateBlockState(oldBlockName string, oldBlockHash chain
 	g.blocksByName[newBlockName] = newBlock
 	g.blockHeights[newBlockName] = blockHeight
 }
+
 // setTip使用提供的名称将实例的提示更改为块。
 // setTip changes the tip of the instance to the block with the provided name.
 // This is useful since the tip is used for things such as generating subsequent
@@ -580,6 +601,7 @@ func (g *testGenerator) setTip(blockName string) {
 	g.tipName = blockName
 	g.tipHeight = g.blockHeights[blockName]
 }
+
 // oldestCoinbaseOuts删除先前保存到生成器中的最老的coinbase输出，并将该集作为一个片返回。
 // oldestCoinbaseOuts removes the oldest coinbase output that was previously
 // saved to the generator and returns the set as a slice.
@@ -588,6 +610,7 @@ func (g *testGenerator) oldestCoinbaseOut() spendableOut {
 	g.spendableOuts = g.spendableOuts[1:]
 	return op
 }
+
 // saveTipCoinbaseOut将当前tip块中的coinbase tx输出添加到可使用输出列表中。
 // saveTipCoinbaseOut adds the coinbase tx output in the current tip block to
 // the list of spendable outputs.
@@ -595,6 +618,7 @@ func (g *testGenerator) saveTipCoinbaseOut() {
 	g.spendableOuts = append(g.spendableOuts, makeSpendableOut(g.tip, 0, 0))
 	g.prevCollectedHash = g.tip.BlockHash()
 }
+
 // saveSpendableCoinbaseOuts将来自上一个块的coinbase tx输出的所有coinbase输出添加到当前提示中。
 // saveSpendableCoinbaseOuts adds all coinbase outputs from the last block that
 // had its coinbase tx output colleted to the current tip.  This is useful to
@@ -621,6 +645,7 @@ func (g *testGenerator) saveSpendableCoinbaseOuts() {
 		g.saveTipCoinbaseOut()
 	}
 }
+
 // nonCanonicalVarInt返回一个用9字节编码的可变长度编码整数，即使它可以用最小的规范编码进行编码。
 // nonCanonicalVarInt return a variable-length encoded integer that is encoded
 // with 9 bytes even though it could be encoded with a minimal canonical
@@ -631,6 +656,7 @@ func nonCanonicalVarInt(val uint32) []byte {
 	binary.LittleEndian.PutUint64(rv[1:], uint64(val))
 	return rv[:]
 }
+
 // encodeNonCanonicalBlock以一种非规范的方式序列化数据块，它使用一个带有9字节的可变长度编码整数来编码事务的数量，即使它应该使用最小的规范编码来编码。
 // encodeNonCanonicalBlock serializes the block in a non-canonical way by
 // encoding the number of transactions using a variable-length encoded integer
@@ -645,6 +671,7 @@ func encodeNonCanonicalBlock(b *wire.MsgBlock) []byte {
 	}
 	return buf.Bytes()
 }
+
 // cloneBlock返回提供的块的深度副本。
 // cloneBlock returns a deep copy of the provided block.
 func cloneBlock(b *wire.MsgBlock) wire.MsgBlock {
@@ -655,12 +682,14 @@ func cloneBlock(b *wire.MsgBlock) wire.MsgBlock {
 	}
 	return blockCopy
 }
+
 // repeatOpcode返回一个字节片，其中提供的操作码重复指定的次数。
 // repeatOpcode returns a byte slice with the provided opcode repeated the
 // specified number of times.
 func repeatOpcode(opcode uint8, numRepeats int) []byte {
 	return bytes.Repeat([]byte{opcode}, numRepeats)
 }
+
 // assertScriptSigOpsCount如果提供的脚本没有指定数量的签名操作，则会出现恐慌。
 // assertScriptSigOpsCount panics if the provided script does not have the
 // specified number of signature operations.
@@ -673,6 +702,7 @@ func assertScriptSigOpsCount(script []byte, expected int) {
 			file, line, numSigOps, expected))
 	}
 }
+
 // countBlockSigOps返回传递的块中的脚本中的遗留签名操作的数量。
 // countBlockSigOps returns the number of legacy signature operations in the
 // scripts in the passed block.
@@ -691,6 +721,7 @@ func countBlockSigOps(block *wire.MsgBlock) int {
 
 	return totalSigOps
 }
+
 // assertTipBlockSigOpsCount如果与生成器关联的当前tip块没有指定数量的签名操作，则会出现恐慌。
 // assertTipBlockSigOpsCount panics if the current tip block associated with the
 // generator does not have the specified number of signature operations.
@@ -702,6 +733,7 @@ func (g *testGenerator) assertTipBlockSigOpsCount(expected int) {
 			g.tipHeight, numSigOps, expected))
 	}
 }
+
 // 如果与生成器关联的当前提示块在序列化时没有指定的大小，则assertTipBlockSize会引起恐慌。
 // assertTipBlockSize panics if the if the current tip block associated with the
 // generator does not have the specified size when serialized.
@@ -713,6 +745,7 @@ func (g *testGenerator) assertTipBlockSize(expected int) {
 			serializeSize, expected))
 	}
 }
+
 // 如果与生成器关联的当前提示块在序列化时没有指定的非规范大小，则assertTipNonCanonicalBlockSize会引起恐慌。
 // assertTipNonCanonicalBlockSize panics if the if the current tip block
 // associated with the generator does not have the specified non-canonical size
@@ -725,6 +758,7 @@ func (g *testGenerator) assertTipNonCanonicalBlockSize(expected int) {
 			serializeSize, expected))
 	}
 }
+
 // assertTipBlockNumTxns如果与生成器关联的当前tip块中的事务数与指定值不匹配，则会出现恐慌。
 // assertTipBlockNumTxns panics if the number of transactions in the current tip
 // block associated with the generator does not match the specified value.
@@ -736,6 +770,7 @@ func (g *testGenerator) assertTipBlockNumTxns(expected int) {
 			numTxns, expected))
 	}
 }
+
 // 如果与生成器关联的当前提示块与指定的散列不匹配，则assertTipBlockHash会感到恐慌。
 // assertTipBlockHash panics if the current tip block associated with the
 // generator does not match the specified hash.
@@ -747,6 +782,7 @@ func (g *testGenerator) assertTipBlockHash(expected chainhash.Hash) {
 			expected))
 	}
 }
+
 // assertTipBlockMerkleRoot如果与生成器关联的当前tip块头部的merkle根不匹配指定的散列，则会感到恐慌。
 // assertTipBlockMerkleRoot panics if the merkle root in header of the current
 // tip block associated with the generator does not match the specified hash.
@@ -758,6 +794,7 @@ func (g *testGenerator) assertTipBlockMerkleRoot(expected chainhash.Hash) {
 			expected))
 	}
 }
+
 // assertTipBlockTxOutOpReturn如果与生成器关联的当前tip块在提供的tx索引和输出索引上没有事务输出的OP_RETURN脚本，则会出现恐慌。
 // assertTipBlockTxOutOpReturn panics if the current tip block associated with
 // the generator does not have an OP_RETURN script for the transaction output at
@@ -783,6 +820,7 @@ func (g *testGenerator) assertTipBlockTxOutOpReturn(txIndex, txOutIndex uint32) 
 			g.tipName, g.tipHeight))
 	}
 }
+
 // Generate返回一个测试片段，该测试片段可用于执行一致性验证规则。
 // Generate returns a slice of tests that can be used to exercise the consensus
 // validation rules.  The tests are intended to be flexible enough to allow both
