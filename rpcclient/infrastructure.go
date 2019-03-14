@@ -23,9 +23,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/btcsuite/go-socks/socks"
-	"github.com/btcsuite/websocket"
 	"github.com/drcsuite/drc/btcjson"
+	"github.com/drcsuite/drc/go-socks/socks"
+	"github.com/drcsuite/drc/websocket"
 )
 
 var (

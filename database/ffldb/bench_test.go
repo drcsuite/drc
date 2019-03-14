@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/btcsuite/btcutil"
 	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/database"
+	"github.com/drcsuite/drc/drcutil"
 )
 
 // BenchmarkBlockHeader benchmarks how long it takes to load the mainnet genesis
@@ -28,7 +28,7 @@ func BenchmarkBlockHeader(b *testing.B) {
 	defer os.RemoveAll(dbPath)
 	defer db.Close()
 	err = db.Update(func(tx database.Tx) error {
-		block := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+		block := drcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
 		return tx.StoreBlock(block)
 	})
 	if err != nil {
@@ -69,7 +69,7 @@ func BenchmarkBlock(b *testing.B) {
 	defer os.RemoveAll(dbPath)
 	defer db.Close()
 	err = db.Update(func(tx database.Tx) error {
-		block := btcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
+		block := drcutil.NewBlock(chaincfg.MainNetParams.GenesisBlock)
 		return tx.StoreBlock(block)
 	})
 	if err != nil {

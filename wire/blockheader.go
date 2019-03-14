@@ -17,6 +17,7 @@ import (
 // PrevBlock and MerkleRoot hashes.
 const MaxBlockHeaderPayload = 16 + (chainhash.HashSize * 2)
 
+// 209字节
 // BlockHeader defines information about a block and is used in the bitcoin
 // block (MsgBlock) and headers (MsgHeaders) messages.
 type BlockHeader struct {
@@ -34,10 +35,20 @@ type BlockHeader struct {
 	Timestamp time.Time
 
 	// Difficulty target for the block.
-	Bits uint32
+	//Bits uint32
+	// 发块签名
+	Signature chainhash.Hash64
 
 	// Nonce used to generate the block.
-	Nonce uint32
+	//Nonce uint32
+	// 发块公钥
+	PublicKey chainhash.Hash65
+
+	// 全网估算节点
+	scale uint16
+
+	// 保留字段
+	reserved uint16
 }
 
 // blockHeaderLen is a constant that represents the number of bytes for a block

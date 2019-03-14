@@ -14,7 +14,6 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/goleveldb/leveldb"
 	"github.com/btcsuite/goleveldb/leveldb/comparer"
 	ldberrors "github.com/btcsuite/goleveldb/leveldb/errors"
@@ -25,6 +24,7 @@ import (
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/database"
 	"github.com/drcsuite/drc/database/internal/treap"
+	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/wire"
 )
 
@@ -1146,7 +1146,7 @@ func (tx *transaction) hasBlock(hash *chainhash.Hash) bool {
 //   - ErrTxClosed if the transaction has already been closed
 //
 // This function is part of the database.Tx interface implementation.
-func (tx *transaction) StoreBlock(block *btcutil.Block) error {
+func (tx *transaction) StoreBlock(block *drcutil.Block) error {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
 		return err

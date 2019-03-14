@@ -5,8 +5,8 @@
 package mining
 
 import (
-	"github.com/btcsuite/btcutil"
 	"github.com/drcsuite/drc/blockchain"
+	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/wire"
 )
 
@@ -44,7 +44,7 @@ type Policy struct {
 	// TxMinFreeFee is the minimum fee in Satoshi/1000 bytes that is
 	// required for a transaction to be treated as free for mining purposes
 	// (block template generation).
-	TxMinFreeFee btcutil.Amount
+	TxMinFreeFee drcutil.Amount
 }
 
 // minInt is a helper function to return the minimum of two ints.  This avoids
