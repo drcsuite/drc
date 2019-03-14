@@ -34,20 +34,24 @@ func (hash Hash) String() string {
 	return hex.EncodeToString(hash[:])
 }
 
-type Hash64 [64]byte
+const Hash64Size = 64
+
+type Hash64 [Hash64Size]byte
 
 func (hash Hash64) String() string {
-	for i := 0; i < HashSize/2; i++ {
-		hash[i], hash[HashSize-1-i] = hash[HashSize-1-i], hash[i]
+	for i := 0; i < Hash64Size/2; i++ {
+		hash[i], hash[Hash64Size-1-i] = hash[Hash64Size-1-i], hash[i]
 	}
 	return hex.EncodeToString(hash[:])
 }
 
-type Hash65 [65]byte
+const Hash65Size = 65
+
+type Hash65 [Hash65Size]byte
 
 func (hash Hash65) String() string {
-	for i := 0; i < HashSize/2; i++ {
-		hash[i], hash[HashSize-1-i] = hash[HashSize-1-i], hash[i]
+	for i := 0; i < Hash65Size/2; i++ {
+		hash[i], hash[Hash65Size-1-i] = hash[Hash65Size-1-i], hash[i]
 	}
 	return hex.EncodeToString(hash[:])
 }

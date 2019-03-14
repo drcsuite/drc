@@ -192,6 +192,20 @@ func readElement(r io.Reader, element interface{}) error {
 	// Attempt to read the element based on the concrete type via fast
 	// type assertions first.
 	switch e := element.(type) {
+	case *int16:
+		rv, err := binarySerializer.Uint16(r, littleEndian)
+		if err != nil {
+			return err
+		}
+		*e = int16(rv)
+		return nil
+	case *uint16:
+		rv, err := binarySerializer.Uint16(r, littleEndian)
+		if err != nil {
+			return err
+		}
+		*e = uint16(rv)
+		return nil
 	case *int32:
 		rv, err := binarySerializer.Uint32(r, littleEndian)
 		if err != nil {
@@ -284,7 +298,18 @@ func readElement(r io.Reader, element interface{}) error {
 			return err
 		}
 		return nil
-
+	case *chainhash.Hash64:
+		_, err := io.ReadFull(r, e[:])
+		if err != nil {
+			return err
+		}
+		return nil
+	case *chainhash.Hash65:
+		_, err := io.ReadFull(r, e[:])
+		if err != nil {
+			return err
+		}
+		return nil
 	case *ServiceFlag:
 		rv, err := binarySerializer.Uint64(r, littleEndian)
 		if err != nil {
@@ -349,6 +374,18 @@ func writeElement(w io.Writer, element interface{}) error {
 	// Attempt to write the element based on the concrete type via fast
 	// type assertions first.
 	switch e := element.(type) {
+	case int16:
+		err := binarySerializer.PutUint16(w, littleEndian, uint16(e))
+		if err != nil {
+			return err
+		}
+		return nil
+	case uint16:
+		err := binarySerializer.PutUint16(w, littleEndian, e)
+		if err != nil {
+			return err
+		}
+		return nil
 	case int32:
 		err := binarySerializer.PutUint32(w, littleEndian, uint32(e))
 		if err != nil {
@@ -414,6 +451,20 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 
 	case *chainhash.Hash:
+		_, err := w.Write(e[:])
+		if err != nil {
+			return err
+		}
+		return nil
+
+	case *chainhash.Hash64:
+		_, err := w.Write(e[:])
+		if err != nil {
+			return err
+		}
+		return nil
+
+	case *chainhash.Hash65:
 		_, err := w.Write(e[:])
 		if err != nil {
 			return err
@@ -689,4 +740,12 @@ func randomUint64(r io.Reader) (uint64, error) {
 // RandomUint64 returns a cryptographically random uint64 value.
 func RandomUint64() (uint64, error) {
 	return randomUint64(rand.Reader)
+}
+
+func ChangeCode() {
+	fmt.Println("此处已修改")
+}
+
+func TestChangeCode() {
+	fmt.Println("此处已修改")
 }

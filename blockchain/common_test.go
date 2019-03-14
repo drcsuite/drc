@@ -370,14 +370,16 @@ func newFakeChain(params *chaincfg.Params) *BlockChain {
 	}
 }
 
+// newFakeNode创建一个块节点，该节点连接到已传递的父节点，并填充所提供的字段和其他字段的伪值。
 // newFakeNode creates a block node connected to the passed parent with the
 // provided fields populated and fake values for the other fields.
 func newFakeNode(parent *blockNode, blockVersion int32, bits uint32, timestamp time.Time) *blockNode {
+	wire.ChangeCode()
 	// Make up a header and create a block node from it.
 	header := &wire.BlockHeader{
 		Version:   blockVersion,
 		PrevBlock: parent.hash,
-		Bits:      bits,
+		//Bits:      bits,
 		Timestamp: timestamp,
 	}
 	return newBlockNode(header, parent)

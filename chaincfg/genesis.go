@@ -73,6 +73,11 @@ var genesisMerkleRoot = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet 
 	0x3a, 0x9f, 0xb8, 0xaa, 0x4b, 0x1e, 0x5e, 0x4a,
 })
 
+func change1() {
+	wire.ChangeCode()
+}
+
+// genesisBlock定义了区块链的genesis区块，它作为主网络的公共事务分类账。
 // genesisBlock defines the genesis block of the block chain which serves as the
 // public transaction ledger for the main network.
 var genesisBlock = wire.MsgBlock{
@@ -81,8 +86,8 @@ var genesisBlock = wire.MsgBlock{
 		PrevBlock:  chainhash.Hash{},         // 0000000000000000000000000000000000000000000000000000000000000000
 		MerkleRoot: genesisMerkleRoot,        // 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
 		Timestamp:  time.Unix(0x495fab29, 0), // 2009-01-03 18:15:05 +0000 UTC
-		Bits:       0x1d00ffff,               // 486604799 [00000000ffff0000000000000000000000000000000000000000000000000000]
-		Nonce:      0x7c2bac1d,               // 2083236893
+		//Bits:       0x1d00ffff,               // 486604799 [00000000ffff0000000000000000000000000000000000000000000000000000]
+		//Nonce:      0x7c2bac1d,               // 2083236893
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
@@ -101,6 +106,10 @@ var regTestGenesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet
 // the main network.
 var regTestGenesisMerkleRoot = genesisMerkleRoot
 
+func chnage2() {
+	wire.ChangeCode()
+}
+
 // regTestGenesisBlock defines the genesis block of the block chain which serves
 // as the public transaction ledger for the regression test network.
 var regTestGenesisBlock = wire.MsgBlock{
@@ -109,8 +118,8 @@ var regTestGenesisBlock = wire.MsgBlock{
 		PrevBlock:  chainhash.Hash{},         // 0000000000000000000000000000000000000000000000000000000000000000
 		MerkleRoot: regTestGenesisMerkleRoot, // 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
 		Timestamp:  time.Unix(1296688602, 0), // 2011-02-02 23:16:42 +0000 UTC
-		Bits:       0x207fffff,               // 545259519 [7fffff0000000000000000000000000000000000000000000000000000000000]
-		Nonce:      2,
+		//Bits:       0x207fffff,               // 545259519 [7fffff0000000000000000000000000000000000000000000000000000000000]
+		//Nonce:      2,
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
@@ -129,6 +138,10 @@ var testNet3GenesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go ve
 // for the main network.
 var testNet3GenesisMerkleRoot = genesisMerkleRoot
 
+func change3() {
+	wire.ChangeCode()
+}
+
 // testNet3GenesisBlock defines the genesis block of the block chain which
 // serves as the public transaction ledger for the test network (version 3).
 var testNet3GenesisBlock = wire.MsgBlock{
@@ -137,8 +150,8 @@ var testNet3GenesisBlock = wire.MsgBlock{
 		PrevBlock:  chainhash.Hash{},          // 0000000000000000000000000000000000000000000000000000000000000000
 		MerkleRoot: testNet3GenesisMerkleRoot, // 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
 		Timestamp:  time.Unix(1296688602, 0),  // 2011-02-02 23:16:42 +0000 UTC
-		Bits:       0x1d00ffff,                // 486604799 [00000000ffff0000000000000000000000000000000000000000000000000000]
-		Nonce:      0x18aea41a,                // 414098458
+		//Bits:       0x1d00ffff,                // 486604799 [00000000ffff0000000000000000000000000000000000000000000000000000]
+		//Nonce:      0x18aea41a,                // 414098458
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
@@ -157,6 +170,10 @@ var simNetGenesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet 
 // the main network.
 var simNetGenesisMerkleRoot = genesisMerkleRoot
 
+func change4() {
+	wire.ChangeCode()
+}
+
 // simNetGenesisBlock defines the genesis block of the block chain which serves
 // as the public transaction ledger for the simulation test network.
 var simNetGenesisBlock = wire.MsgBlock{
@@ -165,8 +182,8 @@ var simNetGenesisBlock = wire.MsgBlock{
 		PrevBlock:  chainhash.Hash{},         // 0000000000000000000000000000000000000000000000000000000000000000
 		MerkleRoot: simNetGenesisMerkleRoot,  // 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
 		Timestamp:  time.Unix(1401292357, 0), // 2014-05-28 15:52:37 +0000 UTC
-		Bits:       0x207fffff,               // 545259519 [7fffff0000000000000000000000000000000000000000000000000000000000]
-		Nonce:      2,
+		//Bits:       0x207fffff,               // 545259519 [7fffff0000000000000000000000000000000000000000000000000000000000]
+		//Nonce:      2,
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }

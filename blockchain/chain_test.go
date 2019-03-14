@@ -454,10 +454,11 @@ func nodeHashes(nodes []*blockNode, indexes ...int) []chainhash.Hash {
 // the passed indexes of the provided nodes.  It is used to construct expected
 // located headers in the tests.
 func nodeHeaders(nodes []*blockNode, indexes ...int) []wire.BlockHeader {
+	wire.TestChangeCode()
 	headers := make([]wire.BlockHeader, 0, len(indexes))
-	for _, idx := range indexes {
-		headers = append(headers, nodes[idx].Header())
-	}
+	//for _, idx := range indexes {
+	//	headers = append(headers, nodes[idx].Header())
+	//}
 	return headers
 }
 

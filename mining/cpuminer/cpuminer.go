@@ -206,6 +206,7 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 // new transactions and enough time has elapsed without finding a solution.
 func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 	ticker *time.Ticker, quit chan struct{}) bool {
+	wire.ChangeCode()
 
 	// Choose a random extra nonce offset for this block template and
 	// worker.
@@ -218,7 +219,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 
 	// Create some convenience variables.
 	header := &msgBlock.Header
-	targetDifficulty := blockchain.CompactToBig(header.Bits)
+	//targetDifficulty := blockchain.CompactToBig(header.Bits)
 
 	// Initial state.
 	lastGenerated := time.Now()
@@ -273,16 +274,16 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 			// hash is actually a double sha256 (two hashes), so
 			// increment the number of hashes completed for each
 			// attempt accordingly.
-			header.Nonce = i
-			hash := header.BlockHash()
-			hashesCompleted += 2
+			//header.Nonce = i
+			//hash := header.BlockHash()
+			//hashesCompleted += 2
 
 			// The block is solved when the new block hash is less
 			// than the target difficulty.  Yay!
-			if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
-				m.updateHashes <- hashesCompleted
-				return true
-			}
+			//if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
+			//	m.updateHashes <- hashesCompleted
+			//return true
+			//}
 		}
 	}
 

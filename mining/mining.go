@@ -843,11 +843,12 @@ mempoolLoop:
 	// Calculate the required difficulty for the block.  The timestamp
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
+	wire.ChangeCode()
 	ts := medianAdjustedTime(best, g.timeSource)
-	reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
-	if err != nil {
-		return nil, err
-	}
+	//reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	// Calculate the next expected block version based on the state of the
 	// rule change deployments.
@@ -864,7 +865,7 @@ mempoolLoop:
 		PrevBlock:  best.Hash,
 		MerkleRoot: *merkles[len(merkles)-1],
 		Timestamp:  ts,
-		Bits:       reqDifficulty,
+		//Bits:       reqDifficulty,
 	}
 	for _, tx := range blockTxns {
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {
@@ -881,10 +882,10 @@ mempoolLoop:
 		return nil, err
 	}
 
-	log.Debugf("Created new block template (%d transactions, %d in "+
-		"fees, %d signature operations cost, %d weight, target difficulty "+
-		"%064x)", len(msgBlock.Transactions), totalFees, blockSigOpCost,
-		blockWeight, blockchain.CompactToBig(msgBlock.Header.Bits))
+	//log.Debugf("Created new block template (%d transactions, %d in "+
+	//	"fees, %d signature operations cost, %d weight, target difficulty "+
+	//	"%064x)", len(msgBlock.Transactions), totalFees, blockSigOpCost,
+	//	blockWeight, blockchain.CompactToBig(msgBlock.Header.Bits))
 
 	return &BlockTemplate{
 		Block:             &msgBlock,
@@ -906,16 +907,17 @@ func (g *BlkTmplGenerator) UpdateBlockTime(msgBlock *wire.MsgBlock) error {
 	// The new timestamp is potentially adjusted to ensure it comes after
 	// the median time of the last several blocks per the chain consensus
 	// rules.
+	wire.ChangeCode()
 	newTime := medianAdjustedTime(g.chain.BestSnapshot(), g.timeSource)
 	msgBlock.Header.Timestamp = newTime
 
 	// Recalculate the difficulty if running on a network that requires it.
 	if g.chainParams.ReduceMinDifficulty {
-		difficulty, err := g.chain.CalcNextRequiredDifficulty(newTime)
-		if err != nil {
-			return err
-		}
-		msgBlock.Header.Bits = difficulty
+		//difficulty, err := g.chain.CalcNextRequiredDifficulty(newTime)
+		//if err != nil {
+		//	return err
+		//}
+		//msgBlock.Header.Bits = difficulty
 	}
 
 	return nil

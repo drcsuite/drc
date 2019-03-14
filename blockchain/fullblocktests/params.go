@@ -39,6 +39,10 @@ func fromHex(s string) []byte {
 	return r
 }
 
+func change1() {
+	wire.ChangeCode()
+}
+
 var (
 	// bigOne is 1 represented as a big.Int.  It is defined here to avoid
 	// the overhead of creating it multiple times.
@@ -56,8 +60,8 @@ var (
 			PrevBlock:  *newHashFromStr("0000000000000000000000000000000000000000000000000000000000000000"),
 			MerkleRoot: *newHashFromStr("4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"),
 			Timestamp:  time.Unix(1296688602, 0), // 2011-02-02 23:16:42 +0000 UTC
-			Bits:       0x207fffff,               // 545259519 [7fffff0000000000000000000000000000000000000000000000000000000000]
-			Nonce:      2,
+			//Bits:       0x207fffff,               // 545259519 [7fffff0000000000000000000000000000000000000000000000000000000000]
+			//Nonce:      2,
 		},
 		Transactions: []*wire.MsgTx{{
 			Version: 1,

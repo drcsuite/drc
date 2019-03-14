@@ -336,6 +336,7 @@ func calcMerkleRoot(txns []*wire.MsgTx) chainhash.Hash {
 // so the 'nextBlock' function can properly detect when a nonce was modified by
 // a munge function.
 func solveBlock(header *wire.BlockHeader) bool {
+	wire.ChangeCode()
 	// sbResult is used by the solver goroutines to send results.
 	type sbResult struct {
 		found bool
@@ -344,7 +345,7 @@ func solveBlock(header *wire.BlockHeader) bool {
 
 	// solver accepts a block header and a nonce range to test. It is
 	// intended to be run as a goroutine.
-	targetDifficulty := blockchain.CompactToBig(header.Bits)
+	//targetDifficulty := blockchain.CompactToBig(header.Bits)
 	quit := make(chan bool)
 	results := make(chan sbResult)
 	solver := func(hdr wire.BlockHeader, startNonce, stopNonce uint32) {
@@ -355,14 +356,14 @@ func solveBlock(header *wire.BlockHeader) bool {
 			case <-quit:
 				return
 			default:
-				hdr.Nonce = i
-				hash := hdr.BlockHash()
-				if blockchain.HashToBig(&hash).Cmp(
-					targetDifficulty) <= 0 {
-
-					results <- sbResult{true, i}
-					return
-				}
+				//hdr.Nonce = i
+				//hash := hdr.BlockHash()
+				//if blockchain.HashToBig(&hash).Cmp(
+				//	targetDifficulty) <= 0 {
+				//
+				//	results <- sbResult{true, i}
+				//	return
+				//}
 			}
 		}
 		results <- sbResult{false, 0}
@@ -384,7 +385,7 @@ func solveBlock(header *wire.BlockHeader) bool {
 		result := <-results
 		if result.found {
 			close(quit)
-			header.Nonce = result.nonce
+			//header.Nonce = result.nonce
 			return true
 		}
 	}
@@ -530,14 +531,15 @@ func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, mungers
 		ts = g.tip.Header.Timestamp.Add(time.Second)
 	}
 
+	wire.ChangeCode()
 	block := wire.MsgBlock{
 		Header: wire.BlockHeader{
 			Version:    1,
 			PrevBlock:  g.tip.BlockHash(),
 			MerkleRoot: calcMerkleRoot(txns),
-			Bits:       g.params.PowLimitBits,
-			Timestamp:  ts,
-			Nonce:      0, // To be solved.
+			//Bits:       g.params.PowLimitBits,
+			Timestamp: ts,
+			//Nonce:      0, // To be solved.
 		},
 		Transactions: txns,
 	}
@@ -545,7 +547,7 @@ func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, mungers
 	// Perform any block munging just before solving.  Only recalculate the
 	// merkle root if it wasn't manually changed by a munge function.
 	curMerkleRoot := block.Header.MerkleRoot
-	curNonce := block.Header.Nonce
+	//curNonce := block.Header.Nonce
 	for _, f := range mungers {
 		f(&block)
 	}
@@ -555,10 +557,10 @@ func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, mungers
 
 	// Only solve the block if the nonce wasn't manually changed by a munge
 	// function.
-	if block.Header.Nonce == curNonce && !solveBlock(&block.Header) {
-		panic(fmt.Sprintf("Unable to solve block at height %d",
-			nextHeight))
-	}
+	//if block.Header.Nonce == curNonce && !solveBlock(&block.Header) {
+	//	panic(fmt.Sprintf("Unable to solve block at height %d",
+	//		nextHeight))
+	//}
 
 	// Update generator state and return the block.
 	blockHash := block.BlockHash()
@@ -1470,6 +1472,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	})
 	rejected(blockchain.ErrNoTransactions)
 
+	wire.ChangeCode()
 	// Create block with invalid proof of work.
 	//
 	//   ... -> b43(13)
@@ -1484,7 +1487,8 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		for {
 			// Keep incrementing the nonce until the hash treated as
 			// a uint256 is higher than the limit.
-			b46.Header.Nonce++
+
+			//b46.Header.Nonce++
 			blockHash := b46.BlockHash()
 			hashNum := blockchain.HashToBig(&blockHash)
 			if hashNum.Cmp(g.params.PowLimit) >= 0 {
@@ -1522,8 +1526,11 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//   ... -> b43(13)
 	//                 \-> b49(14)
 	g.setTip("b43")
+	wire.ChangeCode()
 	g.nextBlock("b49", outs[14], func(b *wire.MsgBlock) {
-		b.Header.Bits--
+
+		//b.Header.Bits--
+
 	})
 	rejected(blockchain.ErrUnexpectedDifficulty)
 
@@ -1538,7 +1545,9 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	// involves an unsolvable block.
 	{
 		origHash := b49a.BlockHash()
-		b49a.Header.Bits = 0x01810000 // -1 in compact form.
+
+		//b49a.Header.Bits = 0x01810000 // -1 in compact form.
+
 		g.updateBlockState("b49a", origHash, "b49a", b49a)
 	}
 	rejected(blockchain.ErrUnexpectedDifficulty)

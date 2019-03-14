@@ -346,27 +346,28 @@ func BenchmarkSerializeTx(b *testing.B) {
 // BenchmarkReadBlockHeader performs a benchmark on how long it takes to
 // deserialize a block header.
 func BenchmarkReadBlockHeader(b *testing.B) {
-	buf := []byte{
-		0x01, 0x00, 0x00, 0x00, // Version 1
-		0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
-		0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
-		0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
-		0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, // PrevBlock
-		0x3b, 0xa3, 0xed, 0xfd, 0x7a, 0x7b, 0x12, 0xb2,
-		0x7a, 0xc7, 0x2c, 0x3e, 0x67, 0x76, 0x8f, 0x61,
-		0x7f, 0xc8, 0x1b, 0xc3, 0x88, 0x8a, 0x51, 0x32,
-		0x3a, 0x9f, 0xb8, 0xaa, 0x4b, 0x1e, 0x5e, 0x4a, // MerkleRoot
-		0x29, 0xab, 0x5f, 0x49, // Timestamp
-		0xff, 0xff, 0x00, 0x1d, // Bits
-		0xf3, 0xe0, 0x01, 0x00, // Nonce
-		0x00, // TxnCount Varint
-	}
-	r := bytes.NewReader(buf)
-	var header BlockHeader
-	for i := 0; i < b.N; i++ {
-		r.Seek(0, 0)
-		readBlockHeader(r, 0, &header)
-	}
+	TestChangeCode()
+	//buf := []byte{
+	//	0x01, 0x00, 0x00, 0x00, // Version 1
+	//	0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
+	//	0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
+	//	0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
+	//	0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, // PrevBlock
+	//	0x3b, 0xa3, 0xed, 0xfd, 0x7a, 0x7b, 0x12, 0xb2,
+	//	0x7a, 0xc7, 0x2c, 0x3e, 0x67, 0x76, 0x8f, 0x61,
+	//	0x7f, 0xc8, 0x1b, 0xc3, 0x88, 0x8a, 0x51, 0x32,
+	//	0x3a, 0x9f, 0xb8, 0xaa, 0x4b, 0x1e, 0x5e, 0x4a, // MerkleRoot
+	//	0x29, 0xab, 0x5f, 0x49, // Timestamp
+	//	0xff, 0xff, 0x00, 0x1d, // Bits
+	//	0xf3, 0xe0, 0x01, 0x00, // Nonce
+	//	0x00, // TxnCount Varint
+	//}
+	//r := bytes.NewReader(buf)
+	//var header BlockHeader
+	//for i := 0; i < b.N; i++ {
+	//	r.Seek(0, 0)
+	//	readBlockHeader(r, 0, &header)
+	//}
 }
 
 // BenchmarkWriteBlockHeader performs a benchmark on how long it takes to
@@ -411,31 +412,32 @@ func BenchmarkDecodeGetHeaders(b *testing.B) {
 // BenchmarkDecodeHeaders performs a benchmark on how long it takes to
 // decode a headers message with the maximum number of headers.
 func BenchmarkDecodeHeaders(b *testing.B) {
-	// Create a message with the maximum number of headers.
-	pver := ProtocolVersion
-	var m MsgHeaders
-	for i := 0; i < MaxBlockHeadersPerMsg; i++ {
-		hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", i))
-		if err != nil {
-			b.Fatalf("NewHashFromStr: unexpected error: %v", err)
-		}
-		m.AddBlockHeader(NewBlockHeader(1, hash, hash, 0, uint32(i)))
-	}
-
-	// Serialize it so the bytes are available to test the decode below.
-	var bb bytes.Buffer
-	if err := m.BtcEncode(&bb, pver, LatestEncoding); err != nil {
-		b.Fatalf("MsgHeaders.BtcEncode: unexpected error: %v", err)
-	}
-	buf := bb.Bytes()
-
-	r := bytes.NewReader(buf)
-	var msg MsgHeaders
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		r.Seek(0, 0)
-		msg.BtcDecode(r, pver, LatestEncoding)
-	}
+	TestChangeCode()
+	//	// Create a message with the maximum number of headers.
+	//	pver := ProtocolVersion
+	//	var m MsgHeaders
+	//	for i := 0; i < MaxBlockHeadersPerMsg; i++ {
+	//		hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", i))
+	//		if err != nil {
+	//			b.Fatalf("NewHashFromStr: unexpected error: %v", err)
+	//		}
+	//		m.AddBlockHeader(NewBlockHeader(1, hash, hash, 0, uint32(i)))
+	//	}
+	//
+	//	// Serialize it so the bytes are available to test the decode below.
+	//	var bb bytes.Buffer
+	//	if err := m.BtcEncode(&bb, pver, LatestEncoding); err != nil {
+	//		b.Fatalf("MsgHeaders.BtcEncode: unexpected error: %v", err)
+	//	}
+	//	buf := bb.Bytes()
+	//
+	//	r := bytes.NewReader(buf)
+	//	var msg MsgHeaders
+	//	b.ResetTimer()
+	//	for i := 0; i < b.N; i++ {
+	//		r.Seek(0, 0)
+	//		msg.BtcDecode(r, pver, LatestEncoding)
+	//	}
 }
 
 // BenchmarkDecodeGetBlocks performs a benchmark on how long it takes to
@@ -558,39 +560,40 @@ func BenchmarkDecodeNotFound(b *testing.B) {
 // BenchmarkDecodeMerkleBlock performs a benchmark on how long it takes to
 // decode a reasonably sized merkleblock message.
 func BenchmarkDecodeMerkleBlock(b *testing.B) {
-	// Create a message with random data.
-	pver := ProtocolVersion
-	var m MsgMerkleBlock
-	hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", 10000))
-	if err != nil {
-		b.Fatalf("NewHashFromStr: unexpected error: %v", err)
-	}
-	m.Header = *NewBlockHeader(1, hash, hash, 0, uint32(10000))
-	for i := 0; i < 105; i++ {
-		hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", i))
-		if err != nil {
-			b.Fatalf("NewHashFromStr: unexpected error: %v", err)
-		}
-		m.AddTxHash(hash)
-		if i%8 == 0 {
-			m.Flags = append(m.Flags, uint8(i))
-		}
-	}
-
-	// Serialize it so the bytes are available to test the decode below.
-	var bb bytes.Buffer
-	if err := m.BtcEncode(&bb, pver, LatestEncoding); err != nil {
-		b.Fatalf("MsgMerkleBlock.BtcEncode: unexpected error: %v", err)
-	}
-	buf := bb.Bytes()
-
-	r := bytes.NewReader(buf)
-	var msg MsgMerkleBlock
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		r.Seek(0, 0)
-		msg.BtcDecode(r, pver, LatestEncoding)
-	}
+	TestChangeCode()
+	//	// Create a message with random data.
+	//	pver := ProtocolVersion
+	//	var m MsgMerkleBlock
+	//	hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", 10000))
+	//	if err != nil {
+	//		b.Fatalf("NewHashFromStr: unexpected error: %v", err)
+	//	}
+	//	m.Header = *NewBlockHeader(1, hash, hash, 0, uint32(10000))
+	//	for i := 0; i < 105; i++ {
+	//		hash, err := chainhash.NewHashFromStr(fmt.Sprintf("%x", i))
+	//		if err != nil {
+	//			b.Fatalf("NewHashFromStr: unexpected error: %v", err)
+	//		}
+	//		m.AddTxHash(hash)
+	//		if i%8 == 0 {
+	//			m.Flags = append(m.Flags, uint8(i))
+	//		}
+	//	}
+	//
+	//	// Serialize it so the bytes are available to test the decode below.
+	//	var bb bytes.Buffer
+	//	if err := m.BtcEncode(&bb, pver, LatestEncoding); err != nil {
+	//		b.Fatalf("MsgMerkleBlock.BtcEncode: unexpected error: %v", err)
+	//	}
+	//	buf := bb.Bytes()
+	//
+	//	r := bytes.NewReader(buf)
+	//	var msg MsgMerkleBlock
+	//	b.ResetTimer()
+	//	for i := 0; i < b.N; i++ {
+	//		r.Seek(0, 0)
+	//		msg.BtcDecode(r, pver, LatestEncoding)
+	//	}
 }
 
 // BenchmarkTxHash performs a benchmark on how long it takes to hash a

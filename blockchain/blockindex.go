@@ -64,9 +64,7 @@ func (status blockStatus) KnownInvalid() bool {
 	return status&(statusValidateFailed|statusInvalidAncestor) != 0
 }
 
-// blockNode表示块链中的一个块，主要用于
-//帮助选择最好的链条作为主链条。主链是
-//存储到块数据库中。
+// blockNode表示块链中的块，主要用于帮助选择最佳链作为主链。主链存储在块数据库中。
 // blockNode represents a block within the block chain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
 // stored into the block database.
@@ -117,19 +115,20 @@ type blockNode struct {
 // This function is NOT safe for concurrent access.  It must only be called when
 // initially creating a node.
 func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) {
+	wire.ChangeCode()
 	*node = blockNode{
-		hash:       blockHeader.BlockHash(),
-		workSum:    CalcWork(blockHeader.Bits),
-		version:    blockHeader.Version,
-		bits:       blockHeader.Bits,
-		nonce:      blockHeader.Nonce,
+		hash: blockHeader.BlockHash(),
+		//workSum:    CalcWork(blockHeader.Bits),
+		version: blockHeader.Version,
+		//bits:       blockHeader.Bits,
+		//nonce:      blockHeader.Nonce,
 		timestamp:  blockHeader.Timestamp.Unix(),
 		merkleRoot: blockHeader.MerkleRoot,
 	}
 	if parent != nil {
 		node.parent = parent
 		node.height = parent.height + 1
-		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
+		//node.workSum = node.workSum.Add(parent.workSum, node.workSum)
 	}
 }
 
@@ -153,13 +152,14 @@ func (node *blockNode) Header() wire.BlockHeader {
 	if node.parent != nil {
 		prevHash = &node.parent.hash
 	}
+	wire.ChangeCode()
 	return wire.BlockHeader{
 		Version:    node.version,
 		PrevBlock:  *prevHash,
 		MerkleRoot: node.merkleRoot,
 		Timestamp:  time.Unix(node.timestamp, 0),
-		Bits:       node.bits,
-		Nonce:      node.nonce,
+		//Bits:       node.bits,
+		//Nonce:      node.nonce,
 	}
 }
 

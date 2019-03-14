@@ -17,11 +17,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/btcsuite/goleveldb/leveldb"
-	ldberrors "github.com/btcsuite/goleveldb/leveldb/errors"
 	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/database"
 	"github.com/drcsuite/drc/drcutil"
+	"github.com/drcsuite/drc/goleveldb/leveldb"
+	ldberrors "github.com/drcsuite/drc/goleveldb/leveldb/errors"
 	"github.com/drcsuite/drc/wire"
 )
 

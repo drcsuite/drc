@@ -6,6 +6,7 @@ package blockchain
 
 import (
 	"fmt"
+	"github.com/drcsuite/drc/wire"
 	"time"
 
 	"github.com/drcsuite/drc/chaincfg/chainhash"
@@ -194,22 +195,23 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 			return false, false, ruleError(ErrCheckpointTimeTooOld, str)
 		}
 		if !fastAdd {
+			wire.ChangeCode()
 			// Even though the checks prior to now have already ensured the
 			// proof of work exceeds the claimed amount, the claimed amount
 			// is a field in the block header which could be forged.  This
 			// check ensures the proof of work is at least the minimum
 			// expected based on elapsed time since the last checkpoint and
 			// maximum adjustment allowed by the retarget rules.
-			duration := blockHeader.Timestamp.Sub(checkpointTime)
-			requiredTarget := CompactToBig(b.calcEasiestDifficulty(
-				checkpointNode.bits, duration))
-			currentTarget := CompactToBig(blockHeader.Bits)
-			if currentTarget.Cmp(requiredTarget) > 0 {
-				str := fmt.Sprintf("block target difficulty of %064x "+
-					"is too low when compared to the previous "+
-					"checkpoint", currentTarget)
-				return false, false, ruleError(ErrDifficultyTooLow, str)
-			}
+			//duration := blockHeader.Timestamp.Sub(checkpointTime)
+			//requiredTarget := CompactToBig(b.calcEasiestDifficulty(
+			//	checkpointNode.bits, duration))
+			//currentTarget := CompactToBig(blockHeader.Bits)
+			//if currentTarget.Cmp(requiredTarget) > 0 {
+			//	str := fmt.Sprintf("block target difficulty of %064x "+
+			//		"is too low when compared to the previous "+
+			//		"checkpoint", currentTarget)
+			//	return false, false, ruleError(ErrDifficultyTooLow, str)
+			//}
 		}
 	}
 
