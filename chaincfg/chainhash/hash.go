@@ -34,6 +34,24 @@ func (hash Hash) String() string {
 	return hex.EncodeToString(hash[:])
 }
 
+type Hash64 [64]byte
+
+func (hash Hash64) String() string {
+	for i := 0; i < HashSize/2; i++ {
+		hash[i], hash[HashSize-1-i] = hash[HashSize-1-i], hash[i]
+	}
+	return hex.EncodeToString(hash[:])
+}
+
+type Hash65 [65]byte
+
+func (hash Hash65) String() string {
+	for i := 0; i < HashSize/2; i++ {
+		hash[i], hash[HashSize-1-i] = hash[HashSize-1-i], hash[i]
+	}
+	return hex.EncodeToString(hash[:])
+}
+
 // CloneBytes returns a copy of the bytes which represent the hash as a byte
 // slice.
 //
