@@ -7,6 +7,7 @@ package cpuminer
 import (
 	"errors"
 	"fmt"
+	"github.com/drcsuite/drc/btcec"
 	"math/rand"
 	"runtime"
 	"sync"
@@ -104,6 +105,7 @@ type CPUMiner struct {
 	updateHashes      chan uint64
 	speedMonitorQuit  chan struct{}
 	quit              chan struct{}
+	privKey           *btcec.PrivateKey
 }
 
 // speedMonitor handles tracking the number of hashes per second the mining
@@ -628,10 +630,21 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 	}
 }
 
+func SetConfigPrivKey() {
+
+}
+
 // New returns a new instance of a CPU miner for the provided configuration.
 // Use Start to begin the mining process.  See the documentation for CPUMiner
 // type for more details.
 func New(cfg *Config) *CPUMiner {
+	wire.ChangeCode()
+	// 生成公私钥，放入cpuminer
+	privKey, err := btcec.NewPrivateKey(btcec.S256())
+	if err != nil {
+		log.Errorf("private key generation error: %s", err)
+		return nil
+	}
 	return &CPUMiner{
 		g:                 cfg.BlockTemplateGenerator,
 		cfg:               *cfg,
@@ -639,5 +652,6 @@ func New(cfg *Config) *CPUMiner {
 		updateNumWorkers:  make(chan struct{}),
 		queryHashesPerSec: make(chan float64),
 		updateHashes:      make(chan uint64),
+		privKey:           privKey,
 	}
 }

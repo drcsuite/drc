@@ -45,13 +45,13 @@ func (hash Hash64) String() string {
 	return hex.EncodeToString(hash[:])
 }
 
-const Hash65Size = 65
+const Hash33Size = 33
 
-type Hash65 [Hash65Size]byte
+type Hash33 [Hash33Size]byte
 
-func (hash Hash65) String() string {
-	for i := 0; i < Hash65Size/2; i++ {
-		hash[i], hash[Hash65Size-1-i] = hash[Hash65Size-1-i], hash[i]
+func (hash Hash33) String() string {
+	for i := 0; i < Hash33Size/2; i++ {
+		hash[i], hash[Hash33Size-1-i] = hash[Hash33Size-1-i], hash[i]
 	}
 	return hex.EncodeToString(hash[:])
 }

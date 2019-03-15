@@ -844,6 +844,7 @@ mempoolLoop:
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
 	wire.ChangeCode()
+	// 在header中加入publickey
 	ts := medianAdjustedTime(best, g.timeSource)
 	//reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
 	//if err != nil {

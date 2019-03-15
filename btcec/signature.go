@@ -538,3 +538,20 @@ func bits2octets(in []byte, curve elliptic.Curve, rolen int) []byte {
 	}
 	return int2octets(z2, rolen)
 }
+
+/**
+generate signature from [] byte
+*/
+func GetSignature(sign []byte) *Signature {
+	return &Signature{
+		R: new(big.Int).SetBytes(sign[0:32]),
+		S: new(big.Int).SetBytes(sign[32:64]),
+	}
+}
+
+/**
+get []byte from signature
+*/
+func (s *Signature) GenSignBytes() []byte {
+	return bytes.Join([][]byte{s.R.Bytes(), s.S.Bytes()}, nil)
+}
