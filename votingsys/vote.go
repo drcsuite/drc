@@ -1,13 +1,22 @@
 package votingsys
 
-import (
-	"github.com/drcsuite/drc/btcec"
-)
+const IdealVoteNum = 300
 
-// 获取全网节点总数，通过blockHeader获取
-func computeNodes(vb *VoteBlock) uint32 {
+// 估算全网节点总数
+func EstimateScale(prevVoteNum uint16, prevScale uint16) (scale uint16) {
 
-	return vb.Header.Nonce
+	//上一个区块的Scale小于等于300，说明全网节点总数很少，之前收到多少投票就可估算为当前的节点总数。
+	if prevScale <= IdealVoteNum {
+
+		scale = prevVoteNum
+
+		// 上一个区块的Scale大于300，说明全网节点总数大于300，需计算使符合投票的节点数更接近300.
+	} else {
+
+		scale = uint16(int32(prevScale) * int32(prevVoteNum) / IdealVoteNum)
+
+	}
+	return
 }
 
 // 新块验证投票
@@ -38,14 +47,14 @@ func computeNodes(vb *VoteBlock) uint32 {
 //}
 
 // 有投票权的节点签名区块
-func blockSignature(blockHash []byte, key *btcec.PrivateKey) *btcec.Signature {
-
-	signature, err := key.Sign(blockHash)
-	if err != nil {
-		return nil
-	}
-	return signature
-}
+//func blockSignature(blockHash []byte, key *btcec.PrivateKey) *btcec.Signature {
+//
+//	signature, err := key.Sign(blockHash)
+//	if err != nil {
+//		return nil
+//	}
+//	return signature
+//}
 
 // 检查收到的区块是否是之前接收过的
 //func checkBlock(msg *VoteBlock,pub *btcec.PublicKey) bool  {
