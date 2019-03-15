@@ -1,16 +1,16 @@
 package votingsys
 
-const IdealVoteNum = 300
+const IdealVoteNum = 200
 
 // 估算全网节点总数
 func EstimateScale(prevVoteNum uint16, prevScale uint16) (scale uint16) {
 
-	//上一个区块的Scale小于等于300，说明全网节点总数很少，之前收到多少投票就可估算为当前的节点总数。
+	//上一个区块的Scale小于等于200，说明全网节点总数很少，之前收到多少投票就可估算为当前的节点总数。
 	if prevScale <= IdealVoteNum {
 
 		scale = prevVoteNum
 
-		// 上一个区块的Scale大于300，说明全网节点总数大于300，需计算使符合投票的节点数更接近300.
+		// 上一个区块的Scale大于200，说明全网节点总数大于200，需计算使符合投票的节点数更接近200.
 	} else {
 
 		scale = uint16(int32(prevScale) * int32(prevVoteNum) / IdealVoteNum)
@@ -19,15 +19,13 @@ func EstimateScale(prevVoteNum uint16, prevScale uint16) (scale uint16) {
 	return
 }
 
-// 新块验证投票
-
-//func BlockVote(p *peer.Peer, msg *VoteBlock,pri *btcec.PrivateKey,pub *btcec.PublicKey) {
-//
+//// 新块验证投票
+//func  BlockVote(p peer.Peer,msg *wire.MsgBlock,pub *btcec.PublicKey) {
 //
 //	if checkBlock(msg,pub) {
 //
-// 计算本节点的weight，确认是否有投票资格
-//		nodeNumber := computeNodes(msg)
+//// 计算本节点的weight，确认是否有投票资格
+//		nodeNumber := msg.Header.
 //
 //var weight uint32
 //
@@ -45,8 +43,8 @@ func EstimateScale(prevVoteNum uint16, prevScale uint16) (scale uint16) {
 //		}
 //	}
 //}
-
-// 有投票权的节点签名区块
+//
+//// 有投票权的节点签名区块
 //func blockSignature(blockHash []byte, key *btcec.PrivateKey) *btcec.Signature {
 //
 //	signature, err := key.Sign(blockHash)
@@ -55,8 +53,8 @@ func EstimateScale(prevVoteNum uint16, prevScale uint16) (scale uint16) {
 //	}
 //	return signature
 //}
-
-// 检查收到的区块是否是之前接收过的
+//
+//// 检查收到的区块是否是之前接收过的
 //func checkBlock(msg *VoteBlock,pub *btcec.PublicKey) bool  {
 //
 //	// 查看是否有自己的签名
