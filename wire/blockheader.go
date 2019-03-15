@@ -107,7 +107,7 @@ func (h *BlockHeader) Serialize(w io.Writer) error {
 // NewBlockHeader returns a new BlockHeader using the provided version, previous
 // block hash, merkle root hash, difficulty bits, and nonce used to generate the
 // block with defaults for the remaining fields.
-func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash, signature *chainhash.Hash64, publickey *chainhash.Hash65,
+func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash, signature *chainhash.Hash64, publickey *chainhash.Hash33,
 	scale uint16, reserved uint16) *BlockHeader {
 
 	ChangeCode()

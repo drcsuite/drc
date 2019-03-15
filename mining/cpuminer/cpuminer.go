@@ -344,7 +344,14 @@ out:
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(payToAddr)
+		pubKey, err := chainhash.NewHash33((btcec.PublicKey)(m.privKey.PublicKey).SerializeCompressed())
+		if err != nil {
+			errStr := fmt.Sprintf("Failed to create new block "+
+				"template: %v", err)
+			log.Errorf(errStr)
+			continue
+		}
+		template, err := m.g.NewBlockTemplate(payToAddr, pubKey)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -357,6 +364,8 @@ out:
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
+
+		// 修改发块规则，验证签名，计算weight，符合条件进行发块
 		if m.solveBlock(template.Block, curHeight+1, ticker, quit) {
 			block := drcutil.NewBlock(template.Block)
 			m.submitBlock(block)
@@ -598,7 +607,14 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		template, err := m.g.NewBlockTemplate(payToAddr)
+		pubKey, err := chainhash.NewHash33((btcec.PublicKey)(m.privKey.PublicKey).SerializeCompressed())
+		if err != nil {
+			errStr := fmt.Sprintf("Failed to create new block "+
+				"template: %v", err)
+			log.Errorf(errStr)
+			continue
+		}
+		template, err := m.g.NewBlockTemplate(payToAddr, pubKey)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -628,10 +644,6 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 			}
 		}
 	}
-}
-
-func SetConfigPrivKey() {
-
 }
 
 // New returns a new instance of a CPU miner for the provided configuration.

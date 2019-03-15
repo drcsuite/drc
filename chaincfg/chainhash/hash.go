@@ -81,6 +81,28 @@ func (hash *Hash) SetBytes(newHash []byte) error {
 	return nil
 }
 
+func (hash *Hash33) SetBytes(newHash []byte) error {
+	nhlen := len(newHash)
+	if nhlen != Hash33Size {
+		return fmt.Errorf("invalid hash length of %v, want %v", nhlen,
+			Hash33Size)
+	}
+	copy(hash[:], newHash)
+
+	return nil
+}
+
+func (hash *Hash64) SetBytes(newHash []byte) error {
+	nhlen := len(newHash)
+	if nhlen != Hash64Size {
+		return fmt.Errorf("invalid hash length of %v, want %v", nhlen,
+			Hash64Size)
+	}
+	copy(hash[:], newHash)
+
+	return nil
+}
+
 // IsEqual returns true if target is the same as hash.
 func (hash *Hash) IsEqual(target *Hash) bool {
 	if hash == nil && target == nil {
@@ -96,6 +118,24 @@ func (hash *Hash) IsEqual(target *Hash) bool {
 // the number of bytes passed in is not HashSize.
 func NewHash(newHash []byte) (*Hash, error) {
 	var sh Hash
+	err := sh.SetBytes(newHash)
+	if err != nil {
+		return nil, err
+	}
+	return &sh, err
+}
+
+func NewHash33(newHash []byte) (*Hash33, error) {
+	var sh Hash33
+	err := sh.SetBytes(newHash)
+	if err != nil {
+		return nil, err
+	}
+	return &sh, err
+}
+
+func NewHash64(newHash []byte) (*Hash64, error) {
+	var sh Hash64
 	err := sh.SetBytes(newHash)
 	if err != nil {
 		return nil, err
