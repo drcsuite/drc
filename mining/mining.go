@@ -865,6 +865,7 @@ mempoolLoop:
 		PrevBlock:  best.Hash,
 		MerkleRoot: *merkles[len(merkles)-1],
 		Timestamp:  ts,
+
 		//Bits:       reqDifficulty,
 	}
 	for _, tx := range blockTxns {
