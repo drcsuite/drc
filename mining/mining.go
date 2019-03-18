@@ -440,7 +440,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //  |  transactions (while block size   |   |
 //  |  <= policy.BlockMinSize)          |   |
 //   -----------------------------------  --
-func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress drcutil.Address) (*BlockTemplate, error) {
+func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress drcutil.Address, pubkey *chainhash.Hash33) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestSnapshot()
 	nextBlockHeight := best.Height + 1
@@ -844,6 +844,7 @@ mempoolLoop:
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
 	wire.ChangeCode()
+	// 在header中加入publickey
 	ts := medianAdjustedTime(best, g.timeSource)
 	//reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
 	//if err != nil {
@@ -865,8 +866,7 @@ mempoolLoop:
 		PrevBlock:  best.Hash,
 		MerkleRoot: *merkles[len(merkles)-1],
 		Timestamp:  ts,
-
-		//Bits:       reqDifficulty,
+		PublicKey:  *pubkey,
 	}
 	for _, tx := range blockTxns {
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {

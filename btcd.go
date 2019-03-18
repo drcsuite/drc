@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/drcsuite/drc/wire"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -91,10 +92,11 @@ func btcdMain(serverChan chan<- *server) error {
 	}
 
 	// Perform upgrades to btcd as new versions require it.
-	if err := doUpgrades(); err != nil {
-		btcdLog.Errorf("%v", err)
-		return err
-	}
+	wire.ChangeCode()
+	//if err := doUpgrades(); err != nil {
+	//	btcdLog.Errorf("%v", err)
+	//	return err
+	//}
 
 	// Return now if an interrupt signal was triggered.
 	if interruptRequested(interrupt) {

@@ -13,11 +13,11 @@ import (
 )
 
 // MaxBlockHeaderPayload is the maximum number of bytes a block header can be.
-// Version 4 bytes + Timestamp 4 bytes + scale 2 bytes + reserved 2 bytes +
+// Version 4 bytes + Timestamp 4 bytes + scale 2 bytes + reserved 2 bytes + 32*2 + 64 + 33 = 173
 // PrevBlock and MerkleRoot hashes.
-const MaxBlockHeaderPayload = 12 + (chainhash.HashSize * 2) + chainhash.Hash64Size + chainhash.Hash65Size
+const MaxBlockHeaderPayload = 12 + (chainhash.HashSize * 2) + chainhash.Hash64Size + chainhash.Hash33Size
 
-// 209字节
+// 205字节
 // BlockHeader defines information about a block and is used in the bitcoin
 // block (MsgBlock) and headers (MsgHeaders) messages.
 type BlockHeader struct {
@@ -38,7 +38,7 @@ type BlockHeader struct {
 	Signature chainhash.Hash64
 
 	// 发块公钥
-	PublicKey chainhash.Hash65
+	PublicKey chainhash.Hash33
 
 	// 全网估算节点
 	Scale uint16
@@ -103,7 +103,7 @@ func (h *BlockHeader) Serialize(w io.Writer) error {
 // NewBlockHeader returns a new BlockHeader using the provided version, previous
 // block hash, merkle root hash, difficulty bits, and nonce used to generate the
 // block with defaults for the remaining fields.
-func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash, signature *chainhash.Hash64, publickey *chainhash.Hash65,
+func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash, signature *chainhash.Hash64, publickey *chainhash.Hash33,
 	scale uint16, reserved uint16) *BlockHeader {
 
 	ChangeCode()

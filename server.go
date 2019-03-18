@@ -2747,6 +2747,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		return nil, err
 	}
 
+	//根据配置选项创建挖掘策略和块模板生成器。
 	// Create the mining policy and block template generator based on the
 	// configuration options.
 	//
