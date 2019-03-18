@@ -9,6 +9,3 @@ type SignAndKey struct {
 	Sign   *btcec.Signature
 	PubKey *btcec.PublicKey
 }
-
-// 区块签名的票池
-var TicketPool = make(map[string][]SignAndKey)
