@@ -2,6 +2,7 @@ package votingsys
 
 import (
 	"github.com/drcsuite/drc/btcec"
+	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"math/big"
 )
 
@@ -12,7 +13,14 @@ const IdealBlockNum = 50
 const IdealVoteNum = 300
 
 // 区块签名的票池
-var TicketPool = make(map[*btcec.PublicKey][]SignAndKey)
+var TicketPool = make(map[chainhash.Hash][]SignAndKey)
+
+// 具有投票权的节点对区块的签名值和验证时用的公钥
+type SignAndKey struct {
+	Signature chainhash.Hash64
+
+	PublicKey chainhash.Hash65
+}
 
 // 估算全网节点总数
 func EstimateScale(prevVoteNum uint16, prevScale uint16) (scale uint16) {
@@ -34,18 +42,18 @@ func EstimateScale(prevVoteNum uint16, prevScale uint16) (scale uint16) {
 // 计算投票的π值
 func VoteVerge(scale uint16) *big.Int {
 
-	//bigint格式的全网节点数
+	// bigint格式的全网节点数
 	bigScale := big.NewInt(int64(scale))
-	//bigint格式的2的256次方的值
-	max256, _ := new(big.Int).SetString("10000000000000000000000000000000000000000000000000000000000000000", 16)
-	//bigint格式的理想投票节点数
+	// bigint格式的理想投票节点数
 	bigIdealVoteNum := big.NewInt(IdealVoteNum)
+	// bigint格式的2的256次方的值
+	max256, _ := new(big.Int).SetString("10000000000000000000000000000000000000000000000000000000000000000", 16)
 
 	// 投票π值计算
-	bigIdealVoteNum.Mul(bigIdealVoteNum, max256)
-	bigIdealVoteNum.Quo(bigIdealVoteNum, bigScale)
+	max256.Mul(max256, bigIdealVoteNum)
+	max256.Quo(max256, bigScale)
 
-	return bigIdealVoteNum
+	return max256
 }
 
 // 计算发块的π值
@@ -62,9 +70,9 @@ func BlockVerge(scale uint16) *big.Int {
 }
 
 //// 新块验证投票
-//func BlockVote(p peer.Peer, msg *wire.MsgBlock, pub *btcec.PublicKey) {
+//func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey) {
 //
-//	if checkBlock(msg, pub) {
+//	if checkBlock(msg.Header,chainhash.NewHash64(publicKey.SerializeHybrid()) ) {
 //
 //		// 计算本节点的weight，确认是否有投票资格
 //		nodeNumber := msg.Header.
@@ -84,26 +92,35 @@ func BlockVerge(scale uint16) *big.Int {
 //		}
 //	}
 //}
-//
-//// 有投票权的节点签名区块
-//func blockSignature(blockHash []byte, key *btcec.PrivateKey) *btcec.Signature {
-//
-//	signature, err := key.Sign(blockHash)
-//	if err != nil {
-//		return nil
-//	}
-//	return signature
-//}
-//
-//// 检查收到的区块是否是之前接收过的
-//func checkBlock(ticketPool map[*btcec.PublicKey][]SignAndKey, pub *btcec.PublicKey) bool {
-//
-//	// 查看是否有自己的签名
-//	for pubKey := range ticketPool {
-//
-//		if pubKey.IsEqual(pub) {
-//			return true
-//		}
-//	}
-//	return false
-//}
+
+// 有投票权的节点签名区块
+func blockHeaderSign(blockHeaderHash chainhash.Hash, privateKey chainhash.Hash65) *chainhash.Hash64 {
+
+	priKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), privateKey.CloneBytes())
+
+	// 对blockHeaderHash签名
+	signature, err := priKey.Sign(blockHeaderHash.CloneBytes())
+	if err != nil {
+		return nil
+	}
+
+	sign, _ := chainhash.NewHash64(signature.Serialize())
+	return sign
+}
+
+// 检查收到的区块是否在之间签过名
+func checkBlock(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash65) bool {
+
+	// 查看签名池里是否有自己的签名,有的话返回true
+	for key, value := range TicketPool {
+		if key == blockHeaderHash {
+			// 遍历收到的区块所有的签名公钥
+			for _, signAndKey := range value {
+				if publicKey == signAndKey.PublicKey {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
