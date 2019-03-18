@@ -56,33 +56,6 @@ func (hash Hash33) String() string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (hash *Hash65) CloneBytes() []byte {
-	newHash := make([]byte, Hash65Size)
-	copy(newHash, hash[:])
-
-	return newHash
-}
-
-func (hash *Hash64) SetBytes(newHash []byte) error {
-	nhlen := len(newHash)
-	if nhlen != Hash64Size {
-		return fmt.Errorf("invalid hash length of %v, want %v", nhlen,
-			Hash64Size)
-	}
-	copy(hash[:], newHash)
-
-	return nil
-}
-
-func NewHash64(newHash []byte) (*Hash64, error) {
-	var sh Hash64
-	err := sh.SetBytes(newHash)
-	if err != nil {
-		return nil, err
-	}
-	return &sh, err
-}
-
 // CloneBytes returns a copy of the bytes which represent the hash as a byte
 // slice.
 //

@@ -8,5 +8,5 @@ type MsgSign struct {
 	// 投票节点签名
 	Signature chainhash.Hash64
 	// 投票节点公钥
-	PublicKey chainhash.Hash65
+	PublicKey chainhash.Hash33
 }

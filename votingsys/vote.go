@@ -19,7 +19,7 @@ var TicketPool = make(map[chainhash.Hash][]SignAndKey)
 type SignAndKey struct {
 	Signature chainhash.Hash64
 
-	PublicKey chainhash.Hash65
+	PublicKey chainhash.Hash33
 }
 
 // 估算全网节点总数
@@ -94,12 +94,10 @@ func BlockVerge(scale uint16) *big.Int {
 //}
 
 // 有投票权的节点签名区块
-func blockHeaderSign(blockHeaderHash chainhash.Hash, privateKey chainhash.Hash65) *chainhash.Hash64 {
-
-	priKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), privateKey.CloneBytes())
+func blockHeaderSign(blockHeaderHash chainhash.Hash, privateKey *btcec.PrivateKey) *chainhash.Hash64 {
 
 	// 对blockHeaderHash签名
-	signature, err := priKey.Sign(blockHeaderHash.CloneBytes())
+	signature, err := privateKey.Sign(blockHeaderHash.CloneBytes())
 	if err != nil {
 		return nil
 	}
@@ -109,7 +107,7 @@ func blockHeaderSign(blockHeaderHash chainhash.Hash, privateKey chainhash.Hash65
 }
 
 // 检查收到的区块是否在之间签过名
-func checkBlock(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash65) bool {
+func checkBlock(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash33) bool {
 
 	// 查看签名池里是否有自己的签名,有的话返回true
 	for key, value := range TicketPool {
