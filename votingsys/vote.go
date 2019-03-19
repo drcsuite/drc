@@ -71,8 +71,10 @@ func BlockVerge(scale uint16) *big.Int {
 
 //// 新块验证投票
 //func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey) {
+//	bytemsg.Header.
 //
-//	if checkBlock(msg.Header,chainhash.NewHash64(publicKey.SerializeHybrid()) ) {
+//	chainhash.DoubleHashH(.)
+//	if checkBlock(msg.Header.,chainhash.NewHash33(publicKey.SerializeCompressed()) ) {
 //
 //		// 计算本节点的weight，确认是否有投票资格
 //		nodeNumber := msg.Header.
