@@ -91,7 +91,6 @@ func BlockVerge(scale uint16) *big.Int {
 func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey, privateKey *btcec.PrivateKey) {
 
 	if CheckBlock(*msg) {
-
 		pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
 		CheckAndPanic(err)
 		// 散列两次区块内容
