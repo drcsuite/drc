@@ -1,4 +1,4 @@
-package votingsys
+package cpuminer
 
 import (
 	"fmt"
