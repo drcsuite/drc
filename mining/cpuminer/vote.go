@@ -1,10 +1,16 @@
-package votingsys
+package cpuminer
 
 import (
+	"errors"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"github.com/drcsuite/drc/peer"
+	"github.com/drcsuite/drc/wire"
 	"math/big"
 )
+
+// 求scale值需要的前置参考块的数量
+const BlockCount = 10
 
 // 理想发块节点数
 const IdealBlockNum = 50
@@ -23,19 +29,32 @@ type SignAndKey struct {
 }
 
 // 估算全网节点总数
-func EstimateScale(prevVoteNum uint16, prevScale uint16) (scale uint16) {
+func EstimateScale(prevVoteNums []uint16, prevScales []uint16) (scale uint16) {
+
+	meanScale := mean(prevScales)
+	meanVoteNum := mean(prevVoteNums)
 
 	//上一个区块的Scale小于等于300，说明全网节点总数很少，之前收到多少投票就可估算为当前的节点总数。
-	if prevScale <= IdealVoteNum {
+	if meanScale <= IdealVoteNum {
 
-		scale = prevVoteNum
+		scale = meanVoteNum
 
 		// 上一个区块的Scale大于300，说明全网节点总数大于300，需计算使符合投票的节点数更接近300.
 	} else {
 
-		scale = uint16(uint32(prevScale) * uint32(prevVoteNum) / IdealVoteNum)
+		scale = uint16(uint32(meanScale) * uint32(meanVoteNum) / IdealVoteNum)
 
 	}
+	return
+}
+
+// 求[]uint16类型切片的平均值
+func mean(values []uint16) (meanValue uint16) {
+	var totalValue uint16 = 0
+	for _, value := range values {
+		totalValue = totalValue + value
+	}
+	meanValue = totalValue / uint16(len(values))
 	return
 }
 
@@ -69,43 +88,51 @@ func BlockVerge(scale uint16) *big.Int {
 	return verge
 }
 
-//// 新块验证投票
-//func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey) {
-//	bytemsg.Header.
-//
-//	chainhash.DoubleHashH(.)
-//	if checkBlock(msg.Header.,chainhash.NewHash33(publicKey.SerializeCompressed()) ) {
-//
-//		// 计算本节点的weight，确认是否有投票资格
-//		nodeNumber := msg.Header.
-//
-//		var weight uint32
-//
-//		if weight > 200/nodeNumber*uint32(math.Pow(2, 256)) {
-//
-//			sign := blockSignature(msg.Transactions, pri)
-//			blockFooter := &BlockFooter{Sign: sign, PubKey: pub}
-//			msg.Footer = append(msg.Footer, blockFooter)
-//
-//			p.QueueMessage(msg, nil)
-//
-//		} else {
-//			p.QueueMessage(msg, nil)
-//		}
-//	}
-//}
+// 新块验证投票
+func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey, privateKey *btcec.PrivateKey) error {
 
-// 有投票权的节点签名区块
-func blockHeaderSign(blockHeaderHash chainhash.Hash, privateKey *btcec.PrivateKey) *chainhash.Hash64 {
-
-	// 对blockHeaderHash签名
-	signature, err := privateKey.Sign(blockHeaderHash.CloneBytes())
+	pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
 	if err != nil {
-		return nil
+		return err
 	}
+	// 散列两次区块内容
+	headerHash := msg.Header.BlockHash()
 
-	sign, _ := chainhash.NewHash64(signature.Serialize())
-	return sign
+	// 之前未签名过本区块，分析处理
+	if checkBlock(headerHash, *pubKey) {
+
+		// 用自己的私钥签名区块
+		headerSign, err := privateKey.Sign(headerHash.CloneBytes())
+		if err != nil {
+			return err
+		}
+		// 计算本节点的投票weight
+		weight := chainhash.DoubleHashB(headerSign.Serialize())
+		bigWeight := new(big.Int).SetBytes(weight)
+
+		voteVerge := VoteVerge(msg.Header.Scale)
+
+		// weight值小于voteVerge，有投票权，进行投票签名
+		if bigWeight.Cmp(voteVerge) <= 0 {
+
+			sign, err := chainhash.NewHash64(headerSign.Serialize())
+			if err != nil {
+				return err
+			}
+
+			// 扩散签名
+			msgSign := &wire.MsgSign{
+				BlockHeaderHash: headerHash,
+				Signature:       *sign,
+				PublicKey:       *pubKey,
+			}
+			p.QueueMessage(msgSign, nil)
+		}
+		// 之前对本区块签过名，直接转发出去
+	} else {
+		p.QueueMessage(msg, nil)
+	}
+	return errors.New("consensus goes wrong")
 }
 
 // 检查收到的区块是否在之间签过名
@@ -117,10 +144,10 @@ func checkBlock(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash33) bool
 			// 遍历收到的区块所有的签名公钥
 			for _, signAndKey := range value {
 				if publicKey == signAndKey.PublicKey {
-					return true
+					return false
 				}
 			}
 		}
 	}
-	return false
+	return true
 }
