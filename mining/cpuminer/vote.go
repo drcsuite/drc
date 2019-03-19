@@ -1,7 +1,6 @@
 package cpuminer
 
 import (
-	"errors"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/peer"
@@ -89,54 +88,50 @@ func BlockVerge(scale uint16) *big.Int {
 }
 
 // 新块验证投票
-func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey, privateKey *btcec.PrivateKey) error {
+func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey, privateKey *btcec.PrivateKey) {
 
-	pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
-	if err != nil {
-		return err
-	}
-	// 散列两次区块内容
-	headerHash := msg.Header.BlockHash()
+	if CheckBlock(*msg) {
 
-	// 之前未签名过本区块，分析处理
-	if checkBlock(headerHash, *pubKey) {
+		pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
+		CheckAndPanic(err)
+		// 散列两次区块内容
+		headerHash := msg.Header.BlockHash()
 
-		// 用自己的私钥签名区块
-		headerSign, err := privateKey.Sign(headerHash.CloneBytes())
-		if err != nil {
-			return err
-		}
-		// 计算本节点的投票weight
-		weight := chainhash.DoubleHashB(headerSign.Serialize())
-		bigWeight := new(big.Int).SetBytes(weight)
+		// 之前未签名过本区块，分析处理
+		if preventRepeatSign(headerHash, *pubKey) {
 
-		voteVerge := VoteVerge(msg.Header.Scale)
+			// 用自己的私钥签名区块
+			headerSign, err := privateKey.Sign(headerHash.CloneBytes())
+			CheckAndPanic(err)
+			// 计算本节点的投票weight
+			weight := chainhash.DoubleHashB(headerSign.Serialize())
+			bigWeight := new(big.Int).SetBytes(weight)
 
-		// weight值小于voteVerge，有投票权，进行投票签名
-		if bigWeight.Cmp(voteVerge) <= 0 {
+			voteVerge := VoteVerge(msg.Header.Scale)
 
-			sign, err := chainhash.NewHash64(headerSign.Serialize())
-			if err != nil {
-				return err
+			// weight值小于voteVerge，有投票权，进行投票签名
+			if bigWeight.Cmp(voteVerge) <= 0 {
+
+				sign, err := chainhash.NewHash64(headerSign.Serialize())
+				CheckAndPanic(err)
+
+				// 扩散签名
+				msgSign := &wire.MsgSign{
+					BlockHeaderHash: headerHash,
+					Signature:       *sign,
+					PublicKey:       *pubKey,
+				}
+				p.QueueMessage(msgSign, nil)
 			}
-
-			// 扩散签名
-			msgSign := &wire.MsgSign{
-				BlockHeaderHash: headerHash,
-				Signature:       *sign,
-				PublicKey:       *pubKey,
-			}
-			p.QueueMessage(msgSign, nil)
+			// 之前对本区块签过名，直接转发出去
+		} else {
+			p.QueueMessage(msg, nil)
 		}
-		// 之前对本区块签过名，直接转发出去
-	} else {
-		p.QueueMessage(msg, nil)
 	}
-	return errors.New("consensus goes wrong")
 }
 
-// 检查收到的区块是否在之间签过名
-func checkBlock(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash33) bool {
+// 防止重复签名区块
+func preventRepeatSign(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash33) bool {
 
 	// 查看签名池里是否有自己的签名,有的话返回true
 	for key, value := range TicketPool {
@@ -150,4 +145,33 @@ func checkBlock(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash33) bool
 		}
 	}
 	return true
+}
+
+// 检查区块
+func CheckBlock(msg wire.MsgBlock) bool {
+
+	//验证区块头的签名
+	signature, err := btcec.ParseSignature(msg.Header.Signature.CloneBytes(), btcec.S256())
+	if err != nil {
+		return false
+	}
+	pubKey, err := btcec.ParsePubKey(msg.Header.PublicKey.CloneBytes(), btcec.S256())
+	if err != nil {
+		return false
+	}
+	hash := msg.Header.PrevBlock.CloneBytes()
+	if signature.Verify(hash, pubKey) {
+
+		return true
+	} else {
+		return false
+	}
+	return false
+}
+
+// Check And Panic
+func CheckAndPanic(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
