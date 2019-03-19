@@ -82,6 +82,8 @@ type Config struct {
 	// not current since any solved blocks would be on a side chain and and
 	// up orphaned anyways.
 	IsCurrent func() bool
+
+	Chain *blockchain.BlockChain
 }
 
 // CPUMiner provides facilities for solving blocks (mining) using the CPU in
@@ -94,6 +96,7 @@ type CPUMiner struct {
 	sync.Mutex
 	g                 *mining.BlkTmplGenerator
 	cfg               Config
+	chain             *blockchain.BlockChain
 	numWorkers        uint32
 	started           bool
 	discreteMining    bool
@@ -336,7 +339,24 @@ out:
 		m.submitBlockLock.Lock()
 		curHeight := m.g.BestSnapshot().Height
 		preSign := m.g.BestSnapshot().Signature
-		m.privKey.Sign(preSign.CloneBytes())
+
+		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<π
+		signature, err := m.privKey.Sign(chainhash.DoubleHashB(preSign.CloneBytes()))
+		if err != nil {
+			m.submitBlockLock.Unlock()
+			errStr := fmt.Sprintf("Failed to signature prevate seed: %v", err)
+			log.Errorf(errStr)
+			continue
+		}
+		weight := chainhash.DoubleHashB(signature.GenSignBytes())
+
+		// 计算前十个块平均weight
+		for i := 0; i < 10; i++ {
+			node := m.chain.GetBlockIndex().LookupNode(&m.g.BestSnapshot().Hash)
+			scale := node.Header().Scale
+
+		}
+
 		if curHeight != 0 && !m.cfg.IsCurrent() {
 			m.submitBlockLock.Unlock()
 			time.Sleep(time.Second)
@@ -675,5 +695,6 @@ func New(cfg *Config) *CPUMiner {
 		queryHashesPerSec: make(chan float64),
 		updateHashes:      make(chan uint64),
 		privKey:           privKey,
+		chain:             cfg.Chain,
 	}
 }

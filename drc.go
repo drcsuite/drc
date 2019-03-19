@@ -10,8 +10,9 @@ func main() {
 	//testCipherAndSign()
 	//ptr()
 	//ptrint()
+	//GenesisBlock()
 
-	GenesisBlock()
+	Array()
 	fmt.Println(" Hello, DRC!")
 }
 
@@ -96,4 +97,10 @@ func GenesisBlock() {
 	}
 	s := hex.EncodeToString(PkScript)
 	fmt.Println(s)
+}
+
+func Array() {
+	bytes := make([]byte, 0)
+	i := append(bytes, 1, 2, 3)
+	fmt.Println(len(i))
 }
