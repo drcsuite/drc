@@ -9,6 +9,9 @@ import (
 	"math/big"
 )
 
+// 求scale值需要的前置参考块的数量
+const BlockCount = 10
+
 // 理想发块节点数
 const IdealBlockNum = 50
 
@@ -26,19 +29,32 @@ type SignAndKey struct {
 }
 
 // 估算全网节点总数
-func EstimateScale(prevVoteNum uint16, prevScale uint16) (scale uint16) {
+func EstimateScale(prevVoteNums []uint16, prevScales []uint16) (scale uint16) {
+
+	meanScale := mean(prevScales)
+	meanVoteNum := mean(prevVoteNums)
 
 	//上一个区块的Scale小于等于300，说明全网节点总数很少，之前收到多少投票就可估算为当前的节点总数。
-	if prevScale <= IdealVoteNum {
+	if meanScale <= IdealVoteNum {
 
-		scale = prevVoteNum
+		scale = meanVoteNum
 
 		// 上一个区块的Scale大于300，说明全网节点总数大于300，需计算使符合投票的节点数更接近300.
 	} else {
 
-		scale = uint16(uint32(prevScale) * uint32(prevVoteNum) / IdealVoteNum)
+		scale = uint16(uint32(meanScale) * uint32(meanVoteNum) / IdealVoteNum)
 
 	}
+	return
+}
+
+// 求[]uint16类型切片的平均值
+func mean(values []uint16) (meanValue uint16) {
+	var totalValue uint16 = 0
+	for _, value := range values {
+		totalValue = totalValue + value
+	}
+	meanValue = totalValue / uint16(len(values))
 	return
 }
 

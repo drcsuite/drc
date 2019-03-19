@@ -14,18 +14,27 @@ type MsgSign struct {
 	PublicKey chainhash.Hash33
 }
 
-func (*MsgSign) BtcDecode(io.Reader, uint32, MessageEncoding) error {
-	panic("implement me")
+func (msg *MsgSign) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
+	return readSign(r, pver, msg)
 }
 
-func (*MsgSign) BtcEncode(io.Writer, uint32, MessageEncoding) error {
-	panic("implement me")
+func readSign(r io.Reader, pver uint32, msg *MsgSign) error {
+	return readElements(r, &msg.BlockHeaderHash, &msg.Signature, &msg.PublicKey)
 }
 
-func (*MsgSign) Command() string {
-	panic("implement me")
+func (msg *MsgSign) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
+	return writeSign(w, pver, msg)
 }
 
-func (*MsgSign) MaxPayloadLength(uint32) uint32 {
-	panic("implement me")
+func writeSign(w io.Writer, pver uint32, msg *MsgSign) error {
+
+	return writeElements(w, &msg.BlockHeaderHash, &msg.Signature, &msg.PublicKey)
+}
+
+func (msg *MsgSign) Command() string {
+	return CmdSign
+}
+
+func (msg *MsgSign) MaxPayloadLength(pver uint32) uint32 {
+	return MaxBlockPayload
 }

@@ -57,6 +57,7 @@ const (
 	CmdCFilter      = "cfilter"
 	CmdCFHeaders    = "cfheaders"
 	CmdCFCheckpt    = "cfcheckpt"
+	CmdSign         = "sign"
 )
 
 // MessageEncoding 表示要使用的有线消息编码格式。
