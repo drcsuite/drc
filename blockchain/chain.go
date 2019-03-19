@@ -62,14 +62,14 @@ type orphanBlock struct {
 // However, the returned snapshot must be treated as immutable since it is
 // shared by all callers.
 type BestState struct {
-	Hash        chainhash.Hash // The hash of the block.
-	Height      int32          // The height of the block.
-	Bits        uint32         // The difficulty bits of the block.
-	BlockSize   uint64         // The size of the block.
-	BlockWeight uint64         // The weight of the block.
-	NumTxns     uint64         // The number of txns in the block.
-	TotalTxns   uint64         // The total number of txns in the chain.
-	MedianTime  time.Time      // Median time as per CalcPastMedianTime.
+	Hash   chainhash.Hash // The hash of the block.
+	Height int32          // The height of the block.
+	//Bits        uint32         // The difficulty bits of the block.
+	BlockSize   uint64    // The size of the block.
+	BlockWeight uint64    // The weight of the block.
+	NumTxns     uint64    // The number of txns in the block.
+	TotalTxns   uint64    // The total number of txns in the chain.
+	MedianTime  time.Time // Median time as per CalcPastMedianTime.
 	PubKey      chainhash.Hash33
 	Signature   chainhash.Hash64
 }
@@ -77,7 +77,7 @@ type BestState struct {
 // newBestState为给定的参数返回一个新的best stats实例。
 // newBestState returns a new best stats instance for the given parameters.
 func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
-	totalTxns uint64, signature chainhash.Hash64, pubKey chainhash.Hash33, medianTime time.Time) *BestState {
+	totalTxns uint64, signature chainhash.Hash64, pubKey chainhash.Hash33, scale uint16, reserved uint16, medianTime time.Time) *BestState {
 
 	return &BestState{
 		Hash:   node.hash,
@@ -105,14 +105,16 @@ type BlockChain struct {
 	// The following fields are set when the instance is created and can't
 	// be changed afterwards, so there is no need to protect them with a
 	// separate mutex.
-	checkpoints         []chaincfg.Checkpoint
-	checkpointsByHeight map[int32]*chaincfg.Checkpoint
-	db                  database.DB
-	chainParams         *chaincfg.Params
-	timeSource          MedianTimeSource
-	sigCache            *txscript.SigCache
-	indexManager        IndexManager
-	hashCache           *txscript.HashCache
+
+	//checkpoints         []chaincfg.Checkpoint
+
+	//checkpointsByHeight map[int32]*chaincfg.Checkpoint
+	db           database.DB
+	chainParams  *chaincfg.Params
+	timeSource   MedianTimeSource
+	sigCache     *txscript.SigCache
+	indexManager IndexManager
+	hashCache    *txscript.HashCache
 
 	// The following fields are calculated based upon the provided chain
 	// parameters.  They are also set when the instance is created and
@@ -147,7 +149,8 @@ type BlockChain struct {
 
 	// These fields are related to checkpoint handling.  They are protected
 	// by the chain lock.
-	nextCheckpoint *chaincfg.Checkpoint
+
+	//nextCheckpoint *chaincfg.Checkpoint
 	checkpointNode *blockNode
 
 	// The state is used as a fairly efficient way to cache information
@@ -637,10 +640,12 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 	wire.ChangeCode()
 	pubKey := block.MsgBlock().Header.PublicKey
 	signature := block.MsgBlock().Header.Signature
+	scale := block.MsgBlock().Header.Scale
+	reserved := block.MsgBlock().Header.Reserved
 
 	// 添加signature和pubKey
 	state := newBestState(node, blockSize, blockWeight, numTxns,
-		curTotalTxns+numTxns, signature, pubKey, node.CalcPastMedianTime())
+		curTotalTxns+numTxns, signature, pubKey, scale, reserved, node.CalcPastMedianTime())
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
@@ -758,9 +763,11 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *drcutil.Block, view
 	// 添加signature和pubKey
 	pubKey := block.MsgBlock().Header.PublicKey
 	signature := block.MsgBlock().Header.Signature
+	scale := block.MsgBlock().Header.Scale
+	reserved := block.MsgBlock().Header.Reserved
 
 	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
-		newTotalTxns, signature, pubKey, prevNode.CalcPastMedianTime())
+		newTotalTxns, signature, pubKey, scale, reserved, prevNode.CalcPastMedianTime())
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
@@ -1273,10 +1280,12 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *drcutil.Block, fla
 func (b *BlockChain) isCurrent() bool {
 	// Not current if the latest main (best) chain height is before the
 	// latest known good checkpoint (when checkpoints are enabled).
-	checkpoint := b.LatestCheckpoint()
-	if checkpoint != nil && b.bestChain.Tip().height < checkpoint.Height {
-		return false
-	}
+
+	wire.ChangeCode()
+	//checkpoint := b.LatestCheckpoint()
+	//if checkpoint != nil && b.bestChain.Tip().height < checkpoint.Height {
+	//	return false
+	//}
 
 	// Not current if the latest best block has a timestamp before 24 hours
 	// ago.
@@ -1692,6 +1701,11 @@ func (b *BlockChain) LocateHeaders(locator BlockLocator, hashStop *chainhash.Has
 	return headers
 }
 
+func (b *BlockChain) GetBlockIndex() *blockIndex {
+	wire.ChangeCode()
+	return b.index
+}
+
 // IndexManager提供了一个通用接口，在连接和断开与主链顶端的块时调用该接口，以支持可选索引。
 // IndexManager provides a generic interface that the is called when blocks are
 // connected and disconnected to and from the tip of the main chain for the
@@ -1745,7 +1759,7 @@ type Config struct {
 	//
 	// This field can be nil if the caller does not wish to specify any
 	// checkpoints.
-	Checkpoints []chaincfg.Checkpoint
+	//Checkpoints []chaincfg.Checkpoint
 
 	// TimeSource defines the median time source to use for things such as
 	// block processing and determining whether or not the chain is current.
@@ -1798,29 +1812,30 @@ func New(config *Config) (*BlockChain, error) {
 
 	// Generate a checkpoint by height map from the provided checkpoints
 	// and assert the provided checkpoints are sorted by height as required.
-	var checkpointsByHeight map[int32]*chaincfg.Checkpoint
-	var prevCheckpointHeight int32
-	if len(config.Checkpoints) > 0 {
-		checkpointsByHeight = make(map[int32]*chaincfg.Checkpoint)
-		for i := range config.Checkpoints {
-			checkpoint := &config.Checkpoints[i]
-			if checkpoint.Height <= prevCheckpointHeight {
-				return nil, AssertError("blockchain.New " +
-					"checkpoints are not sorted by height")
-			}
-
-			checkpointsByHeight[checkpoint.Height] = checkpoint
-			prevCheckpointHeight = checkpoint.Height
-		}
-	}
+	//var checkpointsByHeight map[int32]*chaincfg.Checkpoint
+	wire.ChangeCode()
+	//var prevCheckpointHeight int32
+	//if len(config.Checkpoints) > 0 {
+	//	checkpointsByHeight = make(map[int32]*chaincfg.Checkpoint)
+	//	for i := range config.Checkpoints {
+	//		checkpoint := &config.Checkpoints[i]
+	//		if checkpoint.Height <= prevCheckpointHeight {
+	//			return nil, AssertError("blockchain.New " +
+	//				"checkpoints are not sorted by height")
+	//		}
+	//
+	//		checkpointsByHeight[checkpoint.Height] = checkpoint
+	//		prevCheckpointHeight = checkpoint.Height
+	//	}
+	//}
 
 	params := config.ChainParams
 	targetTimespan := int64(params.TargetTimespan / time.Second)
 	targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
 	adjustmentFactor := params.RetargetAdjustmentFactor
 	b := BlockChain{
-		checkpoints:         config.Checkpoints,
-		checkpointsByHeight: checkpointsByHeight,
+		//checkpoints:         config.Checkpoints,
+		//checkpointsByHeight: checkpointsByHeight,
 		db:                  config.DB,
 		chainParams:         params,
 		timeSource:          config.TimeSource,

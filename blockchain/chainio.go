@@ -1059,8 +1059,11 @@ func (b *BlockChain) createChainState() error {
 	// 为创世块添加pk和sign
 	sign := genesisBlock.MsgBlock().Header.Signature
 	pubKey := genesisBlock.MsgBlock().Header.PublicKey
+	scale := genesisBlock.MsgBlock().Header.Scale
+	reserved := genesisBlock.MsgBlock().Header.Reserved
+
 	b.stateSnapshot = newBestState(node, blockSize, blockWeight, numTxns,
-		numTxns, sign, pubKey, time.Unix(node.timestamp, 0))
+		numTxns, sign, pubKey, scale, reserved, time.Unix(node.timestamp, 0))
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
@@ -1290,7 +1293,7 @@ func (b *BlockChain) initChainState() error {
 		wire.ChangeCode()
 		// tip 作为blockNode添加sign和pk
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
-			numTxns, state.totalTxns, tip.signature, tip.publicKey, tip.CalcPastMedianTime())
+			numTxns, state.totalTxns, tip.signature, tip.publicKey, tip.scale, tip.reserved, tip.CalcPastMedianTime())
 
 		return nil
 	})

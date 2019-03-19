@@ -107,6 +107,8 @@ type blockNode struct {
 	status    blockStatus
 	signature chainhash.Hash64
 	publicKey chainhash.Hash33
+	scale     uint16
+	reserved  uint16
 }
 
 // initBlockNode初始化给定头节点和父节点的块节点，

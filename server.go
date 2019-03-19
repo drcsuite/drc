@@ -15,7 +15,6 @@ import (
 	"math"
 	"net"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -2657,18 +2656,18 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	}
 
 	// Merge given checkpoints with the default ones unless they are disabled.
-	var checkpoints []chaincfg.Checkpoint
+	//var checkpoints []chaincfg.Checkpoint
 	if !cfg.DisableCheckpoints {
-		checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, cfg.addCheckpoints)
+		//checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, cfg.addCheckpoints)
 	}
 
 	// Create a new block chain instance with the appropriate configuration.
 	var err error
 	s.chain, err = blockchain.New(&blockchain.Config{
-		DB:           s.db,
-		Interrupt:    interrupt,
-		ChainParams:  s.chainParams,
-		Checkpoints:  checkpoints,
+		DB:          s.db,
+		Interrupt:   interrupt,
+		ChainParams: s.chainParams,
+		//Checkpoints:  checkpoints,
 		TimeSource:   s.timeSource,
 		SigCache:     s.sigCache,
 		IndexManager: indexManager,
@@ -2771,6 +2770,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		ProcessBlock:           s.syncManager.ProcessBlock,
 		ConnectedCount:         s.ConnectedCount,
 		IsCurrent:              s.syncManager.IsCurrent,
+		Chain:                  s.chain,
 	})
 
 	// Only setup a function to return new addresses to connect to when
@@ -3124,28 +3124,28 @@ func isWhitelisted(addr net.Addr) bool {
 
 // checkpointSorter implements sort.Interface to allow a slice of checkpoints to
 // be sorted.
-type checkpointSorter []chaincfg.Checkpoint
+//type checkpointSorter []chaincfg.Checkpoint
 
 // 返回片中检查点的数量。
 // Len returns the number of checkpoints in the slice.  It is part of the
 // sort.Interface implementation.
-func (s checkpointSorter) Len() int {
-	return len(s)
-}
+//func (s checkpointSorter) Len() int {
+//	return len(s)
+//}
 
 // 交换通过的索引上的检查点。
 // Swap swaps the checkpoints at the passed indices.  It is part of the
 // sort.Interface implementation.
-func (s checkpointSorter) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
+//func (s checkpointSorter) Swap(i, j int) {
+//	s[i], s[j] = s[j], s[i]
+//}
 
 // 返回带有索引i的检查点是否应该在带有索引j的检查点之前排序。
 // Less returns whether the checkpoint with index i should sort before the
 // checkpoint with index j.  It is part of the sort.Interface implementation.
-func (s checkpointSorter) Less(i, j int) bool {
-	return s[i].Height < s[j].Height
-}
+//func (s checkpointSorter) Less(i, j int) bool {
+//	return s[i].Height < s[j].Height
+//}
 
 // 返回合并到一个片中的两个检查点片，以便按高度对检查点进行排序。
 // 如果附加检查点包含与默认检查点具有相同高度的检查点，则附加检查点将优先并覆盖默认检查点。
@@ -3154,28 +3154,28 @@ func (s checkpointSorter) Less(i, j int) bool {
 // checkpoints contain a checkpoint with the same height as a checkpoint in the
 // default checkpoints, the additional checkpoint will take precedence and
 // overwrite the default one.
-func mergeCheckpoints(defaultCheckpoints, additional []chaincfg.Checkpoint) []chaincfg.Checkpoint {
-	// Create a map of the additional checkpoints to remove duplicates while
-	// leaving the most recently-specified checkpoint.
-	extra := make(map[int32]chaincfg.Checkpoint)
-	for _, checkpoint := range additional {
-		extra[checkpoint.Height] = checkpoint
-	}
-
-	// Add all default checkpoints that do not have an override in the
-	// additional checkpoints.
-	numDefault := len(defaultCheckpoints)
-	checkpoints := make([]chaincfg.Checkpoint, 0, numDefault+len(extra))
-	for _, checkpoint := range defaultCheckpoints {
-		if _, exists := extra[checkpoint.Height]; !exists {
-			checkpoints = append(checkpoints, checkpoint)
-		}
-	}
-
-	// Append the additional checkpoints and return the sorted results.
-	for _, checkpoint := range extra {
-		checkpoints = append(checkpoints, checkpoint)
-	}
-	sort.Sort(checkpointSorter(checkpoints))
-	return checkpoints
-}
+//func mergeCheckpoints(defaultCheckpoints, additional []chaincfg.Checkpoint) []chaincfg.Checkpoint {
+//	// Create a map of the additional checkpoints to remove duplicates while
+//	// leaving the most recently-specified checkpoint.
+//	extra := make(map[int32]chaincfg.Checkpoint)
+//	for _, checkpoint := range additional {
+//		extra[checkpoint.Height] = checkpoint
+//	}
+//
+//	// Add all default checkpoints that do not have an override in the
+//	// additional checkpoints.
+//	numDefault := len(defaultCheckpoints)
+//	checkpoints := make([]chaincfg.Checkpoint, 0, numDefault+len(extra))
+//	for _, checkpoint := range defaultCheckpoints {
+//		if _, exists := extra[checkpoint.Height]; !exists {
+//			checkpoints = append(checkpoints, checkpoint)
+//		}
+//	}
+//
+//	// Append the additional checkpoints and return the sorted results.
+//	for _, checkpoint := range extra {
+//		checkpoints = append(checkpoints, checkpoint)
+//	}
+//	sort.Sort(checkpointSorter(checkpoints))
+//	return checkpoints
+//}
