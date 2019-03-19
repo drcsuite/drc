@@ -356,7 +356,7 @@ func TestPeerConnection(t *testing.T) {
 
 // TestPeerListeners tests that the peer listeners are called as expected.
 func TestPeerListeners(t *testing.T) {
-	wire.ChangeCode()
+	wire.TestChangeCode()
 	//verack := make(chan struct{}, 1)
 	//ok := make(chan wire.Message, 20)
 	//peerCfg := &peer.Config{

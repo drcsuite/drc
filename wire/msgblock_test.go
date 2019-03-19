@@ -17,7 +17,7 @@ import (
 
 // TestBlock tests the MsgBlock API.
 func TestBlock(t *testing.T) {
-	ChangeCode()
+	TestChangeCode()
 	//	pver := ProtocolVersion
 	//
 	//	// Block 1 header.
@@ -484,7 +484,7 @@ func TestBlockSerializeSize(t *testing.T) {
 }
 
 func change1() {
-	ChangeCode()
+	TestChangeCode()
 }
 
 // blockOne is the first block in the mainnet block chain.

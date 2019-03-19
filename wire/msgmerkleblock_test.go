@@ -17,7 +17,7 @@ import (
 
 // TestMerkleBlock tests the MsgMerkleBlock API.
 func TestMerkleBlock(t *testing.T) {
-	ChangeCode()
+	TestChangeCode()
 	//pver := ProtocolVersion
 	//enc := BaseEncoding
 	//
@@ -113,7 +113,7 @@ func TestMerkleBlock(t *testing.T) {
 // TestMerkleBlockCrossProtocol tests the MsgMerkleBlock API when encoding with
 // the latest protocol version and decoding with BIP0031Version.
 func TestMerkleBlockCrossProtocol(t *testing.T) {
-	ChangeCode()
+	TestChangeCode()
 	// Block 1 header.
 	//prevHash := &blockOne.Header.PrevBlock
 	//merkleHash := &blockOne.Header.MerkleRoot
@@ -373,7 +373,7 @@ func TestMerkleBlockOverflowErrors(t *testing.T) {
 }
 
 func change2() {
-	ChangeCode()
+	TestChangeCode()
 }
 
 // merkleBlockOne is a merkle block created from block one of the block chain

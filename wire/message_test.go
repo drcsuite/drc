@@ -29,7 +29,7 @@ func makeHeader(btcnet BitcoinNet, command string,
 
 // TestMessage tests the Read/WriteMessage and Read/WriteMessageN API.
 func TestMessage(t *testing.T) {
-	ChangeCode()
+	TestChangeCode()
 	//	pver := ProtocolVersion
 	//
 	//	// Create the various types of messages to test.

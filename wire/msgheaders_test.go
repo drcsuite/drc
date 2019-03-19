@@ -58,7 +58,7 @@ func TestHeaders(t *testing.T) {
 // TestHeadersWire tests the MsgHeaders wire encode and decode for various
 // numbers of headers and protocol versions.
 func TestHeadersWire(t *testing.T) {
-	ChangeCode()
+	TestChangeCode()
 	//	hash := mainNetGenesisHash
 	//	merkleHash := blockOne.Header.MerkleRoot
 	//	bits := uint32(0x1d00ffff)
@@ -224,7 +224,7 @@ func TestHeadersWire(t *testing.T) {
 // TestHeadersWireErrors performs negative tests against wire encode and decode
 // of MsgHeaders to confirm error paths work correctly.
 func TestHeadersWireErrors(t *testing.T) {
-	ChangeCode()
+	TestChangeCode()
 	//	pver := ProtocolVersion
 	//	wireErr := &MessageError{}
 	//

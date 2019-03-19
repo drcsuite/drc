@@ -82,6 +82,7 @@ type blockNode struct {
 	// hash is the double sha 256 of the block.
 	hash chainhash.Hash
 
+	// workSum是链中到该节点并包括该节点的总工作量。
 	// workSum is the total amount of work in the chain up to and including
 	// this node.
 	workSum *big.Int
@@ -93,9 +94,9 @@ type blockNode struct {
 	// reconstructing headers from memory.  These must be treated as
 	// immutable and are intentionally ordered to avoid padding on 64-bit
 	// platforms.
-	version    int32
-	bits       uint32
-	nonce      uint32
+	version int32
+	//bits       uint32
+	//nonce      uint32
 	timestamp  int64
 	merkleRoot chainhash.Hash
 
@@ -103,7 +104,9 @@ type blockNode struct {
 	// status field, unlike the other fields, may be written to and so should
 	// only be accessed using the concurrent-safe NodeStatus method on
 	// blockIndex once the node has been added to the global index.
-	status blockStatus
+	status    blockStatus
+	signature chainhash.Hash64
+	publicKey chainhash.Hash33
 }
 
 // initBlockNode初始化给定头节点和父节点的块节点，

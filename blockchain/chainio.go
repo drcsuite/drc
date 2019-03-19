@@ -1054,8 +1054,13 @@ func (b *BlockChain) createChainState() error {
 	numTxns := uint64(len(genesisBlock.MsgBlock().Transactions))
 	blockSize := uint64(genesisBlock.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(genesisBlock))
+
+	wire.ChangeCode()
+	// 为创世块添加pk和sign
+	sign := genesisBlock.MsgBlock().Header.Signature
+	pubKey := genesisBlock.MsgBlock().Header.PublicKey
 	b.stateSnapshot = newBestState(node, blockSize, blockWeight, numTxns,
-		numTxns, time.Unix(node.timestamp, 0))
+		numTxns, sign, pubKey, time.Unix(node.timestamp, 0))
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
@@ -1238,6 +1243,7 @@ func (b *BlockChain) initChainState() error {
 			i++
 		}
 
+		//将最佳链视图设置为存储的最佳状态。
 		// Set the best chain view to the stored best state.
 		tip := b.index.LookupNode(&state.hash)
 		if tip == nil {
@@ -1280,8 +1286,11 @@ func (b *BlockChain) initChainState() error {
 		blockSize := uint64(len(blockBytes))
 		blockWeight := uint64(GetBlockWeight(drcutil.NewBlock(&block)))
 		numTxns := uint64(len(block.Transactions))
+
+		wire.ChangeCode()
+		// tip 作为blockNode添加sign和pk
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
-			numTxns, state.totalTxns, tip.CalcPastMedianTime())
+			numTxns, state.totalTxns, tip.signature, tip.publicKey, tip.CalcPastMedianTime())
 
 		return nil
 	})

@@ -68,6 +68,20 @@ func (hash *Hash) CloneBytes() []byte {
 	return newHash
 }
 
+func (hash *Hash64) CloneBytes() []byte {
+	newHash := make([]byte, HashSize)
+	copy(newHash, hash[:])
+
+	return newHash
+}
+
+func (hash *Hash33) CloneBytes() []byte {
+	newHash := make([]byte, HashSize)
+	copy(newHash, hash[:])
+
+	return newHash
+}
+
 // SetBytes sets the bytes which represent the hash.  An error is returned if
 // the number of bytes passed in is not HashSize.
 func (hash *Hash) SetBytes(newHash []byte) error {

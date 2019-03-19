@@ -374,7 +374,7 @@ func newFakeChain(params *chaincfg.Params) *BlockChain {
 // newFakeNode creates a block node connected to the passed parent with the
 // provided fields populated and fake values for the other fields.
 func newFakeNode(parent *blockNode, blockVersion int32, bits uint32, timestamp time.Time) *blockNode {
-	wire.ChangeCode()
+	wire.TestChangeCode()
 	// Make up a header and create a block node from it.
 	header := &wire.BlockHeader{
 		Version:   blockVersion,

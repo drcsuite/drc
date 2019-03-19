@@ -209,6 +209,8 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 	ticker *time.Ticker, quit chan struct{}) bool {
 	wire.ChangeCode()
+	// 如果是第一个块，使用初始种子作为seed，签名后做doublehash。
+	// 根据根据当前阈值，判断是否具有发块权限
 
 	// Choose a random extra nonce offset for this block template and
 	// worker.
@@ -329,13 +331,20 @@ out:
 		// submission, since the current block will be changing and
 		// this would otherwise end up building a new block template on
 		// a block that is in the process of becoming stale.
+		wire.ChangeCode()
+		// 修改BestSnapshot，返回最佳快照，添加sign和pk
 		m.submitBlockLock.Lock()
 		curHeight := m.g.BestSnapshot().Height
+		preSign := m.g.BestSnapshot().Signature
+		m.privKey.Sign(preSign.CloneBytes())
 		if curHeight != 0 && !m.cfg.IsCurrent() {
 			m.submitBlockLock.Unlock()
 			time.Sleep(time.Second)
 			continue
 		}
+
+		// 只有符合发块阈值的节点，才可以开始发块
+		// 从BestSnapshot中取出最新块的sign，满足条件，开始发块
 
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
@@ -384,6 +393,7 @@ out:
 func (m *CPUMiner) miningWorkerController() {
 	// launchWorkers groups common code to launch a specified number of
 	// workers for generating blocks.
+	wire.ChangeCode()
 	var runningWorkers []chan struct{}
 	launchWorkers := func(numWorkers uint32) {
 		for i := uint32(0); i < numWorkers; i++ {

@@ -23,7 +23,7 @@ var testNoncePrng = rand.New(rand.NewSource(0))
 // subsequent node points to the previous one to create a chain.  The first node
 // will point to the passed parent which can be nil if desired.
 func chainedNodes(parent *blockNode, numNodes int) []*blockNode {
-	wire.ChangeCode()
+	wire.TestChangeCode()
 	nodes := make([]*blockNode, numNodes)
 	//tip := parent
 	//for i := 0; i < numNodes; i++ {

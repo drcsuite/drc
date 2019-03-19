@@ -70,22 +70,26 @@ type BestState struct {
 	NumTxns     uint64         // The number of txns in the block.
 	TotalTxns   uint64         // The total number of txns in the chain.
 	MedianTime  time.Time      // Median time as per CalcPastMedianTime.
+	PubKey      chainhash.Hash33
+	Signature   chainhash.Hash64
 }
 
 // newBestState为给定的参数返回一个新的best stats实例。
 // newBestState returns a new best stats instance for the given parameters.
 func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
-	totalTxns uint64, medianTime time.Time) *BestState {
+	totalTxns uint64, signature chainhash.Hash64, pubKey chainhash.Hash33, medianTime time.Time) *BestState {
 
 	return &BestState{
-		Hash:        node.hash,
-		Height:      node.height,
-		Bits:        node.bits,
+		Hash:   node.hash,
+		Height: node.height,
+		//Bits:        node.bits,
 		BlockSize:   blockSize,
 		BlockWeight: blockWeight,
 		NumTxns:     numTxns,
 		TotalTxns:   totalTxns,
 		MedianTime:  medianTime,
+		Signature:   signature,
+		PubKey:      pubKey,
 	}
 }
 
@@ -629,8 +633,14 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 	numTxns := uint64(len(block.MsgBlock().Transactions))
 	blockSize := uint64(block.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(block))
+
+	wire.ChangeCode()
+	pubKey := block.MsgBlock().Header.PublicKey
+	signature := block.MsgBlock().Header.Signature
+
+	// 添加signature和pubKey
 	state := newBestState(node, blockSize, blockWeight, numTxns,
-		curTotalTxns+numTxns, node.CalcPastMedianTime())
+		curTotalTxns+numTxns, signature, pubKey, node.CalcPastMedianTime())
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
@@ -743,8 +753,14 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *drcutil.Block, view
 	blockSize := uint64(prevBlock.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(prevBlock))
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
+
+	wire.ChangeCode()
+	// 添加signature和pubKey
+	pubKey := block.MsgBlock().Header.PublicKey
+	signature := block.MsgBlock().Header.Signature
+
 	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
-		newTotalTxns, prevNode.CalcPastMedianTime())
+		newTotalTxns, signature, pubKey, prevNode.CalcPastMedianTime())
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.

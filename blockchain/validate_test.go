@@ -66,7 +66,7 @@ func TestSequenceLocksActive(t *testing.T) {
 // TestCheckConnectBlockTemplate tests the CheckConnectBlockTemplate function to
 // ensure it fails.
 func TestCheckConnectBlockTemplate(t *testing.T) {
-	wire.ChangeCode()
+	wire.TestChangeCode()
 	// Create a new database and chain instance to run tests against.
 	//chain, teardownFunc, err := chainSetup("checkconnectblocktemplate",
 	//	&chaincfg.MainNetParams)
@@ -236,7 +236,7 @@ func TestCheckSerializedHeight(t *testing.T) {
 }
 
 func change1() {
-	wire.ChangeCode()
+	wire.TestChangeCode()
 }
 
 // Block100000 defines block 100,000 of the block chain.  It is used to
