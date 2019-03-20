@@ -76,8 +76,8 @@ func mean(values []uint16) (meanValue uint16) {
 	return
 }
 
-// 计算投票的π值
-// To calculate the π value of a vote
+// 计算投票的∏值
+// To calculate the ∏ value of a vote
 func VoteVerge(scale uint16) *big.Int {
 
 	// bigint格式的全网节点数
@@ -90,23 +90,24 @@ func VoteVerge(scale uint16) *big.Int {
 	// The value of the power
 	max256, _ := new(big.Int).SetString("10000000000000000000000000000000000000000000000000000000000000000", 16)
 
-	// 投票π值计算
+	// 投票∏值计算
+	// The vote ∏ value calculation
 	max256.Mul(max256, bigIdealVoteNum)
 	max256.Quo(max256, bigScale)
 
 	return max256
 }
 
-// 计算发块的π值
-// Calculates the π value of the block
+// 计算发块的∏值
+// Calculates the ∏ value of the block
 func BlockVerge(scale uint16) *big.Int {
 
 	bigIdealBlockNum := big.NewInt(IdealBlockNum)
 	bigIdealVoteNum := big.NewInt(IdealVoteNum)
 	verge := VoteVerge(scale)
 
-	// 发块π值计算
-	// A block π value calculation
+	// 发块∏值计算
+	// A block ∏ value calculation
 	verge.Mul(verge, bigIdealBlockNum)
 	verge.Quo(verge, bigIdealVoteNum)
 	return verge
@@ -118,7 +119,9 @@ func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey, priv
 
 	if CheckBlock(*msg) {
 		pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
-		CheckAndPanic(err)
+		if err != nil {
+			log.Errorf("Format conversion error: %s", err)
+		}
 		// 散列两次区块内容
 		// Hash the contents of the block twice
 		headerHash := msg.Header.BlockHash()
@@ -130,7 +133,9 @@ func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey, priv
 			// 用自己的私钥签名区块
 			// Sign the block with your own private key
 			headerSign, err := privateKey.Sign(headerHash.CloneBytes())
-			CheckAndPanic(err)
+			if err != nil {
+				log.Errorf("Signature error: %s", err)
+			}
 			// 计算本节点的投票weight
 			//The voting weight of this node is calculated
 			weight := chainhash.DoubleHashB(headerSign.Serialize())
@@ -143,7 +148,9 @@ func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey, priv
 			if bigWeight.Cmp(voteVerge) <= 0 {
 
 				sign, err := chainhash.NewHash64(headerSign.Serialize())
-				CheckAndPanic(err)
+				if err != nil {
+					log.Errorf("Format conversion error: %s", err)
+				}
 
 				// 维护本地票池
 				// Maintain local ticket pool
@@ -179,15 +186,21 @@ func CollectVotes(p peer.Peer, msg *wire.MsgSign, publicKey *btcec.PublicKey) {
 	// 查看是否是自己的签名投票
 	// Check to see if it's your signature vote
 	pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
-	CheckAndPanic(err)
+	if err != nil {
+		log.Errorf("Format conversion error: %s", err)
+	}
 	if preventRepeatSign(msg.BlockHeaderHash, *pubKey) {
 
 		// 验证区块头的签名
 		// Verify the signature of the block header
 		signature, err := btcec.ParseSignature(msg.Signature.CloneBytes(), btcec.S256())
-		CheckAndPanic(err)
+		if err != nil {
+			log.Errorf("Parse error: %s", err)
+		}
 		pubKey, err := btcec.ParsePubKey(msg.PublicKey.CloneBytes(), btcec.S256())
-		CheckAndPanic(err)
+		if err != nil {
+			log.Errorf("Parse error: %s", err)
+		}
 		hash := msg.BlockHeaderHash.CloneBytes()
 		if signature.Verify(hash, pubKey) {
 
@@ -244,15 +257,13 @@ func CheckBlock(msg wire.MsgBlock) bool {
 	hash := msg.Header.PrevBlock.CloneBytes()
 	if signature.Verify(hash, pubKey) {
 		return true
-	} else {
-		return false
 	}
 	return false
 }
 
-// Check And Panic
-func CheckAndPanic(err error) {
-	if err != nil {
-		panic(err)
-	}
+// 从一段时间收到的所有区块中选择最适合的区块进行签名
+func ChooseBlock() {
+
+	//
+
 }
