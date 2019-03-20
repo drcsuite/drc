@@ -1339,6 +1339,20 @@ func (sp *serverPeer) OnWrite(_ *peer.Peer, bytesWritten int, msg wire.Message, 
 	sp.server.AddBytesSent(uint64(bytesWritten))
 }
 
+// 接收到签名信息调用的处理函数
+// The handler function that is called when the signature information is received
+func (sp *serverPeer) OnSign(_ *peer.Peer, msg *wire.MsgSign) {
+
+	// 处理和保存签名
+	// Process and save signatures
+	if sp.server.cpuMiner.CollectVotes(msg) {
+
+		// 符合传播条件，传播签名
+		// If propagation conditions are met, the signature is propagated
+		sp.QueueMessage(msg, nil)
+	}
+}
+
 // randomUint16Number returns a random uint16 in a specified input range.  Note
 // that the range is in zeroth ordering; if you pass it 1800, you will get
 // values from 0 to 1800.
@@ -1996,6 +2010,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnAddr:         sp.OnAddr,
 			OnRead:         sp.OnRead,
 			OnWrite:        sp.OnWrite,
+			OnSign:         sp.OnSign,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but

@@ -20,11 +20,11 @@ import (
 // before adding it.  The block is expected to have already gone through
 // ProcessBlock before calling this function with it.
 //
-//标志也被传递给checkBlockContext和connectBestChain。有关标志如何修改其行为，请参阅它们的文档。
+// 标志也被传递给checkBlockContext和connectBestChain。有关标志如何修改其行为，请参阅它们的文档。
 // The flags are also passed to checkBlockContext and connectBestChain.  See
 // their documentation for how the flags modify their behavior.
 //
-//此函数必须在持有链状态锁的情况下调用(用于写操作)。
+// 此函数必须在持有链状态锁的情况下调用(用于写操作)。
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) maybeAcceptBlock(block *drcutil.Block, flags BehaviorFlags) (bool, error) {
 	// The height of this block is one more than the referenced previous

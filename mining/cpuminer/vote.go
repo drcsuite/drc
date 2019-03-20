@@ -115,8 +115,17 @@ func BlockVerge(scale uint16) *big.Int {
 
 // 新块验证投票
 // New block validation vote
-func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey, privateKey *btcec.PrivateKey) {
+func (m *CPUMiner) BlockVote(p peer.Peer, msg *wire.MsgBlock) {
+	m.Mutex.Lock()
+	defer m.Mutex.Unlock()
 
+	// 获取本节点公私钥
+	// Gets the node's public key and private key
+	privateKey := m.privKey
+	publicKey := privateKey.PubKey()
+
+	// 验证区块
+	// Verify the block
 	if CheckBlock(*msg) {
 		pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
 		if err != nil {
@@ -181,8 +190,13 @@ func BlockVote(p peer.Peer, msg *wire.MsgBlock, publicKey *btcec.PublicKey, priv
 
 // 收集签名投票
 // Collect signatures and vote
-func CollectVotes(p peer.Peer, msg *wire.MsgSign, publicKey *btcec.PublicKey) {
+func (m *CPUMiner) CollectVotes(msg *wire.MsgSign) bool {
+	m.Mutex.Lock()
+	defer m.Mutex.Unlock()
 
+	// 获取本节点公钥
+	// Gets the node's public key
+	publicKey := m.privKey.PubKey()
 	// 查看是否是自己的签名投票
 	// Check to see if it's your signature vote
 	pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
@@ -191,8 +205,8 @@ func CollectVotes(p peer.Peer, msg *wire.MsgSign, publicKey *btcec.PublicKey) {
 	}
 	if preventRepeatSign(msg.BlockHeaderHash, *pubKey) {
 
-		// 验证区块头的签名
-		// Verify the signature of the block header
+		// 验证签名
+		// Verify the signature
 		signature, err := btcec.ParseSignature(msg.Signature.CloneBytes(), btcec.S256())
 		if err != nil {
 			log.Errorf("Parse error: %s", err)
@@ -212,12 +226,10 @@ func CollectVotes(p peer.Peer, msg *wire.MsgSign, publicKey *btcec.PublicKey) {
 			}
 			TicketPool[msg.BlockHeaderHash] = append(TicketPool[msg.BlockHeaderHash], signAndKey)
 
-			// 传播签名
-			// Spread the signature
-			p.QueueMessage(msg, nil)
-
+			return true
 		}
 	}
+	return false
 }
 
 // 避免重复投票或多次记录投票记录，如果没有重复，返回true
@@ -262,8 +274,15 @@ func CheckBlock(msg wire.MsgBlock) bool {
 }
 
 // 从一段时间收到的所有区块中选择最适合的区块进行签名
-func ChooseBlock() {
+func ChooseBlock(p peer.Peer, msg *wire.MsgBlock) {
 
-	//
+	// 首先查看weight的大小
+
+	//weight := chainhash.DoubleHashB(msg.Header.Signature.CloneBytes())
+	//bigWeight := new(big.Int).SetBytes(weight)
+
+	// 查看有没有积累了票数很多的区块
+
+	// 验证是否为恶意块
 
 }
