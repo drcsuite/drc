@@ -16,7 +16,6 @@ func TestEstimateScale(t *testing.T) {
 }
 
 func TestBlockVerge(t *testing.T) {
-
 	fmt.Println(VoteVerge(257))
 	fmt.Println(BlockVerge(257))
 }

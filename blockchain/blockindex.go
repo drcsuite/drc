@@ -109,6 +109,7 @@ type blockNode struct {
 	signature chainhash.Hash64
 	publicKey chainhash.Hash33
 	scale     uint16
+	vote      uint16
 	reserved  uint16
 }
 
