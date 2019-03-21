@@ -195,6 +195,7 @@ type BlockChain struct {
 	unknownRulesWarned    bool
 	unknownVersionsWarned bool
 
+	// notification字段存储了一块回调，将在某些区块链事件上执行。
 	// The notifications field stores a slice of callbacks to be executed on
 	// certain blockchain events.
 	notificationsLock sync.RWMutex
@@ -712,9 +713,9 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 	// Notify the caller that the block was connected to the main chain.
 	// The caller would typically want to react with actions such as
 	// updating wallets.
-	b.chainLock.Unlock()
-	b.sendNotification(NTBlockConnected, block)
-	b.chainLock.Lock()
+	//b.chainLock.Unlock()
+	//b.sendNotification(NTBlockConnected, block)
+	//b.chainLock.Lock()
 
 	return nil
 }
@@ -1151,7 +1152,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *drcutil.Block, fla
 	// We are extending the main (best) chain with a new block.  This is the
 	// most common case.
 	parentHash := &block.MsgBlock().Header.PrevBlock
-	if parentHash.IsEqual(&b.bestChain.Tip().hash) {
+	if parentHash.IsEqual(&b.bestChain.Tip().hash) { // 如果是在最佳块后为true
 		// Skip checks if node has already been fully validated.
 		fastAdd = fastAdd || b.index.NodeStatus(node).KnownValid()
 
@@ -1225,6 +1226,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *drcutil.Block, fla
 			block.Hash())
 	}
 
+	// 我们正在扩展(或创建)一个侧链，但是这个新的侧链的累积功不足以使它成为新的链。
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.
 	if node.workSum.Cmp(b.bestChain.Tip().workSum) <= 0 {

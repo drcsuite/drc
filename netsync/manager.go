@@ -6,7 +6,6 @@ package netsync
 
 import (
 	"container/list"
-	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -108,6 +107,10 @@ type processBlockResponse struct {
 	isOrphan bool
 	err      error
 }
+type sendBlockResponse struct {
+	isOrphan bool
+	err      error
+}
 
 // processBlockMsg是一种通过消息通道发送的消息类型，用于处理请求的块。
 // 注意，这个调用不同于上面的块msg，因为块msg是为来自对等点并具有额外处理的块而设计的，而这个消息实际上只是在内部块链实例上调用ProcessBlock的一种并发安全方法。
@@ -120,6 +123,11 @@ type processBlockMsg struct {
 	block *drcutil.Block
 	flags blockchain.BehaviorFlags
 	reply chan processBlockResponse
+}
+type sendBlockMsg struct {
+	block *drcutil.Block
+	//flags blockchain.BehaviorFlags
+	reply chan sendBlockResponse
 }
 
 // isCurrentMsg是一种通过消息通道发送的消息类型，用于请求sync manager是否认为它与当前连接的对等点同步。
@@ -186,7 +194,7 @@ type SyncManager struct {
 	headersFirstMode bool
 	headerList       *list.List
 	startHeader      *list.Element
-	nextCheckpoint   *chaincfg.Checkpoint
+	//nextCheckpoint   *chaincfg.Checkpoint
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
@@ -203,10 +211,10 @@ func (sm *SyncManager) resetHeaderState(newestHash *chainhash.Hash, newestHeight
 	// When there is a next checkpoint, add an entry for the latest known
 	// block into the header pool.  This allows the next downloaded header
 	// to prove it links to the chain properly.
-	if sm.nextCheckpoint != nil {
-		node := headerNode{height: newestHeight, hash: newestHash}
-		sm.headerList.PushBack(&node)
-	}
+	//if sm.nextCheckpoint != nil {
+	//	node := headerNode{height: newestHeight, hash: newestHash}
+	//	sm.headerList.PushBack(&node)
+	//}
 }
 
 // findNextHeaderCheckpoint在传递的高度之后返回下一个检查点。当没有空值时，它返回nil，要么是因为高度已经比最终检查点晚，要么是因为禁用检查点等其他原因。
@@ -214,29 +222,29 @@ func (sm *SyncManager) resetHeaderState(newestHash *chainhash.Hash, newestHeight
 // It returns nil when there is not one either because the height is already
 // later than the final checkpoint or some other reason such as disabled
 // checkpoints.
-func (sm *SyncManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoint {
-	checkpoints := sm.chain.Checkpoints()
-	if len(checkpoints) == 0 {
-		return nil
-	}
-
-	// There is no next checkpoint if the height is already after the final
-	// checkpoint.
-	finalCheckpoint := &checkpoints[len(checkpoints)-1]
-	if height >= finalCheckpoint.Height {
-		return nil
-	}
-
-	// Find the next checkpoint.
-	nextCheckpoint := finalCheckpoint
-	for i := len(checkpoints) - 2; i >= 0; i-- {
-		if height >= checkpoints[i].Height {
-			break
-		}
-		nextCheckpoint = &checkpoints[i]
-	}
-	return nextCheckpoint
-}
+//func (sm *SyncManager) findNextHeaderCheckpoint(height int32) *chaincfg.Checkpoint {
+//	checkpoints := sm.chain.Checkpoints()
+//	if len(checkpoints) == 0 {
+//		return nil
+//	}
+//
+//	// There is no next checkpoint if the height is already after the final
+//	// checkpoint.
+//	finalCheckpoint := &checkpoints[len(checkpoints)-1]
+//	if height >= finalCheckpoint.Height {
+//		return nil
+//	}
+//
+//	// Find the next checkpoint.
+//	nextCheckpoint := finalCheckpoint
+//	for i := len(checkpoints) - 2; i >= 0; i-- {
+//		if height >= checkpoints[i].Height {
+//			break
+//		}
+//		nextCheckpoint = &checkpoints[i]
+//	}
+//	return nextCheckpoint
+//}
 
 // startSync将从可用的候选对等点中选择最好的对等点来下载/同步区块链。当同步已经在运行时，它只是返回。它还检查候选人中是否有任何不再是候选人的，并根据需要删除他们。
 // startSync will choose the best peer among the available candidate peers to
@@ -294,7 +302,7 @@ func (sm *SyncManager) startSync() {
 		// to send.
 		sm.requestedBlocks = make(map[chainhash.Hash]struct{})
 
-		locator, err := sm.chain.LatestBlockLocator()
+		//locator, err := sm.chain.LatestBlockLocator()
 		if err != nil {
 			log.Errorf("Failed to get block locator for the "+
 				"latest block: %v", err)
@@ -321,18 +329,18 @@ func (sm *SyncManager) startSync() {
 		// and fully validate them.  Finally, regression test mode does
 		// not support the headers-first approach so do normal block
 		// downloads when in regression test mode.
-		if sm.nextCheckpoint != nil &&
-			best.Height < sm.nextCheckpoint.Height &&
-			sm.chainParams != &chaincfg.RegressionNetParams {
-
-			bestPeer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
-			sm.headersFirstMode = true
-			log.Infof("Downloading headers for blocks %d to "+
-				"%d from peer %s", best.Height+1,
-				sm.nextCheckpoint.Height, bestPeer.Addr())
-		} else {
-			bestPeer.PushGetBlocksMsg(locator, &zeroHash)
-		}
+		//if sm.nextCheckpoint != nil &&
+		//	best.Height < sm.nextCheckpoint.Height &&
+		//	sm.chainParams != &chaincfg.RegressionNetParams {
+		//
+		//	bestPeer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
+		//	sm.headersFirstMode = true
+		//	log.Infof("Downloading headers for blocks %d to "+
+		//		"%d from peer %s", best.Height+1,
+		//		sm.nextCheckpoint.Height, bestPeer.Addr())
+		//} else {
+		//	bestPeer.PushGetBlocksMsg(locator, &zeroHash)
+		//}
 		sm.syncPeer = bestPeer
 	} else {
 		log.Warnf("No sync peer candidates available")
@@ -346,32 +354,32 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 	// Typically a peer is not a candidate for sync if it's not a full node,
 	// however regression test is special in that the regression tool is
 	// not a full node and still needs to be considered a sync candidate.
-	if sm.chainParams == &chaincfg.RegressionNetParams {
-		// The peer is not a candidate if it's not coming from localhost
-		// or the hostname can't be determined for some reason.
-		host, _, err := net.SplitHostPort(peer.Addr())
-		if err != nil {
-			return false
-		}
-
-		if host != "127.0.0.1" && host != "localhost" {
-			return false
-		}
-	} else {
-		// The peer is not a candidate for sync if it's not a full
-		// node. Additionally, if the segwit soft-fork package has
-		// activated, then the peer must also be upgraded.
-		segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-		if err != nil {
-			log.Errorf("Unable to query for segwit "+
-				"soft-fork state: %v", err)
-		}
-		nodeServices := peer.Services()
-		if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork ||
-			(segwitActive && !peer.IsWitnessEnabled()) {
-			return false
-		}
+	//if sm.chainParams == &chaincfg.RegressionNetParams {
+	//	// The peer is not a candidate if it's not coming from localhost
+	//	// or the hostname can't be determined for some reason.
+	//	host, _, err := net.SplitHostPort(peer.Addr())
+	//	if err != nil {
+	//		return false
+	//	}
+	//
+	//	if host != "127.0.0.1" && host != "localhost" {
+	//		return false
+	//	}
+	//} else {
+	// The peer is not a candidate for sync if it's not a full
+	// node. Additionally, if the segwit soft-fork package has
+	// activated, then the peer must also be upgraded.
+	segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
+	if err != nil {
+		log.Errorf("Unable to query for segwit "+
+			"soft-fork state: %v", err)
 	}
+	nodeServices := peer.Services()
+	if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork ||
+		(segwitActive && !peer.IsWitnessEnabled()) {
+		return false
+	}
+	//}
 
 	// Candidate if all checks passed.
 	return true
@@ -561,12 +569,12 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		// the peer or ignore the block when we're in regression test
 		// mode in this case so the chain code is actually fed the
 		// duplicate blocks.
-		if sm.chainParams != &chaincfg.RegressionNetParams {
-			log.Warnf("Got unrequested block %v from %s -- "+
-				"disconnecting", blockHash, peer.Addr())
-			peer.Disconnect()
-			return
-		}
+		//if sm.chainParams != &chaincfg.RegressionNetParams {
+		//	log.Warnf("Got unrequested block %v from %s -- "+
+		//		"disconnecting", blockHash, peer.Addr())
+		//	peer.Disconnect()
+		//	return
+		//}
 	}
 
 	// When in headers-first mode, if the block matches the hash of the
@@ -576,7 +584,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	// Also, remove the list entry for all blocks except the checkpoint
 	// since it is needed to verify the next round of headers links
 	// properly.
-	isCheckpointBlock := false
+	//isCheckpointBlock := false
 	behaviorFlags := blockchain.BFNone
 	if sm.headersFirstMode {
 		firstNodeEl := sm.headerList.Front()
@@ -584,11 +592,12 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 			firstNode := firstNodeEl.Value.(*headerNode)
 			if blockHash.IsEqual(firstNode.hash) {
 				behaviorFlags |= blockchain.BFFastAdd
-				if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
-					isCheckpointBlock = true
-				} else {
-					sm.headerList.Remove(firstNodeEl)
-				}
+				wire.ChangeCode()
+				//if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
+				//	isCheckpointBlock = true
+				//} else {
+				//	sm.headerList.Remove(firstNodeEl)
+				//}
 			}
 		}
 	}
@@ -703,34 +712,34 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	// This is headers-first mode, so if the block is not a checkpoint
 	// request more blocks using the header list when the request queue is
 	// getting short.
-	if !isCheckpointBlock {
-		if sm.startHeader != nil &&
-			len(state.requestedBlocks) < minInFlightBlocks {
-			sm.fetchHeaderBlocks()
-		}
-		return
-	}
+	//if !isCheckpointBlock {
+	//	if sm.startHeader != nil &&
+	//		len(state.requestedBlocks) < minInFlightBlocks {
+	//		sm.fetchHeaderBlocks()
+	//	}
+	//	return
+	//}
 
 	// This is headers-first mode and the block is a checkpoint.  When
 	// there is a next checkpoint, get the next round of headers by asking
 	// for headers starting from the block after this one up to the next
 	// checkpoint.
-	prevHeight := sm.nextCheckpoint.Height
-	prevHash := sm.nextCheckpoint.Hash
-	sm.nextCheckpoint = sm.findNextHeaderCheckpoint(prevHeight)
-	if sm.nextCheckpoint != nil {
-		locator := blockchain.BlockLocator([]*chainhash.Hash{prevHash})
-		err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
-		if err != nil {
-			log.Warnf("Failed to send getheaders message to "+
-				"peer %s: %v", peer.Addr(), err)
-			return
-		}
-		log.Infof("Downloading headers for blocks %d to %d from "+
-			"peer %s", prevHeight+1, sm.nextCheckpoint.Height,
-			sm.syncPeer.Addr())
-		return
-	}
+	//prevHeight := sm.nextCheckpoint.Height
+	//prevHash := sm.nextCheckpoint.Hash
+	//sm.nextCheckpoint = sm.findNextHeaderCheckpoint(prevHeight)
+	//if sm.nextCheckpoint != nil {
+	//	locator := blockchain.BlockLocator([]*chainhash.Hash{prevHash})
+	//	err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
+	//	if err != nil {
+	//		log.Warnf("Failed to send getheaders message to "+
+	//			"peer %s: %v", peer.Addr(), err)
+	//		return
+	//	}
+	//	log.Infof("Downloading headers for blocks %d to %d from "+
+	//		"peer %s", prevHeight+1, sm.nextCheckpoint.Height,
+	//		sm.syncPeer.Addr())
+	//	return
+	//}
 
 	// This is headers-first mode, the block is a checkpoint, and there are
 	// no more checkpoints, so switch to normal mode by requesting blocks
@@ -831,10 +840,10 @@ func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 	// Process all of the received headers ensuring each one connects to the
 	// previous and that checkpoints match.
 	receivedCheckpoint := false
-	var finalHash *chainhash.Hash
+	//var finalHash *chainhash.Hash
 	for _, blockHeader := range msg.Headers {
 		blockHash := blockHeader.BlockHash()
-		finalHash = &blockHash
+		//finalHash = &blockHash
 
 		// Ensure there is a previous header to compare against.
 		prevNodeEl := sm.headerList.Back()
@@ -864,24 +873,24 @@ func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 		}
 
 		// Verify the header at the next checkpoint height matches.
-		if node.height == sm.nextCheckpoint.Height {
-			if node.hash.IsEqual(sm.nextCheckpoint.Hash) {
-				receivedCheckpoint = true
-				log.Infof("Verified downloaded block "+
-					"header against checkpoint at height "+
-					"%d/hash %s", node.height, node.hash)
-			} else {
-				log.Warnf("Block header at height %d/hash "+
-					"%s from peer %s does NOT match "+
-					"expected checkpoint hash of %s -- "+
-					"disconnecting", node.height,
-					node.hash, peer.Addr(),
-					sm.nextCheckpoint.Hash)
-				peer.Disconnect()
-				return
-			}
-			break
-		}
+		//if node.height == sm.nextCheckpoint.Height {
+		//	if node.hash.IsEqual(sm.nextCheckpoint.Hash) {
+		//		receivedCheckpoint = true
+		//		log.Infof("Verified downloaded block "+
+		//			"header against checkpoint at height "+
+		//			"%d/hash %s", node.height, node.hash)
+		//	} else {
+		//		log.Warnf("Block header at height %d/hash "+
+		//			"%s from peer %s does NOT match "+
+		//			"expected checkpoint hash of %s -- "+
+		//			"disconnecting", node.height,
+		//			node.hash, peer.Addr(),
+		//			sm.nextCheckpoint.Hash)
+		//		peer.Disconnect()
+		//		return
+		//	}
+		//	break
+		//}
 	}
 
 	// When this header is a checkpoint, switch to fetching the blocks for
@@ -902,13 +911,13 @@ func (sm *SyncManager) handleHeadersMsg(hmsg *headersMsg) {
 	// This header is not a checkpoint, so request the next batch of
 	// headers starting from the latest known header and ending with the
 	// next checkpoint.
-	locator := blockchain.BlockLocator([]*chainhash.Hash{finalHash})
-	err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
-	if err != nil {
-		log.Warnf("Failed to send getheaders message to "+
-			"peer %s: %v", peer.Addr(), err)
-		return
-	}
+	//locator := blockchain.BlockLocator([]*chainhash.Hash{finalHash})
+	//err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
+	//if err != nil {
+	//	log.Warnf("Failed to send getheaders message to "+
+	//		"peer %s: %v", peer.Addr(), err)
+	//	return
+	//}
 }
 
 // haveInventory返回所传递的库存向量表示的库存是否已知。
@@ -974,6 +983,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		return
 	}
 
+	//尝试在清单中找到最后一个块。也许没有。
 	// Attempt to find the final block in the inventory list.  There may
 	// not be one.
 	lastBlock := -1
@@ -985,6 +995,9 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		}
 	}
 
+	//如果这个inv包含一个块声明，而这个声明不是来自我们当前的同步对等点，
+	// 或者我们是当前的，那么为这个对等点更新最后一个声明的块。
+	// 稍后，我们将使用这些信息根据我们已经接受的对等块更新对等块的高度。
 	// If this inv contains a block announcement, and this isn't coming from
 	// our current sync peer or we're current, then update the last
 	// announced block for this peer. We'll use this information later to
@@ -1000,6 +1013,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		return
 	}
 
+	//如果我们的链是当前的，并且一个对等点声明了一个我们已经知道的块，那么更新它们当前块的高度。
 	// If our chain is current and a peer announces a block we already
 	// know of, then update their current block height.
 	if lastBlock != -1 && sm.current() {
@@ -1009,6 +1023,9 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		}
 	}
 
+	// 如果我们还没有广告上的存货，请索取。
+	// 另外，如果我们已经有了一个孤儿，请向父母索要。
+	// 最后，尝试检测可能的摊位由于长侧链我们已经有和要求更多的方块来防止他们。
 	// Request the advertised inventory if we don't already have it.  Also,
 	// request parent blocks of orphans if we receive one we already have.
 	// Finally, attempt to detect potential stalls due to long side chains
@@ -1024,10 +1041,12 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			continue
 		}
 
+		//将库存添加到对等节点的已知库存缓存中。
 		// Add the inventory to the cache of known inventory
 		// for the peer.
 		peer.AddKnownInventory(iv)
 
+		//当我们处于“优先考虑”模式时，忽略库存。
 		// Ignore inventory when we're in headers-first mode.
 		if sm.headersFirstMode {
 			continue
@@ -1064,6 +1083,9 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		}
 
 		if iv.Type == wire.InvTypeBlock {
+			//这个block是我们已经有的孤立块。当处理现有的孤儿时，它请求丢失的父块。
+			// 当这种情况发生时，这意味着丢失的块比单个库存消息中允许的块要多。
+			// 因此，一旦该对等点请求了最终的广告块，远程对等点就会注意到，并将孤立块重新发送为可用块，以表明有更多缺失的块需要请求。
 			// The block is an orphan block that we already have.
 			// When the existing orphan was processed, it requested
 			// the missing parent blocks.  When this scenario
@@ -1090,11 +1112,13 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				continue
 			}
 
+			//我们已经在这条inv信息中公布了最后一个区块，因此强制要求更多。只有在侧链很长时才会发生这种情况。
 			// We already have the final block advertised by this
 			// inventory message, so force a request for more.  This
 			// should only happen if we're on a really long side
 			// chain.
 			if i == lastBlock {
+				//请求块，直到远程对等方知道的最后一个请求块为止(零停止散列)。
 				// Request blocks after this one up to the
 				// final one the remote peer knows about (zero
 				// stop hash).
@@ -1104,6 +1128,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		}
 	}
 
+	//马上提出尽可能多的要求。任何不适合请求的内容都将在下一个inv消息中被请求。
 	// Request as much as possible at once.  Anything that won't fit into
 	// the request will be requested on the next inv message.
 	numRequested := 0
@@ -1118,6 +1143,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		case wire.InvTypeWitnessBlock:
 			fallthrough
 		case wire.InvTypeBlock:
+			//如果还没有一个挂起的请求，请求该块。
 			// Request the block if there is not already a pending
 			// request.
 			if _, exists := sm.requestedBlocks[iv.Hash]; !exists {
@@ -1239,7 +1265,8 @@ out:
 					isOrphan: isOrphan,
 					err:      nil,
 				}
-
+			case sendBlockMsg:
+				sm.peerNotifier.SendBlock(msg.block.MsgBlock())
 			case isCurrentMsg:
 				msg.reply <- sm.current()
 
@@ -1284,7 +1311,7 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 
 		// Generate the inventory vector and relay it.
 		iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
-		sm.peerNotifier.RelayInventory(iv, block.MsgBlock().Header)
+		sm.peerNotifier.RelayInventory(iv, block.MsgBlock().Header) // blockHash和header
 
 	// A block has been connected to the main block chain.
 	case blockchain.NTBlockConnected:
@@ -1477,6 +1504,13 @@ func (sm *SyncManager) ProcessBlock(block *drcutil.Block, flags blockchain.Behav
 	return response.isOrphan, response.err
 }
 
+func (sm *SyncManager) SendBlock(block *drcutil.Block) (bool, error) {
+	reply := make(chan sendBlockResponse, 1)
+	sm.msgChan <- sendBlockMsg{block: block, reply: reply}
+	response := <-reply
+	return response.isOrphan, response.err
+}
+
 // IsCurrent返回同步管理器是否认为它已与连接的对等点同步。
 // IsCurrent returns whether or not the sync manager believes it is synced with
 // the connected peers.
@@ -1518,16 +1552,16 @@ func New(config *Config) (*SyncManager, error) {
 		feeEstimator:    config.FeeEstimator,
 	}
 
-	best := sm.chain.BestSnapshot()
-	if !config.DisableCheckpoints {
-		// Initialize the next checkpoint based on the current height.
-		sm.nextCheckpoint = sm.findNextHeaderCheckpoint(best.Height)
-		if sm.nextCheckpoint != nil {
-			sm.resetHeaderState(&best.Hash, best.Height)
-		}
-	} else {
-		log.Info("Checkpoints are disabled")
-	}
+	//best := sm.chain.BestSnapshot()
+	//if !config.DisableCheckpoints {
+	//	// Initialize the next checkpoint based on the current height.
+	//	sm.nextCheckpoint = sm.findNextHeaderCheckpoint(best.Height)
+	//	if sm.nextCheckpoint != nil {
+	//		sm.resetHeaderState(&best.Hash, best.Height)
+	//	}
+	//} else {
+	//	log.Info("Checkpoints are disabled")
+	//}
 
 	sm.chain.Subscribe(sm.handleBlockchainNotification)
 

@@ -56,6 +56,7 @@ func (m *mruInventoryMap) Exists(iv *wire.InvVect) bool {
 	return exists
 }
 
+// Add将传递的库存添加到地图中，如果添加新项目将超过最大限制，则处理最老项目的回收。添加现有项使其成为最近使用的项。
 // Add adds the passed inventory to the map and handles eviction of the oldest
 // item if adding the new item would exceed the max limit.  Adding an existing
 // item makes it the most recently used item.

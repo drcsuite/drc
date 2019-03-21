@@ -104,7 +104,8 @@ type blockNode struct {
 	// status field, unlike the other fields, may be written to and so should
 	// only be accessed using the concurrent-safe NodeStatus method on
 	// blockIndex once the node has been added to the global index.
-	status    blockStatus
+	status blockStatus
+
 	signature chainhash.Hash64
 	publicKey chainhash.Hash33
 	scale     uint16
@@ -129,6 +130,10 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 		//nonce:      blockHeader.Nonce,
 		timestamp:  blockHeader.Timestamp.Unix(),
 		merkleRoot: blockHeader.MerkleRoot,
+		signature:  blockHeader.Signature,
+		publicKey:  blockHeader.PublicKey,
+		scale:      blockHeader.Scale,
+		reserved:   blockHeader.Reserved,
 	}
 	if parent != nil {
 		node.parent = parent
@@ -163,6 +168,10 @@ func (node *blockNode) Header() wire.BlockHeader {
 		PrevBlock:  *prevHash,
 		MerkleRoot: node.merkleRoot,
 		Timestamp:  time.Unix(node.timestamp, 0),
+		Scale:      node.scale,
+		Reserved:   node.reserved,
+		Signature:  node.signature,
+		PublicKey:  node.publicKey,
 		//Bits:       node.bits,
 		//Nonce:      node.nonce,
 	}

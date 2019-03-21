@@ -21,8 +21,6 @@ import (
 	"time"
 
 	"github.com/drcsuite/drc/blockchain"
-	"github.com/drcsuite/drc/chaincfg"
-	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/connmgr"
 	"github.com/drcsuite/drc/database"
 	_ "github.com/drcsuite/drc/database/ffldb"
@@ -30,7 +28,7 @@ import (
 	"github.com/drcsuite/drc/go-socks/socks"
 	"github.com/drcsuite/drc/mempool"
 	"github.com/drcsuite/drc/peer"
-	flags "github.com/jessevdk/go-flags"
+	"github.com/jessevdk/go-flags"
 )
 
 const (
@@ -156,20 +154,21 @@ type config struct {
 	NoCFilters           bool          `long:"nocfilters" description:"Disable committed filtering (CF) support"`
 	DropCfIndex          bool          `long:"dropcfindex" description:"Deletes the index used for committed filtering (CF) support from the database on start up and then exits."`
 	SigCacheMaxSize      uint          `long:"sigcachemaxsize" description:"The maximum number of entries in the signature verification cache"`
-	BlocksOnly           bool          `long:"blocksonly" description:"Do not accept transactions from remote peers."`
-	TxIndex              bool          `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
-	DropTxIndex          bool          `long:"droptxindex" description:"Deletes the hash-based transaction index from the database on start up and then exits."`
-	AddrIndex            bool          `long:"addrindex" description:"Maintain a full address-based transaction index which makes the searchrawtransactions RPC available"`
-	DropAddrIndex        bool          `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up and then exits."`
-	RelayNonStd          bool          `long:"relaynonstd" description:"Relay non-standard transactions regardless of the default settings for the active network."`
-	RejectNonStd         bool          `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
-	lookup               func(string) ([]net.IP, error)
-	oniondial            func(string, string, time.Duration) (net.Conn, error)
-	dial                 func(string, string, time.Duration) (net.Conn, error)
-	addCheckpoints       []chaincfg.Checkpoint
-	miningAddrs          []drcutil.Address
-	minRelayTxFee        drcutil.Amount
-	whitelists           []*net.IPNet
+	// 不接受来自远程对等点的事务。
+	BlocksOnly    bool `long:"blocksonly" description:"Do not accept transactions from remote peers."`
+	TxIndex       bool `long:"txindex" description:"Maintain a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
+	DropTxIndex   bool `long:"droptxindex" description:"Deletes the hash-based transaction index from the database on start up and then exits."`
+	AddrIndex     bool `long:"addrindex" description:"Maintain a full address-based transaction index which makes the searchrawtransactions RPC available"`
+	DropAddrIndex bool `long:"dropaddrindex" description:"Deletes the address-based transaction index from the database on start up and then exits."`
+	RelayNonStd   bool `long:"relaynonstd" description:"Relay non-standard transactions regardless of the default settings for the active network."`
+	RejectNonStd  bool `long:"rejectnonstd" description:"Reject non-standard transactions regardless of the default settings for the active network."`
+	lookup        func(string) ([]net.IP, error)
+	oniondial     func(string, string, time.Duration) (net.Conn, error)
+	dial          func(string, string, time.Duration) (net.Conn, error)
+	//addCheckpoints       []chaincfg.Checkpoint
+	miningAddrs   []drcutil.Address
+	minRelayTxFee drcutil.Amount
+	whitelists    []*net.IPNet
 }
 
 // serviceOptions defines the configuration options for the daemon as a service on
@@ -321,53 +320,54 @@ func normalizeAddresses(addrs []string, defaultPort string) []string {
 	return removeDuplicateAddresses(addrs)
 }
 
+// newCheckpointFromStr以“<height>:<hash>”格式解析检查点。
 // newCheckpointFromStr parses checkpoints in the '<height>:<hash>' format.
-func newCheckpointFromStr(checkpoint string) (chaincfg.Checkpoint, error) {
-	parts := strings.Split(checkpoint, ":")
-	if len(parts) != 2 {
-		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
-			"checkpoint %q -- use the syntax <height>:<hash>",
-			checkpoint)
-	}
-
-	height, err := strconv.ParseInt(parts[0], 10, 32)
-	if err != nil {
-		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
-			"checkpoint %q due to malformed height", checkpoint)
-	}
-
-	if len(parts[1]) == 0 {
-		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
-			"checkpoint %q due to missing hash", checkpoint)
-	}
-	hash, err := chainhash.NewHashFromStr(parts[1])
-	if err != nil {
-		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
-			"checkpoint %q due to malformed hash", checkpoint)
-	}
-
-	return chaincfg.Checkpoint{
-		Height: int32(height),
-		Hash:   hash,
-	}, nil
-}
+//func newCheckpointFromStr(checkpoint string) (chaincfg.Checkpoint, error) {
+//	parts := strings.Split(checkpoint, ":")
+//	if len(parts) != 2 {
+//		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
+//			"checkpoint %q -- use the syntax <height>:<hash>",
+//			checkpoint)
+//	}
+//
+//	height, err := strconv.ParseInt(parts[0], 10, 32)
+//	if err != nil {
+//		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
+//			"checkpoint %q due to malformed height", checkpoint)
+//	}
+//
+//	if len(parts[1]) == 0 {
+//		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
+//			"checkpoint %q due to missing hash", checkpoint)
+//	}
+//	hash, err := chainhash.NewHashFromStr(parts[1])
+//	if err != nil {
+//		return chaincfg.Checkpoint{}, fmt.Errorf("unable to parse "+
+//			"checkpoint %q due to malformed hash", checkpoint)
+//	}
+//
+//	return chaincfg.Checkpoint{
+//		Height: int32(height),
+//		Hash:   hash,
+//	}, nil
+//}
 
 // parseCheckpoints checks the checkpoint strings for valid syntax
 // ('<height>:<hash>') and parses them to chaincfg.Checkpoint instances.
-func parseCheckpoints(checkpointStrings []string) ([]chaincfg.Checkpoint, error) {
-	if len(checkpointStrings) == 0 {
-		return nil, nil
-	}
-	checkpoints := make([]chaincfg.Checkpoint, len(checkpointStrings))
-	for i, cpString := range checkpointStrings {
-		checkpoint, err := newCheckpointFromStr(cpString)
-		if err != nil {
-			return nil, err
-		}
-		checkpoints[i] = checkpoint
-	}
-	return checkpoints, nil
-}
+//func parseCheckpoints(checkpointStrings []string) ([]chaincfg.Checkpoint, error) {
+//	if len(checkpointStrings) == 0 {
+//		return nil, nil
+//	}
+//	checkpoints := make([]chaincfg.Checkpoint, len(checkpointStrings))
+//	for i, cpString := range checkpointStrings {
+//		checkpoint, err := newCheckpointFromStr(cpString)
+//		if err != nil {
+//			return nil, err
+//		}
+//		checkpoints[i] = checkpoint
+//	}
+//	return checkpoints, nil
+//}
 
 // filesExists reports whether the named file or directory exists.
 func fileExists(name string) bool {

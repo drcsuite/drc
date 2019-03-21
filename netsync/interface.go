@@ -24,6 +24,8 @@ type PeerNotifier interface {
 
 	RelayInventory(invVect *wire.InvVect, data interface{})
 
+	SendBlock(data interface{})
+
 	TransactionConfirmed(tx *drcutil.Tx)
 }
 
