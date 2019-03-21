@@ -34,15 +34,15 @@ var (
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
-	DataDir        string `short:"b" long:"datadir" description:"Location of the btcd data directory"`
-	DbType         string `long:"dbtype" description:"Database backend to use for the Block Chain"`
-	TestNet3       bool   `long:"testnet" description:"Use the test network"`
-	RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
-	SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
-	InFile         string `short:"i" long:"infile" description:"File containing the block(s)"`
-	TxIndex        bool   `long:"txindex" description:"Build a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
-	AddrIndex      bool   `long:"addrindex" description:"Build a full address-based transaction index which makes the searchrawtransactions RPC available"`
-	Progress       int    `short:"p" long:"progress" description:"Show a progress message each time this number of seconds have passed -- Use 0 to disable progress announcements"`
+	DataDir string `short:"b" long:"datadir" description:"Location of the btcd data directory"`
+	DbType  string `long:"dbtype" description:"Database backend to use for the Block Chain"`
+	//TestNet3       bool   `long:"testnet" description:"Use the test network"`
+	//RegressionTest bool   `long:"regtest" description:"Use the regression test network"`
+	//SimNet         bool   `long:"simnet" description:"Use the simulation test network"`
+	InFile    string `short:"i" long:"infile" description:"File containing the block(s)"`
+	TxIndex   bool   `long:"txindex" description:"Build a full hash-based transaction index which makes all transactions available via the getrawtransaction RPC"`
+	AddrIndex bool   `long:"addrindex" description:"Build a full address-based transaction index which makes the searchrawtransactions RPC available"`
+	Progress  int    `short:"p" long:"progress" description:"Show a progress message each time this number of seconds have passed -- Use 0 to disable progress announcements"`
 }
 
 // filesExists reports whether the named file or directory exists.
@@ -107,20 +107,22 @@ func loadConfig() (*config, []string, error) {
 	// Multiple networks can't be selected simultaneously.
 	funcName := "loadConfig"
 	numNets := 0
+
 	// Count number of network flags passed; assign active network params
 	// while we're at it
-	if cfg.TestNet3 {
-		numNets++
-		activeNetParams = &chaincfg.TestNet3Params
-	}
-	if cfg.RegressionTest {
-		numNets++
-		activeNetParams = &chaincfg.RegressionNetParams
-	}
-	if cfg.SimNet {
-		numNets++
-		activeNetParams = &chaincfg.SimNetParams
-	}
+	wire.ChangeCode()
+	//if cfg.TestNet3 {
+	//	numNets++
+	//	activeNetParams = &chaincfg.TestNet3Params
+	//}
+	//if cfg.RegressionTest {
+	//	numNets++
+	//	activeNetParams = &chaincfg.RegressionNetParams
+	//}
+	//if cfg.SimNet {
+	//	numNets++
+	//	activeNetParams = &chaincfg.SimNetParams
+	//}
 	if numNets > 1 {
 		str := "%s: The testnet, regtest, and simnet params can't be " +
 			"used together -- choose one of the three"

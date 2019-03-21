@@ -13,11 +13,11 @@ import (
 )
 
 // MaxBlockHeaderPayload is the maximum number of bytes a block header can be.
-// Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
+// Version 4 bytes + Timestamp 4 bytes + scale 2 bytes + reserved 2 bytes + 32*2 + 64 + 33 = 173
 // PrevBlock and MerkleRoot hashes.
-const MaxBlockHeaderPayload = 16 + (chainhash.HashSize * 2)
+const MaxBlockHeaderPayload = 12 + (chainhash.HashSize * 2) + chainhash.Hash64Size + chainhash.Hash33Size
 
-// 209字节
+// 205字节
 // BlockHeader defines information about a block and is used in the bitcoin
 // block (MsgBlock) and headers (MsgHeaders) messages.
 type BlockHeader struct {
@@ -34,21 +34,17 @@ type BlockHeader struct {
 	// uint32 on the wire and therefore is limited to 2106.
 	Timestamp time.Time
 
-	// Difficulty target for the block.
-	//Bits uint32
 	// 发块签名
 	Signature chainhash.Hash64
 
-	// Nonce used to generate the block.
-	//Nonce uint32
 	// 发块公钥
-	PublicKey chainhash.Hash65
+	PublicKey chainhash.Hash33
 
 	// 全网估算节点
-	scale uint16
+	Scale uint16
 
 	// 保留字段
-	reserved uint16
+	Reserved uint16
 }
 
 // blockHeaderLen is a constant that represents the number of bytes for a block
@@ -107,9 +103,10 @@ func (h *BlockHeader) Serialize(w io.Writer) error {
 // NewBlockHeader returns a new BlockHeader using the provided version, previous
 // block hash, merkle root hash, difficulty bits, and nonce used to generate the
 // block with defaults for the remaining fields.
-func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash,
-	bits uint32, nonce uint32) *BlockHeader {
+func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash, signature *chainhash.Hash64, publickey *chainhash.Hash33,
+	scale uint16, reserved uint16) *BlockHeader {
 
+	ChangeCode()
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
 	return &BlockHeader{
@@ -117,8 +114,10 @@ func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash,
 		PrevBlock:  *prevHash,
 		MerkleRoot: *merkleRootHash,
 		Timestamp:  time.Unix(time.Now().Unix(), 0),
-		Bits:       bits,
-		Nonce:      nonce,
+		Signature:  *signature,
+		PublicKey:  *publickey,
+		Scale:      scale,
+		Reserved:   reserved,
 	}
 }
 
@@ -127,8 +126,9 @@ func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash,
 // decoding block headers stored to disk, such as in a database, as opposed to
 // decoding from the wire.
 func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
+	ChangeCode()
 	return readElements(r, &bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
-		(*uint32Time)(&bh.Timestamp), &bh.Bits, &bh.Nonce)
+		(*uint32Time)(&bh.Timestamp), &bh.Signature, &bh.PublicKey, &bh.Scale, &bh.Reserved)
 }
 
 // 将比特币块头写入到w
@@ -137,6 +137,7 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 // opposed to encoding for the wire.
 func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	sec := uint32(bh.Timestamp.Unix())
+	ChangeCode()
 	return writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
-		sec, bh.Bits, bh.Nonce)
+		sec, &bh.Signature, &bh.PublicKey, bh.Scale, bh.Reserved)
 }

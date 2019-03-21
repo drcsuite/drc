@@ -64,9 +64,7 @@ func (status blockStatus) KnownInvalid() bool {
 	return status&(statusValidateFailed|statusInvalidAncestor) != 0
 }
 
-// blockNode表示块链中的一个块，主要用于
-//帮助选择最好的链条作为主链条。主链是
-//存储到块数据库中。
+// blockNode表示块链中的块，主要用于帮助选择最佳链作为主链。主链存储在块数据库中。
 // blockNode represents a block within the block chain and is primarily used to
 // aid in selecting the best chain to be the main chain.  The main chain is
 // stored into the block database.
@@ -84,6 +82,7 @@ type blockNode struct {
 	// hash is the double sha 256 of the block.
 	hash chainhash.Hash
 
+	// workSum是链中到该节点并包括该节点的总工作量。
 	// workSum is the total amount of work in the chain up to and including
 	// this node.
 	workSum *big.Int
@@ -95,9 +94,9 @@ type blockNode struct {
 	// reconstructing headers from memory.  These must be treated as
 	// immutable and are intentionally ordered to avoid padding on 64-bit
 	// platforms.
-	version    int32
-	bits       uint32
-	nonce      uint32
+	version int32
+	//bits       uint32
+	//nonce      uint32
 	timestamp  int64
 	merkleRoot chainhash.Hash
 
@@ -106,6 +105,12 @@ type blockNode struct {
 	// only be accessed using the concurrent-safe NodeStatus method on
 	// blockIndex once the node has been added to the global index.
 	status blockStatus
+
+	signature chainhash.Hash64
+	publicKey chainhash.Hash33
+	scale     uint16
+	vote      uint16
+	reserved  uint16
 }
 
 // initBlockNode初始化给定头节点和父节点的块节点，
@@ -117,19 +122,24 @@ type blockNode struct {
 // This function is NOT safe for concurrent access.  It must only be called when
 // initially creating a node.
 func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) {
+	wire.ChangeCode()
 	*node = blockNode{
-		hash:       blockHeader.BlockHash(),
-		workSum:    CalcWork(blockHeader.Bits),
-		version:    blockHeader.Version,
-		bits:       blockHeader.Bits,
-		nonce:      blockHeader.Nonce,
+		hash: blockHeader.BlockHash(),
+		//workSum:    CalcWork(blockHeader.Bits),
+		version: blockHeader.Version,
+		//bits:       blockHeader.Bits,
+		//nonce:      blockHeader.Nonce,
 		timestamp:  blockHeader.Timestamp.Unix(),
 		merkleRoot: blockHeader.MerkleRoot,
+		signature:  blockHeader.Signature,
+		publicKey:  blockHeader.PublicKey,
+		scale:      blockHeader.Scale,
+		reserved:   blockHeader.Reserved,
 	}
 	if parent != nil {
 		node.parent = parent
 		node.height = parent.height + 1
-		node.workSum = node.workSum.Add(parent.workSum, node.workSum)
+		//node.workSum = node.workSum.Add(parent.workSum, node.workSum)
 	}
 }
 
@@ -153,13 +163,18 @@ func (node *blockNode) Header() wire.BlockHeader {
 	if node.parent != nil {
 		prevHash = &node.parent.hash
 	}
+	wire.ChangeCode()
 	return wire.BlockHeader{
 		Version:    node.version,
 		PrevBlock:  *prevHash,
 		MerkleRoot: node.merkleRoot,
 		Timestamp:  time.Unix(node.timestamp, 0),
-		Bits:       node.bits,
-		Nonce:      node.nonce,
+		Scale:      node.scale,
+		Reserved:   node.reserved,
+		Signature:  node.signature,
+		PublicKey:  node.publicKey,
+		//Bits:       node.bits,
+		//Nonce:      node.nonce,
 	}
 }
 

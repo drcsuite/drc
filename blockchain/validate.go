@@ -315,32 +315,33 @@ func CheckTransactionSanity(tx *drcutil.Tx) error {
 //    difficulty is not performed.
 func checkProofOfWork(header *wire.BlockHeader, powLimit *big.Int, flags BehaviorFlags) error {
 	// The target difficulty must be larger than zero.
-	target := CompactToBig(header.Bits)
-	if target.Sign() <= 0 {
-		str := fmt.Sprintf("block target difficulty of %064x is too low",
-			target)
-		return ruleError(ErrUnexpectedDifficulty, str)
-	}
+	wire.ChangeCode()
+	//target := CompactToBig(header.Bits)
+	//if target.Sign() <= 0 {
+	//	str := fmt.Sprintf("block target difficulty of %064x is too low",
+	//		target)
+	//	return ruleError(ErrUnexpectedDifficulty, str)
+	//}
 
 	// The target difficulty must be less than the maximum allowed.
-	if target.Cmp(powLimit) > 0 {
-		str := fmt.Sprintf("block target difficulty of %064x is "+
-			"higher than max of %064x", target, powLimit)
-		return ruleError(ErrUnexpectedDifficulty, str)
-	}
+	//if target.Cmp(powLimit) > 0 {
+	//	str := fmt.Sprintf("block target difficulty of %064x is "+
+	//		"higher than max of %064x", target, powLimit)
+	//	return ruleError(ErrUnexpectedDifficulty, str)
+	//}
 
 	// The block hash must be less than the claimed target unless the flag
 	// to avoid proof of work checks is set.
-	if flags&BFNoPoWCheck != BFNoPoWCheck {
-		// The block hash must be less than the claimed target.
-		hash := header.BlockHash()
-		hashNum := HashToBig(&hash)
-		if hashNum.Cmp(target) > 0 {
-			str := fmt.Sprintf("block hash of %064x is higher than "+
-				"expected max of %064x", hashNum, target)
-			return ruleError(ErrHighHash, str)
-		}
-	}
+	//if flags&BFNoPoWCheck != BFNoPoWCheck {
+	// The block hash must be less than the claimed target.
+	//hash := header.BlockHash()
+	//hashNum := HashToBig(&hash)
+	//if hashNum.Cmp(target) > 0 {
+	//	str := fmt.Sprintf("block hash of %064x is higher than "+
+	//		"expected max of %064x", hashNum, target)
+	//	return ruleError(ErrHighHash, str)
+	//}
+	//}
 
 	return nil
 }
@@ -661,21 +662,22 @@ func checkSerializedHeight(coinbaseTx *drcutil.Tx, wantHeight int32) error {
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
 	fastAdd := flags&BFFastAdd == BFFastAdd
+	wire.ChangeCode()
 	if !fastAdd {
 		// Ensure the difficulty specified in the block header matches
 		// the calculated difficulty based on the previous block and
 		// difficulty retarget rules.
-		expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
-			header.Timestamp)
-		if err != nil {
-			return err
-		}
-		blockDifficulty := header.Bits
-		if blockDifficulty != expectedDifficulty {
-			str := "block difficulty of %d is not the expected value of %d"
-			str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
-			return ruleError(ErrUnexpectedDifficulty, str)
-		}
+		//expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
+		//	header.Timestamp)
+		//if err != nil {
+		//	return err
+		//}
+		//blockDifficulty := header.Bits
+		//if blockDifficulty != expectedDifficulty {
+		//	str := "block difficulty of %d is not the expected value of %d"
+		//	str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
+		//	return ruleError(ErrUnexpectedDifficulty, str)
+		//}
 
 		// Ensure the timestamp for the block header is after the
 		// median time of the last several blocks (medianTimeBlocks).

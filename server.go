@@ -15,7 +15,6 @@ import (
 	"math"
 	"net"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -138,6 +137,9 @@ type relayMsg struct {
 	invVect *wire.InvVect
 	data    interface{}
 }
+type sendMsg struct {
+	data interface{}
+}
 
 // updatePeerHeightsMsg is a message sent from the blockmanager to the server
 // after a new block has been accepted. The purpose of the message is to update
@@ -225,6 +227,7 @@ type server struct {
 	banPeers             chan *serverPeer
 	query                chan interface{}
 	relayInv             chan relayMsg
+	sendMsg              chan sendMsg
 	broadcast            chan broadcastMsg
 	peerHeightsUpdate    chan updatePeerHeightsMsg
 	wg                   sync.WaitGroup
@@ -1498,6 +1501,8 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash, doneChan cha
 	}
 	sp.QueueMessageWithEncoding(&msgBlock, dc, encoding)
 
+	//当对等方请求响应getblocks消息时所发布的最后一个块，
+	// 该消息请求的块比单个消息中包含的块更多，向它发送一个新的库存消息，以触发它为下一批库存发出另一个getblocks消息。
 	// When the peer requests the final block that was advertised in
 	// response to a getblocks message which requested more blocks than
 	// would fit into a single message, send it a new inventory message
@@ -1718,6 +1723,7 @@ func (s *server) handleBanPeerMsg(state *peerState, sp *serverPeer) {
 	state.banned[host] = time.Now().Add(cfg.BanDuration)
 }
 
+// handlerelayinmsg处理将库存转送给还不知道库存的同行。它是从peerHandler goroutine调用的。
 // handleRelayInvMsg deals with relaying inventory to peers that are not already
 // known to have it.  It is invoked from the peerHandler goroutine.
 func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
@@ -1781,6 +1787,21 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 		// It will be ignored if the peer is already known to
 		// have the inventory.
 		sp.QueueInventory(msg.invVect)
+	})
+}
+
+func (s *server) handleSendBlockMsg(state *peerState, msg sendMsg) {
+	state.forAllPeers(func(sp *serverPeer) {
+		if !sp.Connected() {
+			return
+		}
+
+		// Queue the inventory to be relayed with the next batch.
+		// It will be ignored if the peer is already known to
+		// have the inventory.
+		block := msg.data.(wire.MsgBlock)
+		var dc chan<- struct{}
+		sp.QueueMessageWithEncoding(&block, dc, wire.BaseEncoding)
 	})
 }
 
@@ -2133,6 +2154,9 @@ out:
 		case invMsg := <-s.relayInv:
 			s.handleRelayInvMsg(state, invMsg)
 
+		case sendMsg := <-s.sendMsg:
+			s.handleSendBlockMsg(state, sendMsg)
+
 		// Message to broadcast to all connected peers except those
 		// which are excluded by the message.
 		case bmsg := <-s.broadcast:
@@ -2185,10 +2209,14 @@ func (s *server) BanPeer(sp *serverPeer) {
 	s.banPeers <- sp
 }
 
+// RelayInventory将传递的库存向量传递给所有尚未知道它的已连接对等点。
 // RelayInventory relays the passed inventory vector to all connected peers
 // that are not already known to have it.
 func (s *server) RelayInventory(invVect *wire.InvVect, data interface{}) {
 	s.relayInv <- relayMsg{invVect: invVect, data: data}
+}
+func (s *server) SendBlock(data interface{}) {
+	s.sendMsg <- sendMsg{data: data}
 }
 
 // BroadcastMessage sends msg to all peers currently connected to the server
@@ -2657,18 +2685,18 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	}
 
 	// Merge given checkpoints with the default ones unless they are disabled.
-	var checkpoints []chaincfg.Checkpoint
+	//var checkpoints []chaincfg.Checkpoint
 	if !cfg.DisableCheckpoints {
-		checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, cfg.addCheckpoints)
+		//checkpoints = mergeCheckpoints(s.chainParams.Checkpoints, cfg.addCheckpoints)
 	}
 
 	// Create a new block chain instance with the appropriate configuration.
 	var err error
 	s.chain, err = blockchain.New(&blockchain.Config{
-		DB:           s.db,
-		Interrupt:    interrupt,
-		ChainParams:  s.chainParams,
-		Checkpoints:  checkpoints,
+		DB:          s.db,
+		Interrupt:   interrupt,
+		ChainParams: s.chainParams,
+		//Checkpoints:  checkpoints,
 		TimeSource:   s.timeSource,
 		SigCache:     s.sigCache,
 		IndexManager: indexManager,
@@ -2747,6 +2775,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		return nil, err
 	}
 
+	//根据配置选项创建挖掘策略和块模板生成器。
 	// Create the mining policy and block template generator based on the
 	// configuration options.
 	//
@@ -2768,8 +2797,10 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		BlockTemplateGenerator: blockTemplateGenerator,
 		MiningAddrs:            cfg.miningAddrs,
 		ProcessBlock:           s.syncManager.ProcessBlock,
+		SendBlock:              s.syncManager.SendBlock,
 		ConnectedCount:         s.ConnectedCount,
 		IsCurrent:              s.syncManager.IsCurrent,
+		Chain:                  s.chain,
 	})
 
 	// Only setup a function to return new addresses to connect to when
@@ -3123,28 +3154,28 @@ func isWhitelisted(addr net.Addr) bool {
 
 // checkpointSorter implements sort.Interface to allow a slice of checkpoints to
 // be sorted.
-type checkpointSorter []chaincfg.Checkpoint
+//type checkpointSorter []chaincfg.Checkpoint
 
 // 返回片中检查点的数量。
 // Len returns the number of checkpoints in the slice.  It is part of the
 // sort.Interface implementation.
-func (s checkpointSorter) Len() int {
-	return len(s)
-}
+//func (s checkpointSorter) Len() int {
+//	return len(s)
+//}
 
 // 交换通过的索引上的检查点。
 // Swap swaps the checkpoints at the passed indices.  It is part of the
 // sort.Interface implementation.
-func (s checkpointSorter) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
+//func (s checkpointSorter) Swap(i, j int) {
+//	s[i], s[j] = s[j], s[i]
+//}
 
 // 返回带有索引i的检查点是否应该在带有索引j的检查点之前排序。
 // Less returns whether the checkpoint with index i should sort before the
 // checkpoint with index j.  It is part of the sort.Interface implementation.
-func (s checkpointSorter) Less(i, j int) bool {
-	return s[i].Height < s[j].Height
-}
+//func (s checkpointSorter) Less(i, j int) bool {
+//	return s[i].Height < s[j].Height
+//}
 
 // 返回合并到一个片中的两个检查点片，以便按高度对检查点进行排序。
 // 如果附加检查点包含与默认检查点具有相同高度的检查点，则附加检查点将优先并覆盖默认检查点。
@@ -3153,28 +3184,28 @@ func (s checkpointSorter) Less(i, j int) bool {
 // checkpoints contain a checkpoint with the same height as a checkpoint in the
 // default checkpoints, the additional checkpoint will take precedence and
 // overwrite the default one.
-func mergeCheckpoints(defaultCheckpoints, additional []chaincfg.Checkpoint) []chaincfg.Checkpoint {
-	// Create a map of the additional checkpoints to remove duplicates while
-	// leaving the most recently-specified checkpoint.
-	extra := make(map[int32]chaincfg.Checkpoint)
-	for _, checkpoint := range additional {
-		extra[checkpoint.Height] = checkpoint
-	}
-
-	// Add all default checkpoints that do not have an override in the
-	// additional checkpoints.
-	numDefault := len(defaultCheckpoints)
-	checkpoints := make([]chaincfg.Checkpoint, 0, numDefault+len(extra))
-	for _, checkpoint := range defaultCheckpoints {
-		if _, exists := extra[checkpoint.Height]; !exists {
-			checkpoints = append(checkpoints, checkpoint)
-		}
-	}
-
-	// Append the additional checkpoints and return the sorted results.
-	for _, checkpoint := range extra {
-		checkpoints = append(checkpoints, checkpoint)
-	}
-	sort.Sort(checkpointSorter(checkpoints))
-	return checkpoints
-}
+//func mergeCheckpoints(defaultCheckpoints, additional []chaincfg.Checkpoint) []chaincfg.Checkpoint {
+//	// Create a map of the additional checkpoints to remove duplicates while
+//	// leaving the most recently-specified checkpoint.
+//	extra := make(map[int32]chaincfg.Checkpoint)
+//	for _, checkpoint := range additional {
+//		extra[checkpoint.Height] = checkpoint
+//	}
+//
+//	// Add all default checkpoints that do not have an override in the
+//	// additional checkpoints.
+//	numDefault := len(defaultCheckpoints)
+//	checkpoints := make([]chaincfg.Checkpoint, 0, numDefault+len(extra))
+//	for _, checkpoint := range defaultCheckpoints {
+//		if _, exists := extra[checkpoint.Height]; !exists {
+//			checkpoints = append(checkpoints, checkpoint)
+//		}
+//	}
+//
+//	// Append the additional checkpoints and return the sorted results.
+//	for _, checkpoint := range extra {
+//		checkpoints = append(checkpoints, checkpoint)
+//	}
+//	sort.Sort(checkpointSorter(checkpoints))
+//	return checkpoints
+//}

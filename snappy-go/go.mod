@@ -1,0 +1,1 @@
+module btcsuite/snappy-go

@@ -17,22 +17,25 @@ import (
 // nodes.  The ensures that the node have unique hashes.
 var testNoncePrng = rand.New(rand.NewSource(0))
 
+// chainedNodes返回构造的指定节点数，以便每个后续节点都指向前一个节点来创建一个链。
+// 第一个节点将指向传递的父节点，如果需要，父节点可以为nil。
 // chainedNodes returns the specified number of nodes constructed such that each
 // subsequent node points to the previous one to create a chain.  The first node
 // will point to the passed parent which can be nil if desired.
 func chainedNodes(parent *blockNode, numNodes int) []*blockNode {
+	wire.TestChangeCode()
 	nodes := make([]*blockNode, numNodes)
-	tip := parent
-	for i := 0; i < numNodes; i++ {
-		// This is invalid, but all that is needed is enough to get the
-		// synthetic tests to work.
-		header := wire.BlockHeader{Nonce: testNoncePrng.Uint32()}
-		if tip != nil {
-			header.PrevBlock = tip.hash
-		}
-		nodes[i] = newBlockNode(&header, tip)
-		tip = nodes[i]
-	}
+	//tip := parent
+	//for i := 0; i < numNodes; i++ {
+	// This is invalid, but all that is needed is enough to get the
+	// synthetic tests to work.
+	//header := wire.BlockHeader{Nonce: testNoncePrng.Uint32()}
+	//if tip != nil {
+	//	header.PrevBlock = tip.hash
+	//}
+	//nodes[i] = newBlockNode(&header, tip)
+	//tip = nodes[i]
+	//}
 	return nodes
 }
 

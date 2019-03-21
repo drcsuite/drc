@@ -25,6 +25,7 @@ import (
 // with the solution. False is returned if no solution exists.
 func solveBlock(header *wire.BlockHeader, targetDifficulty *big.Int) bool {
 	// sbResult is used by the solver goroutines to send results.
+	wire.ChangeCode()
 	type sbResult struct {
 		found bool
 		nonce uint32
@@ -42,7 +43,7 @@ func solveBlock(header *wire.BlockHeader, targetDifficulty *big.Int) bool {
 			case <-quit:
 				return
 			default:
-				hdr.Nonce = i
+				//hdr.Nonce = i
 				hash := hdr.BlockHash()
 				if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
 					select {
@@ -77,7 +78,7 @@ func solveBlock(header *wire.BlockHeader, targetDifficulty *big.Int) bool {
 		result := <-results
 		if result.found {
 			close(quit)
-			header.Nonce = result.nonce
+			//header.Nonce = result.nonce
 			return true
 		}
 	}
@@ -183,12 +184,13 @@ func CreateBlock(prevBlock *drcutil.Block, inclusionTxs []*drcutil.Tx,
 	}
 	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
 	var block wire.MsgBlock
+	wire.ChangeCode()
 	block.Header = wire.BlockHeader{
 		Version:    blockVersion,
 		PrevBlock:  *prevHash,
 		MerkleRoot: *merkles[len(merkles)-1],
 		Timestamp:  ts,
-		Bits:       net.PowLimitBits,
+		//Bits:       net.PowLimitBits,
 	}
 	for _, tx := range blockTxns {
 		if err := block.AddTransaction(tx.MsgTx()); err != nil {

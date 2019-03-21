@@ -87,6 +87,7 @@ func (b *BlockChain) maybeAcceptBlock(block *drcutil.Block, flags BehaviorFlags)
 		return false, err
 	}
 
+	//通知调用者新块已被接受到块链中。调用方通常希望通过将库存转发给其他对等方来做出反应。
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
 	// inventory to other peers.

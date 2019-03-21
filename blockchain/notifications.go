@@ -69,6 +69,7 @@ func (b *BlockChain) Subscribe(callback NotificationCallback) {
 	b.notificationsLock.Unlock()
 }
 
+// sendNotification在调用New时提供回调函数，如果调用者请求通知，则发送带有传递类型和数据的通知。
 // sendNotification sends a notification with the passed type and data if the
 // caller requested notifications by providing a callback function in the call
 // to New.
