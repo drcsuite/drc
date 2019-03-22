@@ -31,8 +31,6 @@ const (
 	BlockTimeInterval = 10 * time.Second
 )
 
-var Nodes uint16
-
 // 区块签名的票池
 // Block signature of the ticket pool
 var ticketPool = make(map[chainhash.Hash][]SignAndKey)
@@ -79,7 +77,6 @@ func EstimateScale(prevVoteNums []uint16, prevScales []uint16) (scale uint16) {
 		scale = uint16(uint32(meanScale) * uint32(meanVoteNum) / IdealVoteNum)
 
 	}
-	Nodes = scale
 	return
 }
 
@@ -214,7 +211,7 @@ func (m *CPUMiner) BlockVote(p peer.Peer, msg *wire.MsgBlock) {
 
 // 收集签名投票
 // Collect signatures and vote
-func (m *CPUMiner) CollectVotes(msg *wire.MsgSign) bool {
+func (m *CPUMiner) CollectVotes(msg *wire.MsgSign, headerBlock wire.BlockHeader) bool {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 
@@ -247,7 +244,7 @@ func (m *CPUMiner) CollectVotes(msg *wire.MsgSign) bool {
 			sign := msg.Signature.CloneBytes()
 			weight := chainhash.DoubleHashB(sign)
 			bigWeight := new(big.Int).SetBytes(weight)
-			voteVerge := VoteVerge(Nodes)
+			voteVerge := VoteVerge(headerBlock.Scale)
 			// weight值小于voteVerge，此节点有投票权
 			// Weight is less than the voteVerge, this node has the right to vote
 			if bigWeight.Cmp(voteVerge) <= 0 {
@@ -354,8 +351,7 @@ func CheckBlock(msg wire.MsgBlock) bool {
 
 // 处理投票结果，是个独立线程
 // Processing the poll result is a separate thread
-func VoteHandle(getTime time.Time) {
-
+func VoteHandle() {
 	creationTime := GetCreationTime()
 	blockHeight := GetBlockHeight()
 

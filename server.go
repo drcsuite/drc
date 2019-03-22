@@ -1353,11 +1353,11 @@ func (sp *serverPeer) OnSign(_ *peer.Peer, msg *wire.MsgSign) {
 	// check if the block pool has this block. If not, the signature is not recognized.
 	// The new round will no longer process the previous round of voting
 	blockPool := cpuminer.GetBlockPool()
-	if _, exist := blockPool[msg.BlockHeaderHash]; exist {
+	if headerBlock, exist := blockPool[msg.BlockHeaderHash]; exist {
 
 		// 验证和保存签名
 		// Process and save signatures
-		if sp.server.cpuMiner.CollectVotes(msg) {
+		if sp.server.cpuMiner.CollectVotes(msg, headerBlock) {
 
 			// 符合传播条件，传播签名
 			// If propagation conditions are met, the signature is propagated
