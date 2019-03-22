@@ -790,6 +790,8 @@ func (p *Peer) StartingHeight() int32 {
 	return startingHeight
 }
 
+// 如果对等方想要头消息而不是
+//区块的库存向量。
 // WantsHeaders returns if the peer wants header messages instead of
 // inventory vectors for blocks.
 //
@@ -1867,6 +1869,7 @@ func (p *Peer) QueueMessageWithEncoding(msg wire.Message, doneChan chan<- struct
 	p.outputQueue <- outMsg{msg: msg, encoding: encoding, doneChan: doneChan}
 }
 
+// QueueInventory将传递的库存添加到库存发送队列中，该队列可能不会立即发送，而是分批地发送给对等方。同行已经知道拥有的目录将被忽略。
 // QueueInventory adds the passed inventory to the inventory send queue which
 // might not be sent right away, rather it is trickled to the peer in batches.
 // Inventory that the peer is already known to have is ignored.
@@ -2203,9 +2206,9 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 	}
 
 	// Set the chain parameters to testnet if the caller did not specify any.
-	if cfg.ChainParams == nil {
-		cfg.ChainParams = &chaincfg.TestNet3Params
-	}
+	//if cfg.ChainParams == nil {
+	//	cfg.ChainParams = &chaincfg.TestNet3Params
+	//}
 
 	// Set the trickle interval if a non-positive value is specified.
 	if cfg.TrickleInterval <= 0 {

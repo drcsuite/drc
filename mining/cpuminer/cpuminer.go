@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/drcsuite/drc/btcec"
+	"math/big"
 	"math/rand"
 	"runtime"
 	"sync"
@@ -66,6 +67,8 @@ type Config struct {
 	// It typically must run the provided block through the same set of
 	// rules and handling as any other block coming from the network.
 	ProcessBlock func(*drcutil.Block, blockchain.BehaviorFlags) (bool, error)
+
+	SendBlock func(*drcutil.Block) (bool, error)
 
 	// ConnectedCount defines the function to use to obtain how many other
 	// peers the server is connected to.  This is used by the automatic
@@ -173,24 +176,28 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 		return false
 	}
 
+	// 采用后稳策略，先广播块信息，
+	b, e := m.cfg.SendBlock(block)
+	isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
+
 	// Process this block using the same rules as blocks coming from other
 	// nodes.  This will in turn relay it to the network like normal.
-	isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
+	//isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
 	if err != nil {
-		// Anything other than a rule violation is an unexpected error,
-		// so log that error as an internal error.
+		//Anything other than a rule violation is an unexpected error,
+		//so log that error as an internal error.
 		if _, ok := err.(blockchain.RuleError); !ok {
 			log.Errorf("Unexpected error while processing "+
 				"block submitted via CPU miner: %v", err)
 			return false
 		}
 
-		log.Debugf("Block submitted via CPU miner rejected: %v", err)
-		return false
-	}
-	if isOrphan {
-		log.Debugf("Block submitted via CPU miner is an orphan")
-		return false
+		//log.Debugf("Block submitted via CPU miner rejected: %v", err)
+		//return false
+		if isOrphan {
+			log.Debugf("Block submitted via CPU miner is an orphan")
+			return false
+		}
 	}
 
 	// The block was accepted.
@@ -209,20 +216,18 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 // This function will return early with false when conditions that trigger a
 // stale block such as a new block showing up or periodically when there are
 // new transactions and enough time has elapsed without finding a solution.
-func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
+func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock,
 	ticker *time.Ticker, quit chan struct{}) bool {
 	wire.ChangeCode()
-	// 如果是第一个块，使用初始种子作为seed，签名后做doublehash。
-	// 根据根据当前阈值，判断是否具有发块权限
 
 	// Choose a random extra nonce offset for this block template and
 	// worker.
-	enOffset, err := wire.RandomUint64()
-	if err != nil {
-		log.Errorf("Unexpected error while generating random "+
-			"extra nonce offset: %v", err)
-		enOffset = 0
-	}
+	//enOffset, err := wire.RandomUint64()
+	//if err != nil {
+	//	log.Errorf("Unexpected error while generating random "+
+	//		"extra nonce offset: %v", err)
+	//	enOffset = 0
+	//}
 
 	// Create some convenience variables.
 	header := &msgBlock.Header
@@ -236,65 +241,65 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 	// Note that the entire extra nonce range is iterated and the offset is
 	// added relying on the fact that overflow will wrap around 0 as
 	// provided by the Go spec.
-	for extraNonce := uint64(0); extraNonce < maxExtraNonce; extraNonce++ {
-		// Update the extra nonce in the block template with the
-		// new value by regenerating the coinbase script and
-		// setting the merkle root to the new value.
-		m.g.UpdateExtraNonce(msgBlock, blockHeight, extraNonce+enOffset)
+	//for extraNonce := uint64(0); extraNonce < maxExtraNonce; extraNonce++ {
+	// Update the extra nonce in the block template with the
+	// new value by regenerating the coinbase script and
+	// setting the merkle root to the new value.
+	//m.g.UpdateExtraNonce(msgBlock, blockHeight, extraNonce+enOffset)
 
-		// Search through the entire nonce range for a solution while
-		// periodically checking for early quit and stale block
-		// conditions along with updates to the speed monitor.
-		for i := uint32(0); i <= maxNonce; i++ {
-			select {
-			case <-quit:
-				return false
+	// Search through the entire nonce range for a solution while
+	// periodically checking for early quit and stale block
+	// conditions along with updates to the speed monitor.
+	//for i := uint32(0); i <= maxNonce; i++ {
+	select {
+	case <-quit:
+		return false
 
-			case <-ticker.C:
-				m.updateHashes <- hashesCompleted
-				hashesCompleted = 0
+	case <-ticker.C:
+		m.updateHashes <- hashesCompleted
+		hashesCompleted = 0
 
-				// The current block is stale if the best block
-				// has changed.
-				best := m.g.BestSnapshot()
-				if !header.PrevBlock.IsEqual(&best.Hash) {
-					return false
-				}
-
-				// The current block is stale if the memory pool
-				// has been updated since the block template was
-				// generated and it has been at least one
-				// minute.
-				if lastTxUpdate != m.g.TxSource().LastUpdated() &&
-					time.Now().After(lastGenerated.Add(time.Minute)) {
-
-					return false
-				}
-
-				m.g.UpdateBlockTime(msgBlock)
-
-			default:
-				// Non-blocking select to fall through
-			}
-
-			// Update the nonce and hash the block header.  Each
-			// hash is actually a double sha256 (two hashes), so
-			// increment the number of hashes completed for each
-			// attempt accordingly.
-			//header.Nonce = i
-			//hash := header.BlockHash()
-			//hashesCompleted += 2
-
-			// The block is solved when the new block hash is less
-			// than the target difficulty.  Yay!
-			//if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
-			//	m.updateHashes <- hashesCompleted
-			//return true
-			//}
+		// The current block is stale if the best block
+		// has changed.
+		best := m.g.BestSnapshot()
+		if !header.PrevBlock.IsEqual(&best.Hash) {
+			return false
 		}
+
+		// The current block is stale if the memory pool
+		// has been updated since the block template was
+		// generated and it has been at least one
+		// minute.
+		if lastTxUpdate != m.g.TxSource().LastUpdated() &&
+			time.Now().After(lastGenerated.Add(time.Minute)) {
+
+			return false
+		}
+
+		m.g.UpdateBlockTime(msgBlock)
+
+	default:
+		// Non-blocking select to fall through
 	}
 
-	return false
+	// Update the nonce and hash the block header.  Each
+	// hash is actually a double sha256 (two hashes), so
+	// increment the number of hashes completed for each
+	// attempt accordingly.
+	//header.Nonce = i
+	//hash := header.BlockHash()
+	//hashesCompleted += 2
+
+	// The block is solved when the new block hash is less
+	// than the target difficulty.  Yay!
+	//if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
+	//	m.updateHashes <- hashesCompleted
+	//return true
+	//}
+	//}
+	//}
+
+	return true
 }
 
 // generateBlocks is a worker that is controlled by the miningWorkerController.
@@ -338,6 +343,12 @@ out:
 		// 修改BestSnapshot，返回最佳快照，添加sign和pk
 		m.submitBlockLock.Lock()
 		curHeight := m.g.BestSnapshot().Height
+		if curHeight != 0 && !m.cfg.IsCurrent() {
+			m.submitBlockLock.Unlock()
+			time.Sleep(time.Second)
+			continue
+		}
+
 		preSign := m.g.BestSnapshot().Signature
 
 		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<π
@@ -348,24 +359,27 @@ out:
 			log.Errorf(errStr)
 			continue
 		}
-		weight := chainhash.DoubleHashB(signature.GenSignBytes())
+		weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signature.GenSignBytes()))
 
+		votes, scales := make([]uint16, 0), make([]uint16, 0)
+		prevNode := m.chain.GetBlockIndex().LookupNode(&m.g.BestSnapshot().Hash)
 		// 计算前十个块平均weight
 		for i := 0; i < 10; i++ {
-			node := m.chain.GetBlockIndex().LookupNode(&m.g.BestSnapshot().Hash)
-			scale := node.Header().Scale
-
+			scales = append(scales, prevNode.Header().Scale)
+			votes = append(votes, prevNode.Header().Scale)
+			prevNode = prevNode.Ancestor(1)
+			if prevNode == nil {
+				continue
+			}
 		}
-
-		if curHeight != 0 && !m.cfg.IsCurrent() {
-			m.submitBlockLock.Unlock()
+		scale := EstimateScale(votes, scales)
+		pi := VoteVerge(scale)
+		if weight.Cmp(pi) >= 0 {
 			time.Sleep(time.Second)
 			continue
 		}
 
-		// 只有符合发块阈值的节点，才可以开始发块
-		// 从BestSnapshot中取出最新块的sign，满足条件，开始发块
-
+		// 当weight符合规则，发块
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
 		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
@@ -380,7 +394,13 @@ out:
 			log.Errorf(errStr)
 			continue
 		}
-		template, err := m.g.NewBlockTemplate(payToAddr, pubKey)
+		signHash, err := chainhash.NewHash64(signature.GenSignBytes())
+		if err != nil {
+			errStr := fmt.Sprintf("Hash64 Faild: %v", err)
+			log.Errorf(errStr)
+			continue
+		}
+		template, err := m.g.NewBlockTemplate(payToAddr, pubKey, signHash, scale, 0)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -393,10 +413,11 @@ out:
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
+		if m.solveBlock(template.Block, ticker, quit) {
 
-		// 修改发块规则，验证签名，计算weight，符合条件进行发块
-		if m.solveBlock(template.Block, curHeight+1, ticker, quit) {
 			block := drcutil.NewBlock(template.Block)
+
+			// 将块信息提交给对等点
 			m.submitBlock(block)
 		}
 	}
@@ -486,7 +507,7 @@ func (m *CPUMiner) Start() {
 	m.quit = make(chan struct{})
 	m.speedMonitorQuit = make(chan struct{})
 	m.wg.Add(2)
-	go m.speedMonitor()
+	//go m.speedMonitor()
 	go m.miningWorkerController()
 
 	m.started = true
@@ -601,14 +622,15 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 
 	m.speedMonitorQuit = make(chan struct{})
 	m.wg.Add(1)
-	go m.speedMonitor()
+	wire.ChangeCode()
+	//go m.speedMonitor()
 
 	m.Unlock()
 
 	log.Tracef("Generating %d blocks", n)
 
-	i := uint32(0)
-	blockHashes := make([]*chainhash.Hash, n)
+	//i := uint32(0)
+	//blockHashes := make([]*chainhash.Hash, n)
 
 	// Start a ticker which is used to signal checks for stale work and
 	// updates to the speed monitor.
@@ -628,51 +650,51 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// be changing and this would otherwise end up building a new block
 		// template on a block that is in the process of becoming stale.
 		m.submitBlockLock.Lock()
-		curHeight := m.g.BestSnapshot().Height
+		//curHeight := m.g.BestSnapshot().Height
 
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		//payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		pubKey, err := chainhash.NewHash33((btcec.PublicKey)(m.privKey.PublicKey).SerializeCompressed())
-		if err != nil {
-			errStr := fmt.Sprintf("Failed to create new block "+
-				"template: %v", err)
-			log.Errorf(errStr)
-			continue
-		}
-		template, err := m.g.NewBlockTemplate(payToAddr, pubKey)
+		//pubKey, err := chainhash.NewHash33((btcec.PublicKey)(m.privKey.PublicKey).SerializeCompressed())
+		//if err != nil {
+		//	errStr := fmt.Sprintf("Failed to create new block "+
+		//		"template: %v", err)
+		//	log.Errorf(errStr)
+		//	continue
+		//}
+		//template, err := m.g.NewBlockTemplate(payToAddr, pubKey)
 		m.submitBlockLock.Unlock()
-		if err != nil {
-			errStr := fmt.Sprintf("Failed to create new block "+
-				"template: %v", err)
-			log.Errorf(errStr)
-			continue
-		}
+		//if err != nil {
+		//	errStr := fmt.Sprintf("Failed to create new block "+
+		//		"template: %v", err)
+		//	log.Errorf(errStr)
+		//	continue
+		//}
 
 		// Attempt to solve the block.  The function will exit early
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.Block, curHeight+1, ticker, nil) {
-			block := drcutil.NewBlock(template.Block)
-			m.submitBlock(block)
-			blockHashes[i] = block.Hash()
-			i++
-			if i == n {
-				log.Tracef("Generated %d blocks", i)
-				m.Lock()
-				close(m.speedMonitorQuit)
-				m.wg.Wait()
-				m.started = false
-				m.discreteMining = false
-				m.Unlock()
-				return blockHashes, nil
-			}
-		}
+		//if m.solveBlock(template.Block, curHeight+1, ticker, nil) {
+		//	block := drcutil.NewBlock(template.Block)
+		//	m.submitBlock(block)
+		//	blockHashes[i] = block.Hash()
+		//	i++
+		//	if i == n {
+		//		log.Tracef("Generated %d blocks", i)
+		//		m.Lock()
+		//		close(m.speedMonitorQuit)
+		//		m.wg.Wait()
+		//		m.started = false
+		//		m.discreteMining = false
+		//		m.Unlock()
+		//		return blockHashes, nil
+		//	}
+		//}
 	}
 }
 
