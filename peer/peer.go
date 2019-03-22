@@ -215,6 +215,10 @@ type MessageListeners struct {
 	// not an error in the write occurred.  This can be useful for
 	// circumstances such as keeping track of server-wide byte counts.
 	OnWrite func(p *Peer, bytesWritten int, msg wire.Message, err error)
+
+	// 当对等方接收到签名消息时调用它。
+	// OnSign is invoked when a peer receives a signed message.
+	OnSign func(p *Peer, msg *wire.MsgSign)
 }
 
 // Config is the struct to hold configuration options useful to Peer.
@@ -1450,6 +1454,11 @@ out:
 				p.cfg.Listeners.OnBlock(p, msg, buf)
 			}
 
+		case *wire.MsgSign:
+			if p.cfg.Listeners.OnSign != nil {
+				p.cfg.Listeners.OnSign(p, msg)
+			}
+
 		case *wire.MsgInv:
 			if p.cfg.Listeners.OnInv != nil {
 				p.cfg.Listeners.OnInv(p, msg)
@@ -1907,6 +1916,7 @@ func (p *Peer) Disconnect() {
 	close(p.quit)
 }
 
+// 等待来自远程对等点的下一条消息。
 // readRemoteVersionMsg waits for the next message to arrive from the remote
 // peer.  If the next message is not a version message or the version is not
 // acceptable then return an error.
