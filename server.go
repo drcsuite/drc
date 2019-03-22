@@ -1343,7 +1343,9 @@ func (sp *serverPeer) OnWrite(_ *peer.Peer, bytesWritten int, msg wire.Message, 
 // The handler function that is called when the signature information is received
 func (sp *serverPeer) OnSign(_ *peer.Peer, msg *wire.MsgSign) {
 
-	// 处理和保存签名
+	// 查看是否有此区块
+
+	// 验证和保存签名
 	// Process and save signatures
 	if sp.server.cpuMiner.CollectVotes(msg) {
 

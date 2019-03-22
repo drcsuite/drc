@@ -20,9 +20,19 @@ const IdealBlockNum = 50
 // Ideal number of voting nodes
 const IdealVoteNum = 300
 
+// 成为优势区块需取得的票数
+// The number of votes needed to become the dominant block
+const AdvantageVoteNum = 200
+
+var Nodes uint16
+
 // 区块签名的票池
 // Block signature of the ticket pool
-var TicketPool = make(map[chainhash.Hash][]SignAndKey)
+var ticketPool = make(map[chainhash.Hash][]SignAndKey)
+
+// 前一区块的签名票池
+// Block signature of the ticket pool
+var prevTicketPool = make(map[chainhash.Hash][]SignAndKey)
 
 // 具有投票权的节点对区块的签名值和验证时用的公钥
 // The signed value of the block by the voting node and the public key used for verification
@@ -62,6 +72,7 @@ func EstimateScale(prevVoteNums []uint16, prevScales []uint16) (scale uint16) {
 		scale = uint16(uint32(meanScale) * uint32(meanVoteNum) / IdealVoteNum)
 
 	}
+	Nodes = scale
 	return
 }
 
@@ -123,66 +134,72 @@ func (m *CPUMiner) BlockVote(p peer.Peer, msg *wire.MsgBlock) {
 	// Gets the node's public key and private key
 	privateKey := m.privKey
 	publicKey := privateKey.PubKey()
+	// 散列两次区块内容
+	// Hash the contents of the block twice
+	headerHash := msg.Header.BlockHash()
 
 	// 验证区块
 	// Verify the block
 	if CheckBlock(*msg) {
-		pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
-		if err != nil {
-			log.Errorf("Format conversion error: %s", err)
-		}
-		// 散列两次区块内容
-		// Hash the contents of the block twice
-		headerHash := msg.Header.BlockHash()
 
-		// 之前未签名过本区块，分析处理
-		// Had not signed this block before, analyse processing
-		if preventRepeatSign(headerHash, *pubKey) {
+		hash, count := GetMaxVotes()
+		// 票池没有优势区块，此区块需要投票
+		if !(count >= AdvantageVoteNum && hash.IsEqual(&headerHash)) {
 
-			// 用自己的私钥签名区块
-			// Sign the block with your own private key
-			headerSign, err := privateKey.Sign(headerHash.CloneBytes())
+			pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
 			if err != nil {
-				log.Errorf("Signature error: %s", err)
+				log.Errorf("Format conversion error: %s", err)
 			}
-			// 计算本节点的投票weight
-			//The voting weight of this node is calculated
-			weight := chainhash.DoubleHashB(headerSign.Serialize())
-			bigWeight := new(big.Int).SetBytes(weight)
 
-			voteVerge := VoteVerge(msg.Header.Scale)
+			// 之前未签名过本区块，分析处理
+			// Had not signed this block before, analyse processing
+			if preventRepeatSign(headerHash, *pubKey) {
 
-			// weight值小于voteVerge，有投票权，进行投票签名
-			// Weight is less than the voteVerge, has the right to vote, does the voting signature
-			if bigWeight.Cmp(voteVerge) <= 0 {
-
-				sign, err := chainhash.NewHash64(headerSign.Serialize())
+				// 用自己的私钥签名区块
+				// Sign the block with your own private key
+				headerSign, err := privateKey.Sign(headerHash.CloneBytes())
 				if err != nil {
-					log.Errorf("Format conversion error: %s", err)
+					log.Errorf("Signature error: %s", err)
 				}
+				// 计算本节点的投票weight
+				//The voting weight of this node is calculated
+				weight := chainhash.DoubleHashB(headerSign.Serialize())
+				bigWeight := new(big.Int).SetBytes(weight)
 
-				// 维护本地票池
-				// Maintain local ticket pool
-				signAndKey := SignAndKey{
-					Signature: *sign,
-					PublicKey: *pubKey,
+				voteVerge := VoteVerge(msg.Header.Scale)
+
+				// weight值小于voteVerge，有投票权，进行投票签名
+				// Weight is less than the voteVerge, has the right to vote, does the voting signature
+				if bigWeight.Cmp(voteVerge) <= 0 {
+
+					sign, err := chainhash.NewHash64(headerSign.Serialize())
+					if err != nil {
+						log.Errorf("Format conversion error: %s", err)
+					}
+
+					// 维护本地票池
+					// Maintain local ticket pool
+					signAndKey := SignAndKey{
+						Signature: *sign,
+						PublicKey: *pubKey,
+					}
+					ticketPool[headerHash] = append(ticketPool[headerHash], signAndKey)
+
+					// 传播签名和区块
+					// Propagate signatures and blocks
+					msgSign := &wire.MsgSign{
+						BlockHeaderHash: headerHash,
+						Signature:       *sign,
+						PublicKey:       *pubKey,
+					}
+					p.QueueMessage(msgSign, nil)
+					p.QueueMessage(msg, nil)
+
+					// weight不符合情况，传播区块
+					// weight don't conform to the situation, spread the block
+				} else {
+					p.QueueMessage(msg, nil)
 				}
-				TicketPool[headerHash] = append(TicketPool[headerHash], signAndKey)
-
-				// 传播签名和区块
-				// Propagate signatures and blocks
-				msgSign := &wire.MsgSign{
-					BlockHeaderHash: headerHash,
-					Signature:       *sign,
-					PublicKey:       *pubKey,
-				}
-				p.QueueMessage(msgSign, nil)
-				p.QueueMessage(msg, nil)
-
-				// weight不符合情况，传播区块
-				// weight don't conform to the situation, spread the block
-			} else {
-				p.QueueMessage(msg, nil)
 			}
 		}
 	}
@@ -197,6 +214,7 @@ func (m *CPUMiner) CollectVotes(msg *wire.MsgSign) bool {
 	// 获取本节点公钥
 	// Gets the node's public key
 	publicKey := m.privKey.PubKey()
+
 	// 查看是否是自己的签名投票
 	// Check to see if it's your signature vote
 	pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
@@ -218,15 +236,25 @@ func (m *CPUMiner) CollectVotes(msg *wire.MsgSign) bool {
 		hash := msg.BlockHeaderHash.CloneBytes()
 		if signature.Verify(hash, pubKey) {
 
-			// 维护本地票池
-			// Maintain local ticket pool
-			signAndKey := SignAndKey{
-				Signature: msg.Signature,
-				PublicKey: msg.PublicKey,
-			}
-			TicketPool[msg.BlockHeaderHash] = append(TicketPool[msg.BlockHeaderHash], signAndKey)
+			// 查看weight是否符合
+			sign := msg.Signature.CloneBytes()
+			weight := chainhash.DoubleHashB(sign)
+			bigWeight := new(big.Int).SetBytes(weight)
+			voteVerge := VoteVerge(Nodes)
+			// weight值小于voteVerge，此节点有投票权
+			// Weight is less than the voteVerge, this node has the right to vote
+			if bigWeight.Cmp(voteVerge) <= 0 {
 
-			return true
+				// 维护本地票池
+				// Maintain local ticket pool
+				signAndKey := SignAndKey{
+					Signature: msg.Signature,
+					PublicKey: msg.PublicKey,
+				}
+				ticketPool[msg.BlockHeaderHash] = append(ticketPool[msg.BlockHeaderHash], signAndKey)
+
+				return true
+			}
 		}
 	}
 	return false
@@ -238,11 +266,11 @@ func preventRepeatSign(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash3
 
 	// 查看签名池里是否有自己的签名,有的话返回true
 	// Checks the signature pool to see if it has its own signature and returns true
-	for key, value := range TicketPool {
-		if key == blockHeaderHash {
+	for headerHash, signAndKeys := range ticketPool {
+		if headerHash == blockHeaderHash {
 			// 遍历收到的区块所有的签名公钥
 			// Iterates through all the signed public keys of the received block
-			for _, signAndKey := range value {
+			for _, signAndKey := range signAndKeys {
 				if publicKey == signAndKey.PublicKey {
 					return false
 				}
@@ -250,6 +278,22 @@ func preventRepeatSign(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash3
 		}
 	}
 	return true
+}
+
+// 取得当前票池中获得最多投票数的区块和票数值
+// Gets the block with the most votes in the current pool and the number of votes
+func GetMaxVotes() (chainhash.Hash, uint16) {
+
+	var maxVotes = 0
+	var maxBlockHash chainhash.Hash
+
+	for headerHash, signAndKeys := range ticketPool {
+		if count := len(signAndKeys); count > maxVotes {
+			maxVotes = count
+			maxBlockHash = headerHash
+		}
+	}
+	return maxBlockHash, uint16(maxVotes)
 }
 
 // 检查区块
@@ -273,16 +317,35 @@ func CheckBlock(msg wire.MsgBlock) bool {
 	return false
 }
 
-// 从一段时间收到的所有区块中选择最适合的区块进行签名
-func ChooseBlock(p peer.Peer, msg *wire.MsgBlock) {
+// 处理投票结果，是个独立线程
+//func VoteHandle(getTime time.Time) {
+//
+//	blockPool := make(map[chainhash.Hash][]drcutil.Block)
+//
+//	// 根据最新块，确认发块的时间
+//	laterTime := getTime.Add(time.Second * 20)
+//	nowTime := time.Now()
+//	// 调整到处理投票的时间
+//	t := time.NewTimer(laterTime.Sub(nowTime))
+//	<-t.C
+//	t.Stop()
+//
+//	// 10秒处理一波投票结果
+//	handlingTime := time.NewTimer(10 * time.Second)
+//	for {
+//		select {
+//		case <-handlingTime.C:
+//			blockHeaderHash, _ := GetMaxVotes()
+//			block := blockPool[blockHeaderHash]
+//			fmt.Println("待实现")
+//			// 清空票池
+//			ticketPool = make(map[chainhash.Hash][]SignAndKey)
+//
+//		}
+//	}
+//}
 
-	// 首先查看weight的大小
+func GetTicketPool() map[chainhash.Hash][]SignAndKey {
 
-	//weight := chainhash.DoubleHashB(msg.Header.Signature.CloneBytes())
-	//bigWeight := new(big.Int).SetBytes(weight)
-
-	// 查看有没有积累了票数很多的区块
-
-	// 验证是否为恶意块
-
+	return ticketPool
 }
