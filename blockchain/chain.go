@@ -74,6 +74,31 @@ type BestState struct {
 	Signature   chainhash.Hash64
 }
 
+var (
+	blockPool map[chainhash.Hash]*wire.MsgBlock
+)
+
+func (b *BlockChain) haveBlock(hash *chainhash.Hash) bool {
+	return blockPool[*hash] == nil
+}
+
+func (b *BlockChain) getBlock(hash *chainhash.Hash) *wire.MsgBlock {
+	bo := b.haveBlock(hash)
+	if bo {
+		return blockPool[*hash]
+	}
+	return nil
+}
+
+func (b *BlockChain) setBlock(hash *chainhash.Hash, block *wire.MsgBlock) bool {
+	bo := b.haveBlock(hash)
+	if bo {
+		return true
+	}
+	blockPool[*hash] = block
+	return true
+}
+
 // newBestState为给定的参数返回一个新的best stats实例。
 // newBestState returns a new best stats instance for the given parameters.
 func newBestState(node *blockNode, blockSize, blockWeight, numTxns,

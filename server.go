@@ -601,6 +601,8 @@ func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
 	sp.AddKnownInventory(iv)
 
 	// 将块排队等待块管理器处理，并故意进一步接收块，直到比特币块被完全处理并知道是好是坏。
+	// 这有助于防止恶意的对等程序在断开连接(或断开连接)和浪费内存之前排队等待一堆坏块。
+	// 此外，这种行为至少依赖于块接受测试工具，因为引用实现在同一线程中处理块，因此在比特币块完全处理之前会阻止进一步的消息。
 	// Queue the block up to be handled by the block
 	// manager and intentionally block further receives
 	// until the bitcoin block is fully processed and known

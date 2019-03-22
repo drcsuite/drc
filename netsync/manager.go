@@ -563,20 +563,23 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 
 	// If we didn't ask for this block then the peer is misbehaving.
 	blockHash := bmsg.block.Hash()
-	if _, exists = state.requestedBlocks[*blockHash]; !exists {
-		// The regression test intentionally sends some blocks twice
-		// to test duplicate block insertion fails.  Don't disconnect
-		// the peer or ignore the block when we're in regression test
-		// mode in this case so the chain code is actually fed the
-		// duplicate blocks.
-		//if sm.chainParams != &chaincfg.RegressionNetParams {
-		//	log.Warnf("Got unrequested block %v from %s -- "+
-		//		"disconnecting", blockHash, peer.Addr())
-		//	peer.Disconnect()
-		//	return
-		//}
-	}
+	//if _, exists = state.requestedBlocks[*blockHash]; !exists {
+	// The regression test intentionally sends some blocks twice
+	// to test duplicate block insertion fails.  Don't disconnect
+	// the peer or ignore the block when we're in regression test
+	// mode in this case so the chain code is actually fed the
+	// duplicate blocks.
+	//if sm.chainParams != &chaincfg.RegressionNetParams {
+	//	log.Warnf("Got unrequested block %v from %s -- "+
+	//		"disconnecting", blockHash, peer.Addr())
+	//	peer.Disconnect()
+	//	return
+	//}
+	//}
 
+	//在heades -first模式下，如果块匹配正在获取的头列表中第一个头的哈希值，则可以减少验证，
+	// 因为头已经被验证为链接在一起，并且直到下一个检查点为止都是有效的。
+	// 此外，删除除检查点之外的所有块的列表条目，因为它需要正确地验证下一轮头文件链接。
 	// When in headers-first mode, if the block matches the hash of the
 	// first header in the list of headers that are being fetched, it's
 	// eligible for less validation since the headers have already been
@@ -586,21 +589,21 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	// properly.
 	//isCheckpointBlock := false
 	behaviorFlags := blockchain.BFNone
-	if sm.headersFirstMode {
-		firstNodeEl := sm.headerList.Front()
-		if firstNodeEl != nil {
-			firstNode := firstNodeEl.Value.(*headerNode)
-			if blockHash.IsEqual(firstNode.hash) {
-				behaviorFlags |= blockchain.BFFastAdd
-				wire.ChangeCode()
-				//if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
-				//	isCheckpointBlock = true
-				//} else {
-				//	sm.headerList.Remove(firstNodeEl)
-				//}
-			}
-		}
-	}
+	//if sm.headersFirstMode {
+	//	firstNodeEl := sm.headerList.Front()
+	//	if firstNodeEl != nil {
+	//		firstNode := firstNodeEl.Value.(*headerNode)
+	//		if blockHash.IsEqual(firstNode.hash) {
+	//			behaviorFlags |= blockchain.BFFastAdd
+	//			wire.ChangeCode()
+	//			//if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
+	//			//	isCheckpointBlock = true
+	//			//} else {
+	//			//	sm.headerList.Remove(firstNodeEl)
+	//			//}
+	//		}
+	//	}
+	//}
 
 	// Remove block from request maps. Either chain will know about it and
 	// so we shouldn't have any more instances of trying to fetch it, or we
@@ -608,8 +611,12 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	delete(state.requestedBlocks, *blockHash)
 	delete(sm.requestedBlocks, *blockHash)
 
+	// 处理该块以包括验证、最佳链选择、孤儿处理等。
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
+	// 处理发块环节收到的块，
+	// 包括：验证签名，验证交易，验证weight，验证coinbase，
+	// 通过验证将块放入块池
 	_, isOrphan, err := sm.chain.ProcessBlock(bmsg.block, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
@@ -704,6 +711,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		}
 	}
 
+	//如果我们不采取“头先上”的模式，就没什么可做的了。
 	// Nothing more to do if we aren't in headers-first mode.
 	if !sm.headersFirstMode {
 		return
@@ -1146,7 +1154,7 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 			//如果还没有一个挂起的请求，请求该块。
 			// Request the block if there is not already a pending
 			// request.
-			if _, exists := sm.requestedBlocks[iv.Hash]; !exists {
+			if _, exists := sm.requestedBlocks[iv.Hash]; !exists { // 挂起请求
 				sm.requestedBlocks[iv.Hash] = struct{}{}
 				sm.limitMap(sm.requestedBlocks, maxRequestedBlocks)
 				state.requestedBlocks[iv.Hash] = struct{}{}
