@@ -1347,15 +1347,20 @@ func (sp *serverPeer) OnWrite(_ *peer.Peer, bytesWritten int, msg wire.Message, 
 // The handler function that is called when the signature information is received
 func (sp *serverPeer) OnSign(_ *peer.Peer, msg *wire.MsgSign) {
 
-	// 查看是否有此区块
+	// 查看块池是否有此区块,没有的话不承认该签名。新的一轮不再处理上轮投票
+	// check if the block pool has this block. If not, the signature is not recognized.
+	// The new round will no longer process the previous round of voting
+	blockPool := cpuminer.GetBlockPool()
+	if _, exist := blockPool[msg.BlockHeaderHash]; exist {
 
-	// 验证和保存签名
-	// Process and save signatures
-	if sp.server.cpuMiner.CollectVotes(msg) {
+		// 验证和保存签名
+		// Process and save signatures
+		if sp.server.cpuMiner.CollectVotes(msg) {
 
-		// 符合传播条件，传播签名
-		// If propagation conditions are met, the signature is propagated
-		sp.QueueMessage(msg, nil)
+			// 符合传播条件，传播签名
+			// If propagation conditions are met, the signature is propagated
+			sp.QueueMessage(msg, nil)
+		}
 	}
 }
 
