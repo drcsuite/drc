@@ -112,6 +112,11 @@ type sendBlockResponse struct {
 	err      error
 }
 
+type sendSignResponse struct {
+	isOrphan bool
+	err      error
+}
+
 // processBlockMsg是一种通过消息通道发送的消息类型，用于处理请求的块。
 // 注意，这个调用不同于上面的块msg，因为块msg是为来自对等点并具有额外处理的块而设计的，而这个消息实际上只是在内部块链实例上调用ProcessBlock的一种并发安全方法。
 // processBlockMsg is a message type to be sent across the message channel
@@ -128,6 +133,11 @@ type sendBlockMsg struct {
 	block *drcutil.Block
 	//flags blockchain.BehaviorFlags
 	reply chan sendBlockResponse
+}
+
+type sendSignMsg struct {
+	msgSign *wire.MsgSign
+	reply   chan sendSignResponse
 }
 
 // isCurrentMsg是一种通过消息通道发送的消息类型，用于请求sync manager是否认为它与当前连接的对等点同步。
@@ -1275,6 +1285,8 @@ out:
 				}
 			case sendBlockMsg:
 				sm.peerNotifier.SendBlock(msg.block.MsgBlock())
+			case sendSignMsg:
+				sm.peerNotifier.SendSign(msg.msgSign)
 			case isCurrentMsg:
 				msg.reply <- sm.current()
 
@@ -1515,6 +1527,14 @@ func (sm *SyncManager) ProcessBlock(block *drcutil.Block, flags blockchain.Behav
 func (sm *SyncManager) SendBlock(block *drcutil.Block) (bool, error) {
 	reply := make(chan sendBlockResponse, 1)
 	sm.msgChan <- sendBlockMsg{block: block, reply: reply}
+	response := <-reply
+	return response.isOrphan, response.err
+}
+
+// 广播投票签名
+func (sm *SyncManager) SendSign(msg *wire.MsgSign) (bool, error) {
+	reply := make(chan sendSignResponse, 1)
+	sm.msgChan <- sendSignMsg{msgSign: msg, reply: reply}
 	response := <-reply
 	return response.isOrphan, response.err
 }

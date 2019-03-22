@@ -128,9 +128,9 @@ func BlockVerge(scale uint16) *big.Int {
 	return verge
 }
 
-// 新块验证投票
+// 新块验证投票，需广播块返回true
 // New block validation vote
-func (m *CPUMiner) BlockVote(p peer.Peer, msg *wire.MsgBlock) {
+func (m *CPUMiner) BlockVote(p peer.Peer, msg *wire.MsgBlock) bool {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 
@@ -189,29 +189,31 @@ func (m *CPUMiner) BlockVote(p peer.Peer, msg *wire.MsgBlock) {
 					}
 					ticketPool[headerHash] = append(ticketPool[headerHash], signAndKey)
 
-					// 传播签名和区块
-					// Propagate signatures and blocks
+					// 传播签名
+					// Propagate signatures
 					msgSign := &wire.MsgSign{
 						BlockHeaderHash: headerHash,
 						Signature:       *sign,
 						PublicKey:       *pubKey,
 					}
-					p.QueueMessage(msgSign, nil)
-					p.QueueMessage(msg, nil)
+					m.cfg.SendSign(msgSign)
+					return true
 
-					// weight不符合情况，传播区块
+					// weight不符合情况，传播区块,返回true
 					// weight don't conform to the situation, spread the block
 				} else {
-					p.QueueMessage(msg, nil)
+					return true
 				}
 			}
 		}
 	}
+
+	return false
 }
 
 // 收集签名投票
 // Collect signatures and vote
-func (m *CPUMiner) CollectVotes(msg *wire.MsgSign, headerBlock wire.BlockHeader) bool {
+func (m *CPUMiner) CollectVotes(msg *wire.MsgSign, headerBlock wire.BlockHeader) {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 
@@ -257,11 +259,12 @@ func (m *CPUMiner) CollectVotes(msg *wire.MsgSign, headerBlock wire.BlockHeader)
 				}
 				ticketPool[msg.BlockHeaderHash] = append(ticketPool[msg.BlockHeaderHash], signAndKey)
 
-				return true
+				// 符合传播条件，传播签名
+				// If propagation conditions are met, the signature is propagated
+				m.cfg.SendSign(msg)
 			}
 		}
 	}
-	return false
 }
 
 // 避免重复投票或多次记录投票记录，如果没有重复，返回true
