@@ -62,6 +62,12 @@ type blockMsg struct {
 	reply chan struct{}
 }
 
+type candidateMsg struct {
+	block *drcutil.Block
+	peer  *peerpkg.Peer
+	reply chan struct{}
+}
+
 // invMsg将比特币inv消息及其来自的对等方打包在一起，以便块处理程序能够访问该信息。
 // invMsg packages a bitcoin inv message and the peer it came from together
 // so the block handler has access to that information.
@@ -126,7 +132,6 @@ type processBlockMsg struct {
 }
 type sendBlockMsg struct {
 	block *drcutil.Block
-	//flags blockchain.BehaviorFlags
 	reply chan sendBlockResponse
 }
 
@@ -614,6 +619,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	// 处理该块以包括验证、最佳链选择、孤儿处理等。
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
+
 	// 处理发块环节收到的块，
 	// 包括：验证签名，验证交易，验证weight，验证coinbase，
 	// 通过验证将块放入块池
@@ -635,6 +641,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 			panic(dbErr)
 		}
 
+		//将错误转换为适当的拒绝消息并发送。
 		// Convert the error into an appropriate reject message and
 		// send it.
 		code, reason := mempool.ErrToRejectErr(err)
@@ -748,6 +755,124 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	//		sm.syncPeer.Addr())
 	//	return
 	//}
+
+	// This is headers-first mode, the block is a checkpoint, and there are
+	// no more checkpoints, so switch to normal mode by requesting blocks
+	// from the block after this one up to the end of the chain (zero hash).
+	sm.headersFirstMode = false
+	sm.headerList.Init()
+	log.Infof("Reached the final checkpoint -- switching to normal mode")
+	locator := blockchain.BlockLocator([]*chainhash.Hash{blockHash})
+	err = peer.PushGetBlocksMsg(locator, &zeroHash)
+	if err != nil {
+		log.Warnf("Failed to send getblocks message to peer %s: %v",
+			peer.Addr(), err)
+		return
+	}
+}
+
+// 处理发块阶段收到的块
+func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
+	peer := bmsg.peer
+	_, exists := sm.peerStates[peer]
+	if !exists {
+		log.Warnf("Received block message from unknown peer %s", peer)
+		return
+	}
+
+	// If we didn't ask for this block then the peer is misbehaving.
+	blockHash := bmsg.block.CandidateHash()
+
+	//在heades -first模式下，如果块匹配正在获取的头列表中第一个头的哈希值，则可以减少验证，
+	// 因为头已经被验证为链接在一起，并且直到下一个检查点为止都是有效的。
+	// 此外，删除除检查点之外的所有块的列表条目，因为它需要正确地验证下一轮头文件链接。
+	// When in headers-first mode, if the block matches the hash of the
+	// first header in the list of headers that are being fetched, it's
+	// eligible for less validation since the headers have already been
+	// verified to link together and are valid up to the next checkpoint.
+	// Also, remove the list entry for all blocks except the checkpoint
+	// since it is needed to verify the next round of headers links
+	// properly.
+	behaviorFlags := blockchain.BFNone
+
+	// 处理该块以包括验证、最佳链选择、孤儿处理等。
+	// Process the block to include validation, best chain selection, orphan
+	// handling, etc.
+
+	// 处理发块环节收到的块，
+	// 包括：验证签名，验证交易，验证weight，验证coinbase，
+	// 通过验证将块放入块池
+	b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
+	if err != nil || !b {
+		// When the error is a rule error, it means the block was simply
+		// rejected as opposed to something actually going wrong, so log
+		// it as such.  Otherwise, something really did go wrong, so log
+		// it as an actual error.
+		if _, ok := err.(blockchain.RuleError); ok {
+			log.Infof("Rejected block %v from %s: %v", blockHash,
+				peer, err)
+		} else {
+			log.Errorf("Failed to process block %v: %v",
+				blockHash, err)
+		}
+		if dbErr, ok := err.(database.Error); ok && dbErr.ErrorCode ==
+			database.ErrCorruption {
+			panic(dbErr)
+		}
+
+		//将错误转换为适当的拒绝消息并发送。
+		// Convert the error into an appropriate reject message and
+		// send it.
+		//code, reason := mempool.ErrToRejectErr(err)
+		//peer.PushRejectMsg(wire.CmdBlock, code, reason, blockHash, false)
+		return
+	}
+
+	// 通过验证后，记录块高度，记录快照，转发块信息
+
+	// Meta-data about the new block this peer is reporting. We use this
+	// below to update this peer's latest block height and the heights of
+	// other peers based on their last announced block hash. This allows us
+	// to dynamically update the block heights of peers, avoiding stale
+	// heights when looking for a new sync peer. Upon acceptance of a block
+	// or recognition of an orphan, we also use this information to update
+	// the block heights over other peers who's invs may have been ignored
+	// if we are actively syncing while the chain is not yet current or
+	// who may have lost the lock announcement race.
+	var heightUpdate int32
+	var blkHashUpdate *chainhash.Hash
+
+	// Request the parents for the orphan block from the peer that sent it.
+	// When the block is not an orphan, log information about it and
+	// update the chain state.
+	sm.progressLogger.LogBlockHeight(bmsg.block)
+
+	// Update this peer's latest block height, for future
+	// potential sync node candidacy.
+	best := sm.chain.BestSnapshot()
+	heightUpdate = best.Height
+	blkHashUpdate = &best.Hash
+
+	// Clear the rejected transactions.
+	sm.rejectedTxns = make(map[chainhash.Hash]struct{})
+
+	// Update the block height for this peer. But only send a message to
+	// the server for updating peer heights if this is an orphan or our
+	// chain is "current". This avoids sending a spammy amount of messages
+	// if we're syncing the chain from scratch.
+	if blkHashUpdate != nil && heightUpdate != 0 {
+		peer.UpdateLastBlockHeight(heightUpdate)
+		if isOrphan || sm.current() {
+			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
+				peer)
+		}
+	}
+
+	//如果我们不采取“头先上”的模式，就没什么可做的了。
+	// Nothing more to do if we aren't in headers-first mode.
+	if !sm.headersFirstMode {
+		return
+	}
 
 	// This is headers-first mode, the block is a checkpoint, and there are
 	// no more checkpoints, so switch to normal mode by requesting blocks
@@ -1243,6 +1368,10 @@ out:
 				sm.handleBlockMsg(msg)
 				msg.reply <- struct{}{}
 
+			case *candidateMsg:
+				sm.handleCadidateMsg(msg)
+				msg.reply <- struct{}{}
+
 			case *invMsg:
 				sm.handleInvMsg(msg)
 
@@ -1274,7 +1403,7 @@ out:
 					err:      nil,
 				}
 			case sendBlockMsg:
-				sm.peerNotifier.SendBlock(msg.block.MsgBlock())
+				sm.peerNotifier.SendBlock(msg.block.MsgCandidate())
 			case isCurrentMsg:
 				msg.reply <- sm.current()
 
@@ -1425,6 +1554,16 @@ func (sm *SyncManager) QueueBlock(block *drcutil.Block, peer *peerpkg.Peer, done
 	}
 
 	sm.msgChan <- &blockMsg{block: block, peer: peer, reply: done}
+}
+
+func (sm *SyncManager) QueueCandidate(block *drcutil.Block, peer *peerpkg.Peer, done chan struct{}) {
+	// Don't accept more blocks if we're shutting down.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		done <- struct{}{}
+		return
+	}
+
+	sm.msgChan <- &candidateMsg{block: block, peer: peer, reply: done}
 }
 
 // QueueInv将传递的inv消息和对等点添加到块处理队列中。

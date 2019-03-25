@@ -9,6 +9,8 @@ import (
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/database"
 	"github.com/drcsuite/drc/drcutil"
+	"github.com/drcsuite/drc/mining/cpuminer"
+	"github.com/drcsuite/drc/wire"
 )
 
 // behavior flags是一个位掩码，它定义了在执行链处理和一致规则检查时对正常行为的调整。
@@ -30,6 +32,16 @@ const (
 
 	// BFNone is a convenience value to specifically indicate no flags.
 	BFNone BehaviorFlags = 0
+)
+
+var (
+	// 前一轮块池
+	prevCandidatePool map[chainhash.Hash]*wire.MsgCandidate
+	// 当前轮块池
+	currentCandidatePool map[chainhash.Hash]*wire.MsgCandidate
+
+	// 当前轮指向池
+	currentPointPool map[chainhash.Hash][]*wire.MsgCandidate
 )
 
 // block exists确定具有给定散列的块是否存在于主链或任何侧链中。
@@ -69,6 +81,24 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 		return err
 	})
 	return exists, err
+}
+
+func (b *BlockChain) PrevCandidateExists(hash *chainhash.Hash) bool {
+	// Check in the database.
+	exist := prevCandidatePool[*hash]
+	if exist != nil {
+		return true
+	}
+	return false
+}
+
+func (b *BlockChain) CandidateExists(hash *chainhash.Hash) bool {
+	// Check in the database.
+	exist := currentCandidatePool[*hash]
+	if exist != nil {
+		return true
+	}
+	return false
 }
 
 //确定是否存在依赖于传递的块散列的孤子(如果为真，则不再是孤子)，并可能接受它们。
@@ -150,6 +180,7 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 	blockHash := block.Hash()
 	log.Tracef("Processing block %v", blockHash)
 
+	// 该块不能已经存在于主链或侧链中。
 	// The block must not already exist in the main chain or side chains.
 	exists, err := b.blockExists(blockHash)
 	if err != nil {
@@ -160,14 +191,17 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 		return false, false, ruleError(ErrDuplicateBlock, str)
 	}
 
+	//该块不能作为孤儿存在。
 	// The block must not already exist as an orphan.
 	if _, exists := b.orphans[*blockHash]; exists {
 		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
 		return false, false, ruleError(ErrDuplicateBlock, str)
 	}
 
+	//对块及其事务执行初步的完整性检查。
 	// Perform preliminary sanity checks on the block and its transactions.
-	err = checkBlockSanity(block, b.chainParams.PowLimit, b.timeSource, flags)
+	seed := chainhash.DoubleHashH(b.BestSnapshot().Signature.CloneBytes())
+	err = checkBlockSanity(block, &seed, cpuminer.Pi, b.timeSource) // seed pi
 	if err != nil {
 		return false, false, err
 	}
@@ -244,4 +278,62 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 	log.Debugf("Accepted block %v", blockHash)
 
 	return isMainChain, false, nil
+}
+
+// 处理发块阶段收到的块
+func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags) (bool, error) {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	//fastAdd := flags&BFFastAdd == BFFastAdd
+
+	blockHash := block.CandidateHash()
+	log.Tracef("Processing block %v", blockHash)
+
+	// 该块不能已经存在于主链或侧链中。
+	// The block must not already exist in the main chain or side chains.
+	exists := b.CandidateExists(blockHash)
+	if exists {
+		str := fmt.Sprintf("already have block %v", blockHash)
+		return false, ruleError(ErrDuplicateBlock, str)
+	}
+
+	//该块不能作为孤儿存在。
+	// The block must not already exist as an orphan.
+	if _, exists := b.orphans[*blockHash]; exists {
+		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
+		return false, ruleError(ErrDuplicateBlock, str)
+	}
+
+	//对块及其事务执行初步的完整性检查。
+	// Perform preliminary sanity checks on the block and its transactions.
+	seed := chainhash.DoubleHashH(b.BestSnapshot().Signature.CloneBytes())
+	err := checkCandidateSanity(block, &seed, cpuminer.Pi, b.timeSource) // seed pi
+	if err != nil {
+		return false, err
+	}
+
+	// Find the previous checkpoint and perform some additional checks based
+	// on the checkpoint.  This provides a few nice properties such as
+	// preventing old side chain blocks before the last checkpoint,
+	// rejecting easy to mine, but otherwise bogus, blocks that could be
+	// used to eat memory, and ensuring expected (versus claimed) proof of
+	// work requirements since the previous checkpoint are met.
+	blockHeader := &block.MsgCandidate().Header
+
+	// 处理该块前项块
+	prevHash := &blockHeader.PrevBlock
+	prevHashExists := b.PrevCandidateExists(prevHash)
+	if !prevHashExists {
+		str := fmt.Sprintf("The preceding block of this block does not exist: %v", blockHash)
+		return false, ruleError(ErrDuplicateBlock, str)
+	}
+
+	// 加入指向池 和 当前块池
+	currentCandidatePool[*blockHash] = block.MsgCandidate()
+	points := currentPointPool[*blockHash]
+	points = append(points, block.MsgCandidate())
+	log.Debugf("Accepted block %v", blockHash)
+
+	return true, nil
 }

@@ -69,6 +69,7 @@ func (l binaryFreeList) Return(buf []byte) {
 	}
 }
 
+// Uint8使用空闲列表中的缓冲区从提供的读取器中读取一个字节，并将其作为Uint8返回。
 // Uint8 reads a single byte from the provided reader using a buffer from the
 // free list and returns it as a uint8.
 func (l binaryFreeList) Uint8(r io.Reader) (uint8, error) {

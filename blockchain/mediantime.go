@@ -35,6 +35,7 @@ var (
 // used to determine a median time which is then used as an offset to the local
 // clock.
 type MedianTimeSource interface {
+	// AdjustedTime返回由AddTimeSample添加的时间样本计算得到的时间偏移量的中值调整的当前时间。
 	// AdjustedTime returns the current time adjusted by the median time
 	// offset as calculated from the time samples added by AddTimeSample.
 	AdjustedTime() time.Time

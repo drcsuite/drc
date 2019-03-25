@@ -107,6 +107,7 @@ func extractRejectCode(err error) (wire.RejectCode, bool) {
 	return wire.RejectInvalid, false
 }
 
+// ErrToRejectErr检查错误的基本类型，并返回一个适当的拒绝代码和字符串，以便通过电线发送。MsgReject消息。
 // ErrToRejectErr examines the underlying type of the error and returns a reject
 // code and string appropriate to be sent in a wire.MsgReject message.
 func ErrToRejectErr(err error) (wire.RejectCode, string) {

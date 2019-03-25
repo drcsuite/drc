@@ -124,6 +124,8 @@ type MessageListeners struct {
 	// OnBlock is invoked when a peer receives a block bitcoin message.
 	OnBlock func(p *Peer, msg *wire.MsgBlock, buf []byte)
 
+	OnCandidate func(p *Peer, msg *wire.MsgCandidate, buf []byte)
+
 	// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
 	OnCFilter func(p *Peer, msg *wire.MsgCFilter)
 
@@ -1452,6 +1454,11 @@ out:
 		case *wire.MsgBlock:
 			if p.cfg.Listeners.OnBlock != nil {
 				p.cfg.Listeners.OnBlock(p, msg, buf)
+			}
+
+		case *wire.MsgCandidate:
+			if p.cfg.Listeners.OnCandidate != nil {
+				p.cfg.Listeners.OnCandidate(p, msg, buf)
 			}
 
 		case *wire.MsgSign:

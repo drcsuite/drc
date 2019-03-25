@@ -7,6 +7,7 @@ package blockchain
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/drcsuite/drc/btcec"
 	"math"
 	"math/big"
 	"time"
@@ -19,10 +20,11 @@ import (
 )
 
 const (
+	// MaxTimeOffsetSeconds是允许块时间超前于当前时间的最大秒数。现在是2小时。
 	// MaxTimeOffsetSeconds is the maximum number of seconds a block time
 	// is allowed to be ahead of the current time.  This is currently 2
 	// hours.
-	MaxTimeOffsetSeconds = 2 * 60 * 60
+	MaxTimeOffsetSeconds = 0
 
 	// MinCoinbaseScriptLen is the minimum length a coinbase script can be.
 	MinCoinbaseScriptLen = 2
@@ -207,21 +209,24 @@ func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) int64 {
 	return baseSubsidy >> uint(height/chainParams.SubsidyReductionInterval)
 }
 
-//CheckTransactionSanity对事务执行一些初步检查，以确保它是健全的。这些检查与上下文无关。
+//CheckTransactionSanity对tx执行一些初步检查，以确保它是健全的。这些检查与上下文无关。
 // CheckTransactionSanity performs some preliminary checks on a transaction to
 // ensure it is sane.  These checks are context free.
 func CheckTransactionSanity(tx *drcutil.Tx) error {
 	// A transaction must have at least one input.
+	// 事务必须至少有一个输入。
 	msgTx := tx.MsgTx()
 	if len(msgTx.TxIn) == 0 {
 		return ruleError(ErrNoTxInputs, "transaction has no inputs")
 	}
 
 	// A transaction must have at least one output.
+	// 事务必须至少有一个输出。
 	if len(msgTx.TxOut) == 0 {
 		return ruleError(ErrNoTxOutputs, "transaction has no outputs")
 	}
 
+	// 事务序列化时，不能超过允许的最大块有效负载。
 	// A transaction must not exceed the maximum allowed block payload when
 	// serialized.
 	serializedTxSize := tx.MsgTx().SerializeSizeStripped()
@@ -231,6 +236,10 @@ func CheckTransactionSanity(tx *drcutil.Tx) error {
 		return ruleError(ErrTxTooBig, str)
 	}
 
+	// 确保交易金额在范围内。每个事务输出不能为负或超过每个事务允许的最大值。
+	// 此外，所有输出的总数必须遵守相同的限制。
+	// 一笔交易中的所有金额都以一个称为satoshi的单位值表示。
+	// 一个比特币是SatoshiPerBitcoin常量所定义的satoshi的数量。
 	// Ensure the transaction amounts are in range.  Each transaction
 	// output must not be negative or more than the max allowed per
 	// transaction.  Also, the total of all outputs must abide by the same
@@ -252,6 +261,9 @@ func CheckTransactionSanity(tx *drcutil.Tx) error {
 			return ruleError(ErrBadTxOutValue, str)
 		}
 
+		// 2的补码int64溢出保证检测并报告任何溢出。
+		// 这对比特币来说是不可能的，但如果alt增加货币总供应量，或许是可能的。
+		// 检查输出总量是否溢出
 		// Two's complement int64 overflow guarantees that any overflow
 		// is detected and reported.  This is impossible for Bitcoin, but
 		// perhaps possible if an alt increases the total money supply.
@@ -271,6 +283,7 @@ func CheckTransactionSanity(tx *drcutil.Tx) error {
 		}
 	}
 
+	// 检查重复的Tx输入。
 	// Check for duplicate transaction inputs.
 	existingTxOut := make(map[wire.OutPoint]struct{})
 	for _, txIn := range msgTx.TxIn {
@@ -281,6 +294,7 @@ func CheckTransactionSanity(tx *drcutil.Tx) error {
 		existingTxOut[txIn.PreviousOutPoint] = struct{}{}
 	}
 
+	// Coinbase脚本长度必须介于最小和最大长度之间。
 	// Coinbase script length must be between min and max length.
 	if IsCoinBase(tx) {
 		slen := len(msgTx.TxIn[0].SignatureScript)
@@ -291,6 +305,7 @@ func CheckTransactionSanity(tx *drcutil.Tx) error {
 			return ruleError(ErrBadCoinbaseScriptLen, str)
 		}
 	} else {
+		// 此事务的输入引用的以前的事务输出必须不为空。
 		// Previous transaction outputs referenced by the inputs to this
 		// transaction must not be null.
 		for _, txIn := range msgTx.TxIn {
@@ -350,9 +365,9 @@ func checkProofOfWork(header *wire.BlockHeader, powLimit *big.Int, flags Behavio
 // CheckProofOfWork ensures the block header bits which indicate the target
 // difficulty is in min/max range and that the block hash is less than the
 // target difficulty as claimed.
-func CheckProofOfWork(block *drcutil.Block, powLimit *big.Int) error {
-	return checkProofOfWork(&block.MsgBlock().Header, powLimit, BFNone)
-}
+//func CheckProofOfWork(block *drcutil.Block, powLimit *big.Int) error {
+//	return checkProofOfWork(&block.MsgBlock().Header, powLimit, BFNone)
+//}
 
 // CountSigOps返回所提供的事务中所有事务输入和输出脚本的签名操作的数量。
 // CountSigOps returns the number of signature operations for all transaction
@@ -441,15 +456,37 @@ func CountP2SHSigOps(tx *drcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
-func checkBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
+func checkBlockHeaderSanity(header *wire.BlockHeader, seed *chainhash.Hash, pi *big.Int, timeSource MedianTimeSource) error {
 	// Ensure the proof of work bits in the block header is in min/max range
 	// and the block hash is less than the target value described by the
 	// bits.
-	err := checkProofOfWork(header, powLimit, flags)
+	//err := checkProofOfWork(header, powLimit, flags)
+	//if err != nil {
+	//	return err
+	//}
+	// 公钥必须符合标准格式
+	pubKey, err := btcec.ParsePubKey(header.PublicKey.CloneBytes(), btcec.S256())
 	if err != nil {
-		return err
+		str := fmt.Sprintf("The public key is incorrect of %v", header.PublicKey)
+		return ruleError(ErrInvalidTime, str)
 	}
 
+	// 签名是否同源
+	signBytes := header.Signature.CloneBytes()
+	b := btcec.GetSignature(signBytes).Verify(seed.CloneBytes(), pubKey)
+	if !b {
+		str := fmt.Sprintf("Signature verification failed: %v", header.Signature)
+		return ruleError(ErrInvalidTime, str)
+	}
+
+	// weight必须小于全网估算规模数
+	weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signBytes))
+	if weight.Cmp(pi) >= 0 {
+		str := fmt.Sprintf("No send block permissions: %v", weight)
+		return ruleError(ErrInvalidTime, str)
+	}
+
+	//块时间戳的精度不能超过1秒。这个检查是必要的，时间值支持纳秒精度，而一致规则只适用于秒，处理标准Go时间值比在任何地方都转换成秒要好得多。
 	// A block timestamp must not have a greater precision than one second.
 	// This check is necessary because Go time.Time values support
 	// nanosecond precision whereas the consensus rules only apply to
@@ -461,12 +498,11 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSou
 		return ruleError(ErrInvalidTime, str)
 	}
 
+	// 时间验证，确保区块时间不会太长。
 	// Ensure the block time is not too far in the future.
-	maxTimestamp := timeSource.AdjustedTime().Add(time.Second *
-		MaxTimeOffsetSeconds)
+	maxTimestamp := timeSource.AdjustedTime()
 	if header.Timestamp.After(maxTimestamp) {
-		str := fmt.Sprintf("block timestamp of %v is too far in the "+
-			"future", header.Timestamp)
+		str := fmt.Sprintf("block timestamp of %v is too far in the current time: ", header.Timestamp)
 		return ruleError(ErrTimeTooNew, str)
 	}
 
@@ -479,21 +515,23 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSou
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
-func checkBlockSanity(block *drcutil.Block, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
+func checkBlockSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.Int, timeSource MedianTimeSource) error {
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
-	err := checkBlockHeaderSanity(header, powLimit, timeSource, flags)
+	err := checkBlockHeaderSanity(header, seed, pi, timeSource) // 对块头的一些检查
 	if err != nil {
 		return err
 	}
 
 	// A block must have at least one transaction.
+	// 至少包含一个交易
 	numTx := len(msgBlock.Transactions)
 	if numTx == 0 {
 		return ruleError(ErrNoTransactions, "block does not contain "+
 			"any transactions")
 	}
 
+	// 一个块不能有超过最大块有效负载的tx，否则它肯定超过了重量限制。
 	// A block must not have more transactions than the max block payload or
 	// else it is certainly over the weight limit.
 	if numTx > MaxBlockBaseSize {
@@ -502,6 +540,7 @@ func checkBlockSanity(block *drcutil.Block, powLimit *big.Int, timeSource Median
 		return ruleError(ErrBlockTooBig, str)
 	}
 
+	// 一个块在序列化时不能超过允许的最大块有效负载。
 	// A block must not exceed the maximum allowed block payload when
 	// serialized.
 	serializedSize := msgBlock.SerializeSizeStripped()
@@ -511,6 +550,7 @@ func checkBlockSanity(block *drcutil.Block, powLimit *big.Int, timeSource Median
 		return ruleError(ErrBlockTooBig, str)
 	}
 
+	//块中的第一个事务必须是一个coinbase。
 	// The first transaction in a block must be a coinbase.
 	transactions := block.Transactions()
 	if !IsCoinBase(transactions[0]) {
@@ -518,6 +558,7 @@ func checkBlockSanity(block *drcutil.Block, powLimit *big.Int, timeSource Median
 			"block is not a coinbase")
 	}
 
+	//一个块不能有一个以上的coinbase。
 	// A block must not have more than one coinbase.
 	for i, tx := range transactions[1:] {
 		if IsCoinBase(tx) {
@@ -527,6 +568,7 @@ func checkBlockSanity(block *drcutil.Block, powLimit *big.Int, timeSource Median
 		}
 	}
 
+	//在继续之前，对每笔交易做一些初步检查，以确保它们是正常的。
 	// Do some preliminary checks on each transaction to ensure they are
 	// sane before continuing.
 	for _, tx := range transactions {
@@ -536,13 +578,16 @@ func checkBlockSanity(block *drcutil.Block, powLimit *big.Int, timeSource Median
 		}
 	}
 
+	// 构建merkle树，并确保计算得到的merkle根与块头中的条目匹配。
+	// 这还可以缓存块中的所有事务散列，以加快未来的散列检查。
+	// Bitcoind在这里构建树，并在接下来的检查之后检查merkle根，但是没有理由不检查这里的merkle根匹配。
 	// Build merkle tree and ensure the calculated merkle root matches the
 	// entry in the block header.  This also has the effect of caching all
 	// of the transaction hashes in the block to speed up future hash
 	// checks.  Bitcoind builds the tree here and checks the merkle root
 	// after the following checks, but there is no reason not to check the
 	// merkle root matches here.
-	merkles := BuildMerkleTreeStore(block.Transactions(), false)
+	merkles := BuildMerkleTreeStore(block.Transactions(), false) // 将块尾作为最后一个tx一起做merkle
 	calculatedMerkleRoot := merkles[len(merkles)-1]
 	if !header.MerkleRoot.IsEqual(calculatedMerkleRoot) {
 		str := fmt.Sprintf("block merkle root is invalid - block "+
@@ -551,6 +596,7 @@ func checkBlockSanity(block *drcutil.Block, powLimit *big.Int, timeSource Median
 		return ruleError(ErrBadMerkleRoot, str)
 	}
 
+	// 检查重复的交易。这个检查将相当快，因为事务散列已经缓存，因为上面构建了merkle树。
 	// Check for duplicate transactions.  This check will be fairly quick
 	// since the transaction hashes are already cached due to building the
 	// merkle tree above.
@@ -565,6 +611,7 @@ func checkBlockSanity(block *drcutil.Block, powLimit *big.Int, timeSource Median
 		existingTxHashes[*hash] = struct{}{}
 	}
 
+	// 签名操作的数量必须小于每个块允许的最大数量。
 	// The number of signature operations must be less than the maximum
 	// allowed per block.
 	totalSigOps := 0
@@ -580,6 +627,125 @@ func checkBlockSanity(block *drcutil.Block, powLimit *big.Int, timeSource Median
 			return ruleError(ErrTooManySigOps, str)
 		}
 	}
+
+	// 验证块尾的签名是否有效
+
+	return nil
+}
+func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.Int, timeSource MedianTimeSource) error {
+	msgCandidate := block.MsgCandidate()
+	header := &msgCandidate.Header
+	err := checkBlockHeaderSanity(header, seed, pi, timeSource) // 对块头的一些检查
+	if err != nil {
+		return err
+	}
+
+	// A block must have at least one transaction.
+	// 至少包含一个交易
+	numTx := len(msgCandidate.Transactions)
+	if numTx == 0 {
+		return ruleError(ErrNoTransactions, "block does not contain "+
+			"any transactions")
+	}
+
+	// 一个块不能有超过最大块有效负载的tx，否则它肯定超过了重量限制。
+	// A block must not have more transactions than the max block payload or
+	// else it is certainly over the weight limit.
+	if numTx > MaxBlockBaseSize {
+		str := fmt.Sprintf("block contains too many transactions - "+
+			"got %d, max %d", numTx, MaxBlockBaseSize)
+		return ruleError(ErrBlockTooBig, str)
+	}
+
+	// 一个块在序列化时不能超过允许的最大块有效负载。
+	// A block must not exceed the maximum allowed block payload when
+	// serialized.
+	serializedSize := msgCandidate.SerializeSizeStripped()
+	if serializedSize > MaxBlockBaseSize {
+		str := fmt.Sprintf("serialized block is too big - got %d, "+
+			"max %d", serializedSize, MaxBlockBaseSize)
+		return ruleError(ErrBlockTooBig, str)
+	}
+
+	//块中的第一个事务必须是一个coinbase。
+	// The first transaction in a block must be a coinbase.
+	transactions := block.Transactions()
+	if !IsCoinBase(transactions[0]) {
+		return ruleError(ErrFirstTxNotCoinbase, "first transaction in "+
+			"block is not a coinbase")
+	}
+
+	// 一个块不能有一个以上的coinbase。
+	// A block must not have more than one coinbase.
+	for i, tx := range transactions[1:] {
+		if IsCoinBase(tx) {
+			str := fmt.Sprintf("block contains second coinbase at "+
+				"index %d", i+1)
+			return ruleError(ErrMultipleCoinbases, str)
+		}
+	}
+
+	//在继续之前，对每笔交易做一些初步检查，以确保它们是正常的。
+	// Do some preliminary checks on each transaction to ensure they are
+	// sane before continuing.
+	for _, tx := range transactions {
+		err := CheckTransactionSanity(tx)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 构建merkle树，并确保计算得到的merkle根与块头中的条目匹配。
+	// 这还可以缓存块中的所有事务散列，以加快未来的散列检查。
+	// Bitcoind在这里构建树，并在接下来的检查之后检查merkle根，但是没有理由不检查这里的merkle根匹配。
+	// Build merkle tree and ensure the calculated merkle root matches the
+	// entry in the block header.  This also has the effect of caching all
+	// of the transaction hashes in the block to speed up future hash
+	// checks.  Bitcoind builds the tree here and checks the merkle root
+	// after the following checks, but there is no reason not to check the
+	// merkle root matches here.
+	merkles := BuildMerkleTreeStore(block.Transactions(), false) // 将块尾作为最后一个tx一起做merkle
+	calculatedMerkleRoot := merkles[len(merkles)-1]
+	if !header.MerkleRoot.IsEqual(calculatedMerkleRoot) {
+		str := fmt.Sprintf("block merkle root is invalid - block "+
+			"header indicates %v, but calculated value is %v",
+			header.MerkleRoot, calculatedMerkleRoot)
+		return ruleError(ErrBadMerkleRoot, str)
+	}
+
+	// 检查重复的交易。这个检查将相当快，因为事务散列已经缓存，因为上面构建了merkle树。
+	// Check for duplicate transactions.  This check will be fairly quick
+	// since the transaction hashes are already cached due to building the
+	// merkle tree above.
+	existingTxHashes := make(map[chainhash.Hash]struct{})
+	for _, tx := range transactions {
+		hash := tx.Hash()
+		if _, exists := existingTxHashes[*hash]; exists {
+			str := fmt.Sprintf("block contains duplicate "+
+				"transaction %v", hash)
+			return ruleError(ErrDuplicateTx, str)
+		}
+		existingTxHashes[*hash] = struct{}{}
+	}
+
+	// 签名操作的数量必须小于每个块允许的最大数量。
+	// The number of signature operations must be less than the maximum
+	// allowed per block.
+	totalSigOps := 0
+	for _, tx := range transactions {
+		// We could potentially overflow the accumulator so check for
+		// overflow.
+		lastSigOps := totalSigOps
+		totalSigOps += (CountSigOps(tx) * WitnessScaleFactor)
+		if totalSigOps < lastSigOps || totalSigOps > MaxBlockSigOpsCost {
+			str := fmt.Sprintf("block contains too many signature "+
+				"operations - got %v, max %v", totalSigOps,
+				MaxBlockSigOpsCost)
+			return ruleError(ErrTooManySigOps, str)
+		}
+	}
+
+	// 验证块尾的签名是否有效
 
 	return nil
 }
