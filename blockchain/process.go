@@ -161,11 +161,13 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 }
 
 // ProcessBlock是处理将新块插入到块链中的主要工作部件。
+// 它包括拒绝重复块、确保块遵循所有规则、孤立处理和插入到块链以及最佳链选择和重组等功能。
 // ProcessBlock is the main workhorse for handling insertion of new blocks into
 // the block chain.  It includes functionality such as rejecting duplicate
 // blocks, ensuring blocks follow all rules, orphan handling, and insertion into
 // the block chain along with best chain selection and reorganization.
 //
+// 当处理过程中没有发生错误时，第一个返回值指示该块是否在主链上，第二个返回值指示该块是否是孤儿。
 // When no errors occurred during processing, the first return value indicates
 // whether or not the block is on the main chain and the second indicates
 // whether or not the block is an orphan.

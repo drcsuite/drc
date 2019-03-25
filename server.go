@@ -141,6 +141,10 @@ type sendMsg struct {
 	data interface{}
 }
 
+type sendSignature struct {
+	data interface{}
+}
+
 // updatePeerHeightsMsg is a message sent from the blockmanager to the server
 // after a new block has been accepted. The purpose of the message is to update
 // the heights of peers that were known to announce the block before we
@@ -228,6 +232,7 @@ type server struct {
 	query                chan interface{}
 	relayInv             chan relayMsg
 	sendMsg              chan sendMsg
+	sendSignature        chan sendSignature
 	broadcast            chan broadcastMsg
 	peerHeightsUpdate    chan updatePeerHeightsMsg
 	wg                   sync.WaitGroup
@@ -1379,15 +1384,16 @@ func (sp *serverPeer) OnWrite(_ *peer.Peer, bytesWritten int, msg wire.Message, 
 // The handler function that is called when the signature information is received
 func (sp *serverPeer) OnSign(_ *peer.Peer, msg *wire.MsgSign) {
 
-	// 查看是否有此区块
+	// 查看块池是否有此区块,没有的话不承认该签名。新的一轮不再处理上轮投票
+	// check if the block pool has this block. If not, the signature is not recognized.
+	// The new round will no longer process the previous round of voting
+	blockPool := cpuminer.GetBlockPool()
+	if headerBlock, exist := blockPool[msg.BlockHeaderHash]; exist {
 
-	// 验证和保存签名
-	// Process and save signatures
-	if sp.server.cpuMiner.CollectVotes(msg) {
+		// 验证和保存签名,帮助传播签名
+		// Process and save signatures
+		sp.server.cpuMiner.CollectVotes(msg, headerBlock)
 
-		// 符合传播条件，传播签名
-		// If propagation conditions are met, the signature is propagated
-		sp.QueueMessage(msg, nil)
 	}
 }
 
@@ -1853,6 +1859,21 @@ func (s *server) handleSendBlockMsg(state *peerState, msg sendMsg) {
 	})
 }
 
+func (s *server) handleSendSignMsg(state *peerState, msg sendSignature) {
+	state.forAllPeers(func(sp *serverPeer) {
+		if !sp.Connected() {
+			return
+		}
+
+		// Queue the inventory to be relayed with the next batch.
+		// It will be ignored if the peer is already known to
+		// have the inventory.
+		sign := msg.data.(wire.MsgSign)
+		var dc chan<- struct{}
+		sp.QueueMessageWithEncoding(&sign, dc, wire.BaseEncoding)
+	})
+}
+
 // handleBroadcastMsg处理向同行广播消息。它是从peerHandler goroutine调用的。
 // handleBroadcastMsg deals with broadcasting messages to peers.  It is invoked
 // from the peerHandler goroutine.
@@ -2207,6 +2228,9 @@ out:
 		case sendMsg := <-s.sendMsg:
 			s.handleSendBlockMsg(state, sendMsg)
 
+		case sendSignature := <-s.sendSignature:
+			s.handleSendSignMsg(state, sendSignature)
+
 		// Message to broadcast to all connected peers except those
 		// which are excluded by the message.
 		case bmsg := <-s.broadcast:
@@ -2267,6 +2291,10 @@ func (s *server) RelayInventory(invVect *wire.InvVect, data interface{}) {
 }
 func (s *server) SendBlock(data interface{}) {
 	s.sendMsg <- sendMsg{data: data}
+}
+
+func (s *server) SendSign(data interface{}) {
+	s.sendSignature <- sendSignature{data: data}
 }
 
 // BroadcastMessage sends msg to all peers currently connected to the server
@@ -2850,6 +2878,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		MiningAddrs:            cfg.miningAddrs,
 		ProcessBlock:           s.syncManager.ProcessBlock,
 		SendBlock:              s.syncManager.SendBlock,
+		SendSign:               s.syncManager.SendSign,
 		ConnectedCount:         s.ConnectedCount,
 		IsCurrent:              s.syncManager.IsCurrent,
 		Chain:                  s.chain,

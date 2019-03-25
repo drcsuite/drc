@@ -23,12 +23,12 @@ func TestBlockVerge(t *testing.T) {
 func TestTicketPool(t *testing.T) {
 	var signAndKey []SignAndKey
 	signAndKeys := append(signAndKey, SignAndKey{chainhash.Hash64{1}, chainhash.Hash33{2}})
-	TicketPool[chainhash.Hash{1}] = append(signAndKeys, SignAndKey{chainhash.Hash64{3}, chainhash.Hash33{4}})
-	TicketPool[chainhash.Hash{2}] = append(signAndKeys, SignAndKey{chainhash.Hash64{5}, chainhash.Hash33{6}})
+	ticketPool[chainhash.Hash{1}] = append(signAndKeys, SignAndKey{chainhash.Hash64{3}, chainhash.Hash33{4}})
+	ticketPool[chainhash.Hash{2}] = append(signAndKeys, SignAndKey{chainhash.Hash64{5}, chainhash.Hash33{6}})
 
-	for key, value := range TicketPool {
+	for key, value := range ticketPool {
 		fmt.Println("key:", key, ",value:", value)
 	}
-	fmt.Println(TicketPool[chainhash.Hash{2}])
+	fmt.Println(ticketPool[chainhash.Hash{2}])
 	fmt.Println(chainhash.Hash{1, 2, 3, 5} == chainhash.Hash{1, 2, 3, 5})
 }

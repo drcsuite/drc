@@ -72,6 +72,8 @@ type Config struct {
 
 	SendBlock func(*drcutil.Block) (bool, error)
 
+	SendSign func(*wire.MsgSign) (bool, error)
+
 	// ConnectedCount defines the function to use to obtain how many other
 	// peers the server is connected to.  This is used by the automatic
 	// persistent mining routine to determine whether or it should attempt
