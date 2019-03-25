@@ -137,6 +137,7 @@ type processBlockMsg struct {
 }
 type sendBlockMsg struct {
 	block *drcutil.Block
+	//flags blockchain.BehaviorFlags
 	reply chan sendBlockResponse
 }
 
@@ -1372,6 +1373,7 @@ out:
 				sm.peerNotifier.SendBlock(msg.block.MsgCandidate())
 			case sendSignMsg:
 				sm.peerNotifier.SendSign(msg.msgSign)
+
 			case isCurrentMsg:
 				msg.reply <- sm.current()
 
