@@ -3,7 +3,6 @@ package cpuminer
 import (
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
-	"github.com/drcsuite/drc/peer"
 	"github.com/drcsuite/drc/wire"
 	"math/big"
 	"time"
@@ -24,7 +23,7 @@ const (
 
 	// 成为优势区块所需的票数差
 	// The number of votes needed to become the dominant block
-	AdvantageVoteNum = 200
+	AdvantageVoteNum = 100
 
 	// 发块时间间隔
 	// Block time interval
@@ -130,7 +129,7 @@ func BlockVerge(scale uint16) *big.Int {
 
 // 新块验证投票，需广播块返回true
 // New block validation vote
-func (m *CPUMiner) BlockVote(p peer.Peer, msg *wire.MsgBlock) bool {
+func (m *CPUMiner) BlockVote(msg *wire.MsgBlock) bool {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 
@@ -211,8 +210,8 @@ func (m *CPUMiner) BlockVote(p peer.Peer, msg *wire.MsgBlock) bool {
 	return false
 }
 
-// 收集签名投票
-// Collect signatures and vote
+// 收集签名投票，传播投票
+// Collect signatures and vote, spread the vote
 func (m *CPUMiner) CollectVotes(msg *wire.MsgSign, headerBlock wire.BlockHeader) {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
@@ -296,7 +295,7 @@ func isAdvantage(headerHash chainhash.Hash) bool {
 	// The number of votes in the current block
 	count := GetVotes(headerHash)
 
-	// 当前块与最多票数的块票数差值为200票，不需要为其投票
+	// 当前块与最多票数的块票数差值为100票，不需要为其投票
 	// The difference between the current block and the block with the most votes is 200, and no vote is required
 	if max-count >= AdvantageVoteNum {
 		return false
