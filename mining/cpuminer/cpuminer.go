@@ -180,7 +180,7 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 
 	// 采用后稳策略，先广播块信息，
 	b, err := m.cfg.SendBlock(block)
-	if !b {
+	if !b || err != nil {
 		log.Errorf("Failed to send block message: %v", err)
 		return false
 	}

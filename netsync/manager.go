@@ -706,6 +706,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		sm.rejectedTxns = make(map[chainhash.Hash]struct{})
 	}
 
+	// 更新此对等点的块高度。但是，只有当这是孤立的或我们的链是“当前的”时，才向服务器发送消息更新对等高度。如果我们从头开始同步链，这将避免发送垃圾数量的消息。
 	// Update the block height for this peer. But only send a message to
 	// the server for updating peer heights if this is an orphan or our
 	// chain is "current". This avoids sending a spammy amount of messages
@@ -756,6 +757,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	//	return
 	//}
 
+	//这是head -first模式，这个块是一个检查点，并且没有更多的检查点，所以切换到正常模式，从这个块之后的块请求块，直到链的末尾(零散列)。
 	// This is headers-first mode, the block is a checkpoint, and there are
 	// no more checkpoints, so switch to normal mode by requesting blocks
 	// from the block after this one up to the end of the chain (zero hash).
@@ -795,13 +797,11 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 	// properly.
 	behaviorFlags := blockchain.BFNone
 
-	// 处理该块以包括验证、最佳链选择、孤儿处理等。
+	// 处理该块
+	// 包括：验证签名，验证交易，验证weight，验证coinbase，
+	// 通过验证将该块放入块池和指向池
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-
-	// 处理发块环节收到的块，
-	// 包括：验证签名，验证交易，验证weight，验证coinbase，
-	// 通过验证将块放入块池
 	b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
 	if err != nil || !b {
 		// When the error is a rule error, it means the block was simply
@@ -820,53 +820,18 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 			panic(dbErr)
 		}
 
-		//将错误转换为适当的拒绝消息并发送。
-		// Convert the error into an appropriate reject message and
-		// send it.
-		//code, reason := mempool.ErrToRejectErr(err)
-		//peer.PushRejectMsg(wire.CmdBlock, code, reason, blockHash, false)
 		return
 	}
 
-	// 通过验证后，记录块高度，记录快照，转发块信息
-
-	// Meta-data about the new block this peer is reporting. We use this
-	// below to update this peer's latest block height and the heights of
-	// other peers based on their last announced block hash. This allows us
-	// to dynamically update the block heights of peers, avoiding stale
-	// heights when looking for a new sync peer. Upon acceptance of a block
-	// or recognition of an orphan, we also use this information to update
-	// the block heights over other peers who's invs may have been ignored
-	// if we are actively syncing while the chain is not yet current or
-	// who may have lost the lock announcement race.
-	var heightUpdate int32
-	var blkHashUpdate *chainhash.Hash
-
+	//向发送孤儿块的对等方请求父方。当块不是孤立块时，记录有关它的信息并更新链状态。
 	// Request the parents for the orphan block from the peer that sent it.
 	// When the block is not an orphan, log information about it and
 	// update the chain state.
-	sm.progressLogger.LogBlockHeight(bmsg.block)
+	//sm.progressLogger.LogBlockHeight(bmsg.block)
 
-	// Update this peer's latest block height, for future
-	// potential sync node candidacy.
-	best := sm.chain.BestSnapshot()
-	heightUpdate = best.Height
-	blkHashUpdate = &best.Hash
-
+	// 清除被拒绝的事务。
 	// Clear the rejected transactions.
 	sm.rejectedTxns = make(map[chainhash.Hash]struct{})
-
-	// Update the block height for this peer. But only send a message to
-	// the server for updating peer heights if this is an orphan or our
-	// chain is "current". This avoids sending a spammy amount of messages
-	// if we're syncing the chain from scratch.
-	if blkHashUpdate != nil && heightUpdate != 0 {
-		peer.UpdateLastBlockHeight(heightUpdate)
-		if isOrphan || sm.current() {
-			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
-				peer)
-		}
-	}
 
 	//如果我们不采取“头先上”的模式，就没什么可做的了。
 	// Nothing more to do if we aren't in headers-first mode.
@@ -874,18 +839,10 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 		return
 	}
 
-	// This is headers-first mode, the block is a checkpoint, and there are
-	// no more checkpoints, so switch to normal mode by requesting blocks
-	// from the block after this one up to the end of the chain (zero hash).
-	sm.headersFirstMode = false
-	sm.headerList.Init()
-	log.Infof("Reached the final checkpoint -- switching to normal mode")
-	locator := blockchain.BlockLocator([]*chainhash.Hash{blockHash})
-	err = peer.PushGetBlocksMsg(locator, &zeroHash)
-	if err != nil {
-		log.Warnf("Failed to send getblocks message to peer %s: %v",
-			peer.Addr(), err)
-		return
+	// 转发块信息
+	bo, err := sm.SendBlock(bmsg.block)
+	if err != nil || !bo {
+		log.Errorf("Failed to send block message: %v", err)
 	}
 }
 

@@ -280,7 +280,7 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 	return isMainChain, false, nil
 }
 
-// 处理发块阶段收到的块
+// 处理发块阶段收到的块，并将该块放入块池和指向池
 func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags) (bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
@@ -290,7 +290,7 @@ func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags)
 	blockHash := block.CandidateHash()
 	log.Tracef("Processing block %v", blockHash)
 
-	// 该块不能已经存在于主链或侧链中。
+	// 该块不能已经存在于块池中
 	// The block must not already exist in the main chain or side chains.
 	exists := b.CandidateExists(blockHash)
 	if exists {

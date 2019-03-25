@@ -753,8 +753,8 @@ func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.In
 // CheckBlockSanity在继续进行块处理之前，对一个块执行一些初步检查，以确保它是健全的。
 // CheckBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
-func CheckBlockSanity(block *drcutil.Block, powLimit *big.Int, timeSource MedianTimeSource) error {
-	return checkBlockSanity(block, powLimit, timeSource, BFNone)
+func CheckBlockSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.Int, timeSource MedianTimeSource) error {
+	return checkBlockSanity(block, seed, pi, timeSource)
 }
 
 // ExtractCoinbaseHeight尝试从coinbase事务的scriptSig中提取块的高度。
@@ -860,27 +860,27 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	blockHeight := prevNode.height + 1
 
 	// Ensure chain matches up to predetermined checkpoints.
-	blockHash := header.BlockHash()
-	if !b.verifyCheckpoint(blockHeight, &blockHash) {
-		str := fmt.Sprintf("block at height %d does not match "+
-			"checkpoint hash", blockHeight)
-		return ruleError(ErrBadCheckpoint, str)
-	}
+	//blockHash := header.BlockHash()
+	//if !b.verifyCheckpoint(blockHeight, &blockHash) {
+	//	str := fmt.Sprintf("block at height %d does not match "+
+	//		"checkpoint hash", blockHeight)
+	//	return ruleError(ErrBadCheckpoint, str)
+	//}
 
 	// Find the previous checkpoint and prevent blocks which fork the main
 	// chain before it.  This prevents storage of new, otherwise valid,
 	// blocks which build off of old blocks that are likely at a much easier
 	// difficulty and therefore could be used to waste cache and disk space.
-	checkpointNode, err := b.findPreviousCheckpoint()
-	if err != nil {
-		return err
-	}
-	if checkpointNode != nil && blockHeight < checkpointNode.height {
-		str := fmt.Sprintf("block at height %d forks the main chain "+
-			"before the previous checkpoint at height %d",
-			blockHeight, checkpointNode.height)
-		return ruleError(ErrForkTooOld, str)
-	}
+	//checkpointNode, err := b.findPreviousCheckpoint()
+	//if err != nil {
+	//	return err
+	//}
+	//if checkpointNode != nil && blockHeight < checkpointNode.height {
+	//	str := fmt.Sprintf("block at height %d forks the main chain "+
+	//		"before the previous checkpoint at height %d",
+	//		blockHeight, checkpointNode.height)
+	//	return ruleError(ErrForkTooOld, str)
+	//}
 
 	// Reject outdated block versions once a majority of the network
 	// has upgraded.  These were originally voted on by BIP0034,
@@ -1337,11 +1337,11 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	// will therefore be detected by the next checkpoint).  This is a huge
 	// optimization because running the scripts is the most time consuming
 	// portion of block handling.
-	checkpoint := b.LatestCheckpoint()
+	//checkpoint := b.LatestCheckpoint()
 	runScripts := true
-	if checkpoint != nil && node.height <= checkpoint.Height {
-		runScripts = false
-	}
+	//if checkpoint != nil && node.height <= checkpoint.Height {
+	//	runScripts = false
+	//}
 
 	// Blocks created after the BIP0016 activation time need to have the
 	// pay-to-script-hash checks enabled.
@@ -1434,7 +1434,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 // work requirement. The block must connect to the current tip of the main chain.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block) error {
+func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chainhash.Hash, pi *big.Int) error {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -1451,7 +1451,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block) error {
 		return ruleError(ErrPrevBlockNotBest, str)
 	}
 
-	err := checkBlockSanity(block, b.chainParams.PowLimit, b.timeSource, flags)
+	err := checkCandidateSanity(block, seed, pi, b.timeSource)
 	if err != nil {
 		return err
 	}

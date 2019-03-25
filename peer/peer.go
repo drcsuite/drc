@@ -495,6 +495,7 @@ func (p *Peer) String() string {
 	return fmt.Sprintf("%s (%s)", p.addr, directionString(p.inbound))
 }
 
+// UpdateLastBlockHeight更新对等点的最后一个已知块。
 // UpdateLastBlockHeight updates the last known block for the peer.
 //
 // This function is safe for concurrent access.

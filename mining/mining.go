@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"container/heap"
 	"fmt"
+	"github.com/drcsuite/drc/mining/cpuminer"
 	"time"
 
 	"github.com/drcsuite/drc/blockchain"
@@ -900,7 +901,8 @@ mempoolLoop:
 	//block := drcutil.NewBlock()
 	block := drcutil.NewCandidate(&msgBlock, &msgCandidate)
 	block.SetHeight(nextBlockHeight)
-	if err := g.chain.CheckConnectBlockTemplate(block); err != nil {
+	seed, err := chainhash.NewHash(chainhash.DoubleHashB(g.BestSnapshot().Signature.CloneBytes()))
+	if err := g.chain.CheckConnectBlockTemplate(block, seed, cpuminer.VoteVerge(scale)); err != nil {
 		return nil, err
 	}
 

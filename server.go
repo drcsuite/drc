@@ -2314,6 +2314,8 @@ func (s *server) NetTotals() (uint64, uint64) {
 		atomic.LoadUint64(&s.bytesSent)
 }
 
+// UpdatePeerHeights更新已发布最新连接主链块或已识别孤儿的所有对等节点的高度。
+// 这些高度更新允许我们动态刷新对等点高度，确保同步对等点选择能够访问每个对等点的最新块高度。
 // UpdatePeerHeights updates the heights of all peers who have have announced
 // the latest connected main chain block, or a recognized orphan. These height
 // updates allow us to dynamically refresh peer heights, ensuring sync peer
