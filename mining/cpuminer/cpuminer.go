@@ -47,6 +47,8 @@ var (
 	// and is based on the number of processor cores.  This helps ensure the
 	// system stays reasonably responsive under heavy load.
 	defaultNumWorkers = uint32(runtime.NumCPU())
+	Pi                *big.Int
+	Work              bool
 )
 
 // Config is a descriptor containing the cpu miner configuration.
@@ -179,8 +181,12 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 	}
 
 	// 采用后稳策略，先广播块信息，
-	b, e := m.cfg.SendBlock(block)
-	isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
+	b, err := m.cfg.SendBlock(block)
+	if !b || err != nil {
+		log.Errorf("Failed to send block message: %v", err)
+		return false
+	}
+	//isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
 
 	// Process this block using the same rules as blocks coming from other
 	// nodes.  This will in turn relay it to the network like normal.
@@ -196,10 +202,10 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 
 		//log.Debugf("Block submitted via CPU miner rejected: %v", err)
 		//return false
-		if isOrphan {
-			log.Debugf("Block submitted via CPU miner is an orphan")
-			return false
-		}
+		//if isOrphan {
+		//	log.Debugf("Block submitted via CPU miner is an orphan")
+		//	return false
+		//}
 	}
 
 	// The block was accepted.
@@ -218,7 +224,7 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 // This function will return early with false when conditions that trigger a
 // stale block such as a new block showing up or periodically when there are
 // new transactions and enough time has elapsed without finding a solution.
-func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock,
+func (m *CPUMiner) solveBlock(msgBlock *wire.MsgCandidate,
 	ticker *time.Ticker, quit chan struct{}) bool {
 	wire.ChangeCode()
 
@@ -344,6 +350,13 @@ out:
 		wire.ChangeCode()
 		// 修改BestSnapshot，返回最佳快照，添加sign和pk
 		m.submitBlockLock.Lock()
+		// 等待上一轮处理完成
+		if !Work {
+			m.submitBlockLock.Unlock()
+			time.Sleep(time.Second)
+			continue
+		}
+
 		curHeight := m.g.BestSnapshot().Height
 		if curHeight != 0 && !m.cfg.IsCurrent() {
 			m.submitBlockLock.Unlock()
@@ -375,8 +388,8 @@ out:
 			}
 		}
 		scale := EstimateScale(votes, scales)
-		pi := VoteVerge(scale)
-		if weight.Cmp(pi) >= 0 {
+		Pi = VoteVerge(scale)
+		if weight.Cmp(Pi) >= 0 {
 			time.Sleep(time.Second)
 			continue
 		}
@@ -415,12 +428,15 @@ out:
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.Block, ticker, quit) {
+		if m.solveBlock(template.Candidate, ticker, quit) {
 
-			block := drcutil.NewBlock(template.Block)
+			block := drcutil.NewCandidate(template.Block, template.Candidate)
 
 			// 将块信息提交给对等点
-			m.submitBlock(block)
+			bo := m.submitBlock(block)
+			if bo {
+				Work = false
+			}
 		}
 	}
 

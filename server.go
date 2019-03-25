@@ -623,6 +623,36 @@ func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
 	<-sp.blockProcessed
 }
 
+func (sp *serverPeer) OnCandidate(_ *peer.Peer, msg *wire.MsgCandidate, buf []byte) {
+
+	// 将原始MsgBlock转换为btcutil块，该块提供了一些方便的方法和诸如散列缓存之类的东西。
+	// Convert the raw MsgBlock to a drcutil.Block which provides some
+	// convenience methods and things such as hash caching.
+	block := drcutil.NewCandidateFromBlockAndBytes(msg, buf)
+
+	// 将块添加到对等节点的已知目录中。
+	// Add the block to the known inventory for the peer.
+	iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
+	sp.AddKnownInventory(iv)
+
+	// 将块排队等待块管理器处理，并故意进一步接收块，直到比特币块被完全处理并知道是好是坏。
+	// 这有助于防止恶意的对等程序在断开连接(或断开连接)和浪费内存之前排队等待一堆坏块。
+	// 此外，这种行为至少依赖于块接受测试工具，因为引用实现在同一线程中处理块，因此在比特币块完全处理之前会阻止进一步的消息。
+	// Queue the block up to be handled by the block
+	// manager and intentionally block further receives
+	// until the bitcoin block is fully processed and known
+	// good or bad.  This helps prevent a malicious peer
+	// from queuing up a bunch of bad blocks before
+	// disconnecting (or being disconnected) and wasting
+	// memory.  Additionally, this behavior is depended on
+	// by at least the block acceptance test tool as the
+	// reference implementation processes blocks in the same
+	// thread and therefore blocks further messages until
+	// the bitcoin block has been fully processed.
+	sp.server.syncManager.QueueCandidate(block, sp.Peer, sp.blockProcessed)
+	<-sp.blockProcessed
+}
+
 // OnInv在对等方接收到inv比特币消息时被调用，用于检查远程对等方公布的库存并作出相应的响应。
 // 我们将消息传递给blockmanager，它将调用QueueMessage并提供适当的响应。
 // OnInv is invoked when a peer receives an inv bitcoin message and is
@@ -1823,7 +1853,7 @@ func (s *server) handleSendBlockMsg(state *peerState, msg sendMsg) {
 		// Queue the inventory to be relayed with the next batch.
 		// It will be ignored if the peer is already known to
 		// have the inventory.
-		block := msg.data.(wire.MsgBlock)
+		block := msg.data.(wire.MsgCandidate)
 		var dc chan<- struct{}
 		sp.QueueMessageWithEncoding(&block, dc, wire.BaseEncoding)
 	})
@@ -2041,6 +2071,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnMemPool:      sp.OnMemPool,
 			OnTx:           sp.OnTx,
 			OnBlock:        sp.OnBlock,
+			OnCandidate:    sp.OnCandidate,
 			OnInv:          sp.OnInv,
 			OnHeaders:      sp.OnHeaders,
 			OnGetData:      sp.OnGetData,
@@ -2311,6 +2342,8 @@ func (s *server) NetTotals() (uint64, uint64) {
 		atomic.LoadUint64(&s.bytesSent)
 }
 
+// UpdatePeerHeights更新已发布最新连接主链块或已识别孤儿的所有对等节点的高度。
+// 这些高度更新允许我们动态刷新对等点高度，确保同步对等点选择能够访问每个对等点的最新块高度。
 // UpdatePeerHeights updates the heights of all peers who have have announced
 // the latest connected main chain block, or a recognized orphan. These height
 // updates allow us to dynamically refresh peer heights, ensuring sync peer

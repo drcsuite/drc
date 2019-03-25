@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"container/heap"
 	"fmt"
+	"github.com/drcsuite/drc/mining/cpuminer"
 	"time"
 
 	"github.com/drcsuite/drc/blockchain"
@@ -191,6 +192,8 @@ type BlockTemplate struct {
 	// completely valid with the exception of satisfying the proof-of-work
 	// requirement.
 	Block *wire.MsgBlock
+
+	Candidate *wire.MsgCandidate
 
 	// Fees contains the amount of fees each transaction in the generated
 	// template pays in base units.  Since the first transaction is the
@@ -862,7 +865,18 @@ mempoolLoop:
 	// Create a new block ready to be solved.
 	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
 	var msgBlock wire.MsgBlock
+	var msgCandidate wire.MsgCandidate
 	msgBlock.Header = wire.BlockHeader{
+		Version:    nextBlockVersion,
+		PrevBlock:  best.Hash,
+		MerkleRoot: *merkles[len(merkles)-1],
+		Timestamp:  ts,
+		PublicKey:  *pubkey,
+		Signature:  *signature,
+		Scale:      scale,
+		Reserved:   reserved,
+	}
+	msgCandidate.Header = wire.BlockHeader{
 		Version:    nextBlockVersion,
 		PrevBlock:  best.Hash,
 		MerkleRoot: *merkles[len(merkles)-1],
@@ -876,14 +890,19 @@ mempoolLoop:
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {
 			return nil, err
 		}
+		if err := msgCandidate.AddTransaction(tx.MsgTx()); err != nil {
+			return nil, err
+		}
 	}
 
 	// Finally, perform a full check on the created block against the chain
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
-	block := drcutil.NewBlock(&msgBlock)
+	//block := drcutil.NewBlock()
+	block := drcutil.NewCandidate(&msgBlock, &msgCandidate)
 	block.SetHeight(nextBlockHeight)
-	if err := g.chain.CheckConnectBlockTemplate(block); err != nil {
+	seed, err := chainhash.NewHash(chainhash.DoubleHashB(g.BestSnapshot().Signature.CloneBytes()))
+	if err := g.chain.CheckConnectBlockTemplate(block, seed, cpuminer.VoteVerge(scale)); err != nil {
 		return nil, err
 	}
 
@@ -894,6 +913,7 @@ mempoolLoop:
 
 	return &BlockTemplate{
 		Block:             &msgBlock,
+		Candidate:         &msgCandidate,
 		Fees:              txFees,
 		SigOpCosts:        txSigOpCosts,
 		Height:            nextBlockHeight,
@@ -908,7 +928,7 @@ mempoolLoop:
 // consensus rules.  Finally, it will update the target difficulty if needed
 // based on the new time for the test networks since their target difficulty can
 // change based upon time.
-func (g *BlkTmplGenerator) UpdateBlockTime(msgBlock *wire.MsgBlock) error {
+func (g *BlkTmplGenerator) UpdateBlockTime(msgBlock *wire.MsgCandidate) error {
 	// The new timestamp is potentially adjusted to ensure it comes after
 	// the median time of the last several blocks per the chain consensus
 	// rules.

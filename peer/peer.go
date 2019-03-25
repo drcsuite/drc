@@ -124,6 +124,8 @@ type MessageListeners struct {
 	// OnBlock is invoked when a peer receives a block bitcoin message.
 	OnBlock func(p *Peer, msg *wire.MsgBlock, buf []byte)
 
+	OnCandidate func(p *Peer, msg *wire.MsgCandidate, buf []byte)
+
 	// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
 	OnCFilter func(p *Peer, msg *wire.MsgCFilter)
 
@@ -493,6 +495,7 @@ func (p *Peer) String() string {
 	return fmt.Sprintf("%s (%s)", p.addr, directionString(p.inbound))
 }
 
+// UpdateLastBlockHeight更新对等点的最后一个已知块。
 // UpdateLastBlockHeight updates the last known block for the peer.
 //
 // This function is safe for concurrent access.
@@ -1452,6 +1455,11 @@ out:
 		case *wire.MsgBlock:
 			if p.cfg.Listeners.OnBlock != nil {
 				p.cfg.Listeners.OnBlock(p, msg, buf)
+			}
+
+		case *wire.MsgCandidate:
+			if p.cfg.Listeners.OnCandidate != nil {
+				p.cfg.Listeners.OnCandidate(p, msg, buf)
 			}
 
 		case *wire.MsgSign:

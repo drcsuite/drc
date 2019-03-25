@@ -34,7 +34,8 @@ func (e OutOfRangeError) Error() string {
 // transactions on their first access so subsequent accesses don't have to
 // repeat the relatively expensive hashing operations.
 type Block struct {
-	msgBlock                 *wire.MsgBlock  // Underlying MsgBlock
+	msgBlock                 *wire.MsgBlock // Underlying MsgBlock
+	msgCandidate             *wire.MsgCandidate
 	serializedBlock          []byte          // Serialized bytes for the block
 	serializedBlockNoWitness []byte          // Serialized bytes for block w/o witness data
 	blockHash                *chainhash.Hash // Cached block hash
@@ -47,6 +48,11 @@ type Block struct {
 func (b *Block) MsgBlock() *wire.MsgBlock {
 	// Return the cached block.
 	return b.msgBlock
+}
+
+func (b *Block) MsgCandidate() *wire.MsgCandidate {
+	// Return the cached block.
+	return b.msgCandidate
 }
 
 // Bytes returns the serialized bytes for the Block.  This is equivalent to
@@ -103,6 +109,18 @@ func (b *Block) Hash() *chainhash.Hash {
 
 	// Cache the block hash and return it.
 	hash := b.msgBlock.BlockHash()
+	b.blockHash = &hash
+	return &hash
+}
+
+func (b *Block) CandidateHash() *chainhash.Hash {
+	// Return the cached block hash if it has already been generated.
+	if b.blockHash != nil {
+		return b.blockHash
+	}
+
+	// Cache the block hash and return it.
+	hash := b.msgCandidate.BlockHash()
 	b.blockHash = &hash
 	return &hash
 }
@@ -227,6 +245,14 @@ func NewBlock(msgBlock *wire.MsgBlock) *Block {
 	}
 }
 
+func NewCandidate(msgBlock *wire.MsgBlock, msgCandidate *wire.MsgCandidate) *Block {
+	return &Block{
+		msgBlock:     msgBlock,
+		msgCandidate: msgCandidate,
+		blockHeight:  BlockHeightUnknown,
+	}
+}
+
 // NewBlockFromBytes returns a new instance of a bitcoin block given the
 // serialized bytes.  See Block.
 func NewBlockFromBytes(serializedBlock []byte) (*Block, error) {
@@ -261,6 +287,14 @@ func NewBlockFromReader(r io.Reader) (*Block, error) {
 func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock, serializedBlock []byte) *Block {
 	return &Block{
 		msgBlock:        msgBlock,
+		serializedBlock: serializedBlock,
+		blockHeight:     BlockHeightUnknown,
+	}
+}
+
+func NewCandidateFromBlockAndBytes(msgCandidate *wire.MsgCandidate, serializedBlock []byte) *Block {
+	return &Block{
+		msgCandidate:    msgCandidate,
 		serializedBlock: serializedBlock,
 		blockHeight:     BlockHeightUnknown,
 	}

@@ -24,6 +24,7 @@ const (
 
 	// MaxBlockBaseSize is the maximum number of bytes within a block
 	// which can be allocated to non-witness data.
+	// MaxBlockBaseSize是一个块中可以分配给非见证数据的最大字节数
 	MaxBlockBaseSize = 1000000
 
 	// MaxBlockSigOpsCost is the maximum number of signature operations
