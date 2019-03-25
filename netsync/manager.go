@@ -1371,10 +1371,10 @@ out:
 					err:      nil,
 				}
 			case sendBlockMsg:
-				sm.peerNotifier.SendBlock(msg.block.MsgBlock())
+				sm.peerNotifier.SendBlock(msg.block.MsgCandidate())
 			case sendSignMsg:
 				sm.peerNotifier.SendSign(msg.msgSign)
-				sm.peerNotifier.SendBlock(msg.block.MsgCandidate())
+
 			case isCurrentMsg:
 				msg.reply <- sm.current()
 
