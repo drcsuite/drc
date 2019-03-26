@@ -43,6 +43,7 @@ func (b *BlockChain) maybeAcceptBlock(block *drcutil.Block, flags BehaviorFlags)
 	blockHeight := prevNode.height + 1
 	block.SetHeight(blockHeight)
 
+	// 块必须通过所有依赖于块在块链中的位置的验证规则。
 	// The block must pass all of the validation rules which depend on the
 	// position of the block within the block chain.
 	err := b.checkBlockContext(block, prevNode, flags)
@@ -66,6 +67,7 @@ func (b *BlockChain) maybeAcceptBlock(block *drcutil.Block, flags BehaviorFlags)
 		return false, err
 	}
 
+	// 为块创建一个新的块节点，并将其添加到节点索引中。即使这个块最终连接到主链，它也从侧链开始。
 	// Create a new block node for the block and add it to the node index. Even
 	// if the block ultimately gets connected to the main chain, it starts out
 	// on a side chain.

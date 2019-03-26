@@ -219,6 +219,7 @@ func (cm *ConnManager) handleFailedConn(c *ConnReq) {
 	}
 }
 
+// connHandler处理所有与连接相关的请求。它必须像goroutine一样运行。
 // connHandler handles all connection related requests.  It must be run as a
 // goroutine.
 //
@@ -356,6 +357,7 @@ out:
 	log.Trace("Connection handler done")
 }
 
+// NewConnReq创建一个新的连接请求并连接到相应的地址。
 // NewConnReq creates a new connection request and connects to the
 // corresponding address.
 func (cm *ConnManager) NewConnReq() {
@@ -479,7 +481,6 @@ func (cm *ConnManager) Remove(id uint64) {
 	}
 }
 
-
 // listenHandler接受给定侦听器上的传入连接。它必须像goroutine一样运行。
 // listenHandler accepts incoming connections on a given listener.  It must be
 // run as a goroutine.
@@ -501,7 +502,6 @@ func (cm *ConnManager) listenHandler(listener net.Listener) {
 	log.Tracef("Listener handler done for %s", listener.Addr())
 }
 
-
 // Start启动连接管理器并开始连接到网络。
 // Start launches the connection manager and begins connecting to the network.
 func (cm *ConnManager) Start() {
@@ -514,6 +514,7 @@ func (cm *ConnManager) Start() {
 	cm.wg.Add(1)
 	go cm.connHandler()
 
+	// 启动所有侦听器，只要调用者请求它们，并提供一个回调函数，以便在接受连接时调用。
 	// Start all the listeners so long as the caller requested them and
 	// provided a callback to be invoked when connections are accepted.
 	if cm.cfg.OnAccept != nil {

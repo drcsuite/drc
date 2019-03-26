@@ -2144,6 +2144,7 @@ func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 	s.addrManager.Attempt(sp.NA())
 }
 
+// peerDoneHandler通过通知服务器它已经完成并执行了其他需要的清理来处理对等断开。
 // peerDoneHandler handles peer disconnects by notifiying the server that it's
 // done along with other performing other desirable cleanup.
 func (s *server) peerDoneHandler(sp *serverPeer) {
@@ -2440,6 +2441,7 @@ func (s *server) Start() {
 	if !cfg.DisableRPC {
 		s.wg.Add(1)
 
+		//启动rebroadcastHandler，它确保RPC服务器接收到的用户tx被重新广播，直到包含在一个块中。
 		// Start the rebroadcastHandler, which ensures user tx received by
 		// the RPC server are rebroadcast until being included in a block.
 		go s.rebroadcastHandler()
@@ -2575,6 +2577,7 @@ func parseListeners(addrs []string) ([]net.Addr, error) {
 }
 
 func (s *server) upnpUpdateThread() {
+	// 为了防止代码重复，我们每15分钟续租一次。
 	// Go off immediately to prevent code duplication, thereafter we renew
 	// lease every 15 minutes.
 	timer := time.NewTimer(0 * time.Second)

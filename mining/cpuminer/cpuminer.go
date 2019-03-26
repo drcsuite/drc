@@ -376,19 +376,22 @@ out:
 		}
 		weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signature.GenSignBytes()))
 
+		// 前10个块的票数和估算值
 		votes, scales := make([]uint16, 0), make([]uint16, 0)
 		prevNode := m.chain.GetBlockIndex().LookupNode(&m.g.BestSnapshot().Hash)
-		// 计算前十个块平均weight
 		for i := 0; i < 10; i++ {
+			// 添加每个节点实际收到的票数和当时估算值
 			scales = append(scales, prevNode.Header().Scale)
 			votes = append(votes, prevNode.Header().Scale)
 			prevNode = prevNode.Ancestor(1)
 			if prevNode == nil {
-				continue
+				break
 			}
 		}
+		// 计算前十个块平均规模和weight
 		scale := EstimateScale(votes, scales)
 		Pi = VoteVerge(scale)
+		// 如果不符合规则，等待下一轮
 		if weight.Cmp(Pi) >= 0 {
 			time.Sleep(time.Second)
 			continue
