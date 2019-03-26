@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/drcsuite/drc/btcec"
+	"github.com/drcsuite/drc/mining/cpuminer"
 	"math"
 	"math/big"
 	"time"
@@ -38,7 +39,7 @@ const (
 
 	// serializedHeightVersion is the block version which changed block
 	// coinbases to start with the serialized block height.
-	serializedHeightVersion = 2
+	serializedHeightVersion = 1
 
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
@@ -632,6 +633,7 @@ func checkBlockSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.Int, t
 
 	return nil
 }
+
 func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.Int, timeSource MedianTimeSource) error {
 	msgCandidate := block.MsgCandidate()
 	header := &msgCandidate.Header
@@ -827,73 +829,71 @@ func checkSerializedHeight(coinbaseTx *drcutil.Tx, wantHeight int32) error {
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
-	fastAdd := flags&BFFastAdd == BFFastAdd
+	//fastAdd := flags&BFFastAdd == BFFastAdd
 	wire.ChangeCode()
-	if !fastAdd {
-		// Ensure the difficulty specified in the block header matches
-		// the calculated difficulty based on the previous block and
-		// difficulty retarget rules.
-		//expectedDifficulty, err := b.calcNextRequiredDifficulty(prevNode,
-		//	header.Timestamp)
-		//if err != nil {
-		//	return err
-		//}
-		//blockDifficulty := header.Bits
-		//if blockDifficulty != expectedDifficulty {
-		//	str := "block difficulty of %d is not the expected value of %d"
-		//	str = fmt.Sprintf(str, blockDifficulty, expectedDifficulty)
-		//	return ruleError(ErrUnexpectedDifficulty, str)
-		//}
+	prevSignB := prevNode.signature.CloneBytes()
+	seed := chainhash.DoubleHashB(prevSignB)
+	signB := header.Signature.CloneBytes()
+	signature := btcec.GetSignature(signB)
+	pubKey, err := btcec.ParsePubKey(header.PublicKey.CloneBytes(), btcec.S256())
+	if err != nil {
+		return err
+	}
+	if !signature.Verify(seed, pubKey) {
+		str := "signature verify failed"
+		return ruleError(ErrUnexpectedDifficulty, str)
+	}
 
-		// Ensure the timestamp for the block header is after the
-		// median time of the last several blocks (medianTimeBlocks).
-		medianTime := prevNode.CalcPastMedianTime()
-		if !header.Timestamp.After(medianTime) {
-			str := "block timestamp of %v is not after expected %v"
-			str = fmt.Sprintf(str, header.Timestamp, medianTime)
-			return ruleError(ErrTimeTooOld, str)
+	// 验证发块权
+	weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signB))
+	// 前10个块的票数和估算值
+	votes, scales := make([]uint16, 0), make([]uint16, 0)
+	for i := 0; i < 10; i++ {
+		// 添加每个节点实际收到的票数和当时估算值
+		scales = append(scales, prevNode.Header().Scale)
+		votes = append(votes, prevNode.Header().Scale)
+		prevNode = prevNode.Ancestor(1)
+		if prevNode == nil {
+			break
 		}
+	}
+	// 计算前十个块平均规模和weight
+	scale := cpuminer.EstimateScale(votes, scales)
+	Pi := cpuminer.VoteVerge(scale)
+	// 只接受符合条件的块
+	if weight.Cmp(Pi) >= 0 {
+		str := "This block does not have sufficient permissions"
+		return ruleError(ErrUnexpectedDifficulty, str)
+	}
+
+	// Ensure the timestamp for the block header is after the
+	// median time of the last several blocks (medianTimeBlocks).
+	medianTime := prevNode.CalcPastMedianTime()
+	if !header.Timestamp.After(medianTime) {
+		str := "block timestamp of %v is not after expected %v"
+		str = fmt.Sprintf(str, header.Timestamp, medianTime)
+		return ruleError(ErrTimeTooOld, str)
 	}
 
 	// The height of this block is one more than the referenced previous
 	// block.
-	blockHeight := prevNode.height + 1
+	//blockHeight := prevNode.height + 1
 
-	// Ensure chain matches up to predetermined checkpoints.
-	//blockHash := header.BlockHash()
-	//if !b.verifyCheckpoint(blockHeight, &blockHash) {
-	//	str := fmt.Sprintf("block at height %d does not match "+
-	//		"checkpoint hash", blockHeight)
-	//	return ruleError(ErrBadCheckpoint, str)
-	//}
-
-	// Find the previous checkpoint and prevent blocks which fork the main
-	// chain before it.  This prevents storage of new, otherwise valid,
-	// blocks which build off of old blocks that are likely at a much easier
-	// difficulty and therefore could be used to waste cache and disk space.
-	//checkpointNode, err := b.findPreviousCheckpoint()
-	//if err != nil {
-	//	return err
-	//}
-	//if checkpointNode != nil && blockHeight < checkpointNode.height {
-	//	str := fmt.Sprintf("block at height %d forks the main chain "+
-	//		"before the previous checkpoint at height %d",
-	//		blockHeight, checkpointNode.height)
-	//	return ruleError(ErrForkTooOld, str)
-	//}
-
+	//拒绝过时的块版本，一旦网络的大多数
+	//升级。这些最初是由BIP0034投票决定的，
+	// BIP0065和BIP0066。
 	// Reject outdated block versions once a majority of the network
 	// has upgraded.  These were originally voted on by BIP0034,
 	// BIP0065, and BIP0066.
-	params := b.chainParams
-	if header.Version < 2 && blockHeight >= params.BIP0034Height ||
-		header.Version < 3 && blockHeight >= params.BIP0066Height ||
-		header.Version < 4 && blockHeight >= params.BIP0065Height {
-
-		str := "new blocks with version %d are no longer valid"
-		str = fmt.Sprintf(str, header.Version)
-		return ruleError(ErrBlockVersionTooOld, str)
-	}
+	//params := b.chainParams
+	//if header.Version < 2 && blockHeight >= params.BIP0034Height ||
+	//	header.Version < 3 && blockHeight >= params.BIP0066Height ||
+	//	header.Version < 4 && blockHeight >= params.BIP0065Height {
+	//
+	//	str := "new blocks with version %d are no longer valid"
+	//	str = fmt.Sprintf(str, header.Version)
+	//	return ruleError(ErrBlockVersionTooOld, str)
+	//}
 
 	return nil
 }
@@ -902,10 +902,12 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 // checkBlockContext peforms several validation checks on the block which depend
 // on its position within the block chain.
 //
+// 这些标志修改这个函数的行为如下:- BFFastAdd:不检查事务是否已完成，也不执行稍微昂贵的BIP0034验证。
 // The flags modify the behavior of this function as follows:
 //  - BFFastAdd: The transaction are not checked to see if they are finalized
 //    and the somewhat expensive BIP0034 validation is not performed.
 //
+// 这些标志也被传递给checkBlockHeaderContext。有关标志如何修改其行为，请参阅其文档。
 // The flags are also passed to checkBlockHeaderContext.  See its documentation
 // for how the flags modify its behavior.
 //
@@ -918,89 +920,94 @@ func (b *BlockChain) checkBlockContext(block *drcutil.Block, prevNode *blockNode
 		return err
 	}
 
-	fastAdd := flags&BFFastAdd == BFFastAdd
-	if !fastAdd {
-		// Obtain the latest state of the deployed CSV soft-fork in
-		// order to properly guard the new validation behavior based on
-		// the current BIP 9 version bits state.
-		csvState, err := b.deploymentState(prevNode, chaincfg.DeploymentCSV)
-		if err != nil {
-			return err
-		}
+	//fastAdd := flags&BFFastAdd == BFFastAdd
+	//if !fastAdd {
+	// 获取已部署CSV软fork的最新状态，以便根据当前BIP 9版本位状态正确地保护新的验证行为。
+	// Obtain the latest state of the deployed CSV soft-fork in
+	// order to properly guard the new validation behavior based on
+	// the current BIP 9 version bits state.
+	//csvState, err := b.deploymentState(prevNode, chaincfg.DeploymentCSV)
+	//if err != nil {
+	//	return err
+	//}
 
-		// Once the CSV soft-fork is fully active, we'll switch to
-		// using the current median time past of the past block's
-		// timestamps for all lock-time based checks.
-		blockTime := header.Timestamp
-		if csvState == ThresholdActive {
-			blockTime = prevNode.CalcPastMedianTime()
-		}
+	// 一旦CSV软叉完全激活，我们将切换到使用过去块的时间戳的当前时间中值来进行所有基于锁时的检查。
+	// Once the CSV soft-fork is fully active, we'll switch to
+	// using the current median time past of the past block's
+	// timestamps for all lock-time based checks.
+	blockTime := header.Timestamp
+	//if csvState == ThresholdActive {
+	blockTime = prevNode.CalcPastMedianTime()
+	//}
 
-		// The height of this block is one more than the referenced
-		// previous block.
-		blockHeight := prevNode.height + 1
+	// The height of this block is one more than the referenced
+	// previous block.
+	blockHeight := prevNode.height + 1
 
-		// Ensure all transactions in the block are finalized.
-		for _, tx := range block.Transactions() {
-			if !IsFinalizedTransaction(tx, blockHeight,
-				blockTime) {
+	// Ensure all transactions in the block are finalized.
+	for _, tx := range block.Transactions() {
+		if !IsFinalizedTransaction(tx, blockHeight,
+			blockTime) {
 
-				str := fmt.Sprintf("block contains unfinalized "+
-					"transaction %v", tx.Hash())
-				return ruleError(ErrUnfinalizedTx, str)
-			}
-		}
-
-		// Ensure coinbase starts with serialized block heights for
-		// blocks whose version is the serializedHeightVersion or newer
-		// once a majority of the network has upgraded.  This is part of
-		// BIP0034.
-		if ShouldHaveSerializedBlockHeight(header) &&
-			blockHeight >= b.chainParams.BIP0034Height {
-
-			coinbaseTx := block.Transactions()[0]
-			err := checkSerializedHeight(coinbaseTx, blockHeight)
-			if err != nil {
-				return err
-			}
-		}
-
-		// Query for the Version Bits state for the segwit soft-fork
-		// deployment. If segwit is active, we'll switch over to
-		// enforcing all the new rules.
-		segwitState, err := b.deploymentState(prevNode,
-			chaincfg.DeploymentSegwit)
-		if err != nil {
-			return err
-		}
-
-		// If segwit is active, then we'll need to fully validate the
-		// new witness commitment for adherence to the rules.
-		if segwitState == ThresholdActive {
-			// Validate the witness commitment (if any) within the
-			// block.  This involves asserting that if the coinbase
-			// contains the special commitment output, then this
-			// merkle root matches a computed merkle root of all
-			// the wtxid's of the transactions within the block. In
-			// addition, various other checks against the
-			// coinbase's witness stack.
-			if err := ValidateWitnessCommitment(block); err != nil {
-				return err
-			}
-
-			// Once the witness commitment, witness nonce, and sig
-			// op cost have been validated, we can finally assert
-			// that the block's weight doesn't exceed the current
-			// consensus parameter.
-			blockWeight := GetBlockWeight(block)
-			if blockWeight > MaxBlockWeight {
-				str := fmt.Sprintf("block's weight metric is "+
-					"too high - got %v, max %v",
-					blockWeight, MaxBlockWeight)
-				return ruleError(ErrBlockWeightTooHigh, str)
-			}
+			str := fmt.Sprintf("block contains unfinalized "+
+				"transaction %v", tx.Hash())
+			return ruleError(ErrUnfinalizedTx, str)
 		}
 	}
+
+	// 确保coinbase从序列化的块高度开始，这些块的版本是serializedHeightVersion或更新版本，一旦网络的大部分已经升级。这是BIP0034的一部分。
+	// Ensure coinbase starts with serialized block heights for
+	// blocks whose version is the serializedHeightVersion or newer
+	// once a majority of the network has upgraded.  This is part of
+	// BIP0034.
+	if ShouldHaveSerializedBlockHeight(header) &&
+		blockHeight >= b.chainParams.BIP0034Height {
+
+		coinbaseTx := block.Transactions()[0]
+		err := checkSerializedHeight(coinbaseTx, blockHeight)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 查询segwit软fork部署的版本位状态。如果segwit是活动的，我们将切换到强制执行所有新规则。
+	// Query for the Version Bits state for the segwit soft-fork
+	// deployment. If segwit is active, we'll switch over to
+	// enforcing all the new rules.
+	//segwitState, err := b.deploymentState(prevNode,
+	//	chaincfg.DeploymentSegwit)
+	//if err != nil {
+	//	return err
+	//}
+
+	// 如果segwit是活动的，那么我们需要完全验证新的witness承诺是否符合规则。
+	// If segwit is active, then we'll need to fully validate the
+	// new witness commitment for adherence to the rules.
+	//if segwitState == ThresholdActive {
+	// Validate the witness commitment (if any) within the
+	// block.  This involves asserting that if the coinbase
+	// contains the special commitment output, then this
+	// merkle root matches a computed merkle root of all
+	// the wtxid's of the transactions within the block. In
+	// addition, various other checks against the
+	// coinbase's witness stack.
+	//if err := ValidateWitnessCommitment(block); err != nil {
+	//	return err
+	//}
+
+	// Once the witness commitment, witness nonce, and sig
+	// op cost have been validated, we can finally assert
+	// that the block's weight doesn't exceed the current
+	// consensus parameter.
+	//blockWeight := GetBlockWeight(block)
+	//if blockWeight > MaxBlockWeight {
+	//	str := fmt.Sprintf("block's weight metric is "+
+	//		"too high - got %v, max %v",
+	//		blockWeight, MaxBlockWeight)
+	//	return ruleError(ErrBlockWeightTooHigh, str)
+	//}
+	//}
+	//}
 
 	return nil
 }
@@ -1439,7 +1446,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chain
 	defer b.chainLock.Unlock()
 
 	// Skip the proof of work check as this is just a block template.
-	flags := BFNoPoWCheck
+	//flags := BFNoPoWCheck
 
 	// This only checks whether the block can be connected to the tip of the
 	// current chain.
@@ -1456,10 +1463,10 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chain
 		return err
 	}
 
-	err = b.checkBlockContext(block, tip, flags)
-	if err != nil {
-		return err
-	}
+	//err = b.checkBlockContext(block, tip, flags)
+	//if err != nil {
+	//	return err
+	//}
 
 	// Leave the spent txouts entry nil in the state since the information
 	// is not needed and thus extra work can be avoided.
