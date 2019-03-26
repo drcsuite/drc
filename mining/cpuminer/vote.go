@@ -129,7 +129,7 @@ func BlockVerge(scale uint16) *big.Int {
 
 // 新块验证投票，需广播块返回true
 // New block validation vote
-func (m *CPUMiner) BlockVote(msg *wire.MsgBlock) bool {
+func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) bool {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 
@@ -332,7 +332,7 @@ func GetVotes(hash chainhash.Hash) uint16 {
 
 // 检查区块
 // Check the block
-func CheckBlock(msg wire.MsgBlock) bool {
+func CheckBlock(msg wire.MsgCandidate) bool {
 
 	// 验证区块头的签名
 	// Verify the signature of the block header
