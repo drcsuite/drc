@@ -21,13 +21,35 @@ var (
 	Work              bool
 )
 
+// 计算投票的∏值
+// To calculate the ∏ value of a vote
+func VotesVerge(scale uint16) *big.Int {
+
+	// bigint格式的全网节点数
+	// Number of nodes in the whole network
+	bigScale := big.NewInt(int64(scale))
+	// bigint格式的理想投票节点数
+	// Ideal number of voting nodes
+	bigIdealVoteNum := big.NewInt(IdealVoteNum)
+	// bigint格式的2的256次方的值
+	// The value of the power
+	max256, _ := new(big.Int).SetString("10000000000000000000000000000000000000000000000000000000000000000", 16)
+
+	// 投票∏值计算
+	// The vote ∏ value calculation
+	max256.Mul(max256, bigIdealVoteNum)
+	max256.Quo(max256, bigScale)
+
+	return max256
+}
+
 // 计算发块的∏值
 // Calculates the ∏ value of the block
 func BlockVerge(scale uint16) *big.Int {
 
 	bigIdealBlockNum := big.NewInt(IdealBlockNum)
 	bigIdealVoteNum := big.NewInt(IdealVoteNum)
-	verge := VoteVerge(scale)
+	verge := VotesVerge(scale)
 
 	// 发块∏值计算
 	// A block ∏ value calculation
@@ -78,26 +100,4 @@ func mean(values []uint16) (meanValue uint16) {
 	}
 	meanValue = totalValue / uint16(len(values))
 	return
-}
-
-// 计算投票的∏值
-// To calculate the ∏ value of a vote
-func VoteVerge(scale uint16) *big.Int {
-
-	// bigint格式的全网节点数
-	// Number of nodes in the whole network
-	bigScale := big.NewInt(int64(scale))
-	// bigint格式的理想投票节点数
-	// Ideal number of voting nodes
-	bigIdealVoteNum := big.NewInt(IdealVoteNum)
-	// bigint格式的2的256次方的值
-	// The value of the power
-	max256, _ := new(big.Int).SetString("10000000000000000000000000000000000000000000000000000000000000000", 16)
-
-	// 投票∏值计算
-	// The vote ∏ value calculation
-	max256.Mul(max256, bigIdealVoteNum)
-	max256.Quo(max256, bigScale)
-
-	return max256
 }
