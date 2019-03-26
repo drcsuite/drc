@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/drcsuite/drc/btcec"
+	"github.com/drcsuite/drc/vote"
 	"math/big"
 	"math/rand"
 	"runtime"
@@ -47,8 +48,6 @@ var (
 	// and is based on the number of processor cores.  This helps ensure the
 	// system stays reasonably responsive under heavy load.
 	defaultNumWorkers = uint32(runtime.NumCPU())
-	Pi                *big.Int
-	Work              bool
 )
 
 // Config is a descriptor containing the cpu miner configuration.
@@ -351,7 +350,7 @@ out:
 		// 修改BestSnapshot，返回最佳快照，添加sign和pk
 		m.submitBlockLock.Lock()
 		// 等待上一轮处理完成
-		if !Work {
+		if !vote.Work {
 			m.submitBlockLock.Unlock()
 			time.Sleep(time.Second)
 			continue
@@ -389,10 +388,10 @@ out:
 			}
 		}
 		// 计算前十个块平均规模和weight
-		scale := EstimateScale(votes, scales)
-		Pi = VoteVerge(scale)
+		scale := vote.EstimateScale(votes, scales)
+		vote.Pi = vote.BlockVerge(scale)
 		// 如果不符合规则，等待下一轮
-		if weight.Cmp(Pi) >= 0 {
+		if weight.Cmp(vote.Pi) >= 0 {
 			time.Sleep(time.Second)
 			continue
 		}
@@ -405,7 +404,8 @@ out:
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		pubKey, err := chainhash.NewHash33((btcec.PublicKey)(m.privKey.PublicKey).SerializeCompressed())
+		pk := (btcec.PublicKey)(m.privKey.PublicKey)
+		pubKey, err := chainhash.NewHash33(pk.SerializeCompressed())
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
 				"template: %v", err)
@@ -438,7 +438,8 @@ out:
 			// 将块信息提交给对等点
 			bo := m.submitBlock(block)
 			if bo {
-				Work = false
+				vote.Work = false
+				m.BlockVote(block.MsgCandidate())
 			}
 		}
 	}

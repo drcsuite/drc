@@ -8,7 +8,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/drcsuite/drc/btcec"
-	"github.com/drcsuite/drc/mining/cpuminer"
+	"github.com/drcsuite/drc/vote"
 	"math"
 	"math/big"
 	"time"
@@ -858,8 +858,8 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 		}
 	}
 	// 计算前十个块平均规模和weight
-	scale := cpuminer.EstimateScale(votes, scales)
-	Pi := cpuminer.VoteVerge(scale)
+	scale := vote.EstimateScale(votes, scales)
+	Pi := vote.BlockVerge(scale)
 	// 只接受符合条件的块
 	if weight.Cmp(Pi) >= 0 {
 		str := "This block does not have sufficient permissions"
