@@ -9,7 +9,7 @@ import (
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/database"
 	"github.com/drcsuite/drc/drcutil"
-	"github.com/drcsuite/drc/mining/cpuminer"
+	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
 )
 
@@ -224,7 +224,7 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 	// Perform preliminary sanity checks on the block and its transactions.
 	node := b.index.LookupNode(prevHash)
 	seed := chainhash.DoubleHashH(node.signature.CloneBytes())
-	Pi := cpuminer.VoteVerge(blockHeader.Scale)
+	Pi := vote.BlockVerge(blockHeader.Scale)
 	err = checkBlockSanity(block, &seed, Pi, b.timeSource) // seed pi
 	if err != nil {
 		return false, false, err
@@ -278,7 +278,7 @@ func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags)
 	//对块及其事务执行初步的完整性检查。
 	// Perform preliminary sanity checks on the block and its transactions.
 	seed := chainhash.DoubleHashH(b.BestSnapshot().Signature.CloneBytes())
-	err := checkCandidateSanity(block, &seed, cpuminer.Pi, b.timeSource) // seed pi
+	err := checkCandidateSanity(block, &seed, vote.Pi, b.timeSource) // seed pi
 	if err != nil {
 		return false, err
 	}

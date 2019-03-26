@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"container/heap"
 	"fmt"
-	"github.com/drcsuite/drc/mining/cpuminer"
+	"github.com/drcsuite/drc/vote"
 	"time"
 
 	"github.com/drcsuite/drc/blockchain"
@@ -902,7 +902,7 @@ mempoolLoop:
 	block := drcutil.NewCandidate(&msgBlock, &msgCandidate)
 	block.SetHeight(nextBlockHeight)
 	seed, err := chainhash.NewHash(chainhash.DoubleHashB(g.BestSnapshot().Signature.CloneBytes()))
-	if err := g.chain.CheckConnectBlockTemplate(block, seed, cpuminer.VoteVerge(scale)); err != nil {
+	if err := g.chain.CheckConnectBlockTemplate(block, seed, vote.BlockVerge(scale)); err != nil {
 		return nil, err
 	}
 
