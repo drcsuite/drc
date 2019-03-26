@@ -296,7 +296,7 @@ func isAdvantage(headerHash chainhash.Hash) bool {
 	count := GetVotes(headerHash)
 
 	// 当前块与最多票数的块票数差值为100票，不需要为其投票
-	// The difference between the current block and the block with the most votes is 200, and no vote is required
+	// The difference between the current block and the block with the most votes is 100, and no vote is required
 	if max-count >= AdvantageVoteNum {
 		return false
 	}
@@ -351,38 +351,9 @@ func CheckBlock(msg wire.MsgBlock) bool {
 	return false
 }
 
-// 处理投票结果，是个独立线程
-// Processing the poll result is a separate thread
-func VoteHandle() {
-	creationTime := GetCreationTime()
-	blockHeight := GetBlockHeight()
-
-	// 根据最新块，计算10秒发块定时器启动的时间
-	// According to the latest block, calculate the start time of the 10-second block timer
-	laterTime := creationTime.Add(blockHeight*BlockTimeInterval + 20*time.Second)
-	nowTime := time.Now()
-	t := time.NewTimer(laterTime.Sub(nowTime))
-	<-t.C
-	t.Stop()
-
-	// 处理当前轮的写块和投票
-	// Handles write blocks and polls for the current round
-	voteProcess()
-
-	// 10秒处理一波投票结果
-	// Process one wave of voting results 10 second
-	handlingTime := time.NewTimer(10 * time.Second)
-	for {
-		select {
-		case <-handlingTime.C:
-			voteProcess()
-		}
-	}
-}
-
 // 投票时间到，选出获胜区块上链，处理票池
 // When it's time to vote, select the winner on the blockchain and process the pool of votes
-func voteProcess() {
+func VoteProcess() {
 	blockHeaderHash, _ := GetMaxVotes()
 	blockPool := GetBlockPool()
 	block := blockPool[blockHeaderHash]

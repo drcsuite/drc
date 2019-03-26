@@ -6,6 +6,8 @@ package netsync
 
 import (
 	"container/list"
+	"github.com/drcsuite/drc/mining/cpuminer"
+
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/drcsuite/drc/mempool"
 	peerpkg "github.com/drcsuite/drc/peer"
 	"github.com/drcsuite/drc/wire"
+	//"github.com/drcsuite/drc/mining/cpuminer"
 )
 
 const (
@@ -1395,6 +1398,35 @@ out:
 	log.Trace("Block handler done")
 }
 
+// 处理投票结果，是个独立线程
+// Processing the poll result is a separate thread
+func (sm *SyncManager) VoteHandle() {
+	creationTime := cpuminer.GetCreationTime()
+	blockHeight := cpuminer.GetBlockHeight()
+
+	// 根据最新块，计算10秒发块定时器启动的时间
+	// According to the latest block, calculate the start time of the 10-second block timer
+	laterTime := creationTime.Add(blockHeight*cpuminer.BlockTimeInterval + 20*time.Second)
+	nowTime := time.Now()
+	t := time.NewTimer(laterTime.Sub(nowTime))
+	<-t.C
+	t.Stop()
+
+	// 处理当前轮的写块和投票
+	// Handles write blocks and polls for the current round
+	cpuminer.VoteProcess()
+
+	// 10秒处理一波投票结果
+	// Process one wave of voting results 10 second
+	handlingTime := time.NewTimer(10 * time.Second)
+	for {
+		select {
+		case <-handlingTime.C:
+			cpuminer.VoteProcess()
+		}
+	}
+}
+
 // handleblockchain通知处理来自区块链的通知。它做的事情包括请求孤立块父块和将接受的块转发给连接的对等点。
 // handleBlockchainNotification handles notifications from blockchain.  It does
 // things such as request orphan block parents and relay accepted blocks to
@@ -1585,6 +1617,7 @@ func (sm *SyncManager) Start() {
 	log.Trace("Starting sync manager")
 	sm.wg.Add(1)
 	go sm.blockHandler()
+	go sm.VoteHandle()
 }
 
 // Stop通过停止所有异步处理程序并等待它们完成，优雅地关闭同步管理器。
