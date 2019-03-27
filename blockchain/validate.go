@@ -850,6 +850,7 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	votes, scales := make([]uint16, 0), make([]uint16, 0)
 	for i := 0; i < 10; i++ {
 		// 添加每个节点实际收到的票数和当时估算值
+		wire.ChangeCode()
 		scales = append(scales, prevNode.Header().Scale)
 		votes = append(votes, prevNode.Header().Scale)
 		prevNode = prevNode.Ancestor(1)
@@ -960,15 +961,15 @@ func (b *BlockChain) checkBlockContext(block *drcutil.Block, prevNode *blockNode
 	// blocks whose version is the serializedHeightVersion or newer
 	// once a majority of the network has upgraded.  This is part of
 	// BIP0034.
-	if ShouldHaveSerializedBlockHeight(header) &&
-		blockHeight >= b.chainParams.BIP0034Height {
+	//if ShouldHaveSerializedBlockHeight(header) &&
+	//blockHeight >= b.chainParams.BIP0034Height {
 
-		coinbaseTx := block.Transactions()[0]
-		err := checkSerializedHeight(coinbaseTx, blockHeight)
-		if err != nil {
-			return err
-		}
+	coinbaseTx := block.Transactions()[0]
+	err = checkSerializedHeight(coinbaseTx, blockHeight)
+	if err != nil {
+		return err
 	}
+	//}
 
 	// 查询segwit软fork部署的版本位状态。如果segwit是活动的，我们将切换到强制执行所有新规则。
 	// Query for the Version Bits state for the segwit soft-fork

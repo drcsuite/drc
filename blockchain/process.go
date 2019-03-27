@@ -30,6 +30,7 @@ const (
 	// not be performed.
 	BFNoPoWCheck
 
+	// BFNone是一个方便的值，专门指出没有标志。
 	// BFNone is a convenience value to specifically indicate no flags.
 	BFNone BehaviorFlags = 0
 )
@@ -43,6 +44,20 @@ var (
 	// 当前轮指向池
 	currentPointPool map[chainhash.Hash][]*wire.MsgCandidate
 )
+
+// 获取当前轮块池，多数指向的前一轮块的Hash
+func GetBestPointBlockH() chainhash.Hash {
+	var bestHash chainhash.Hash
+	best := 0
+	for k, v := range currentPointPool {
+		l := len(v)
+		if l > best {
+			best = l
+			bestHash = k
+		}
+	}
+	return bestHash
+}
 
 // block exists确定具有给定散列的块是否存在于主链或任何侧链中。
 // blockExists determines whether a block with the given hash exists either in
@@ -123,6 +138,10 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 		processHashes[0] = nil // Prevent GC leak.
 		processHashes = processHashes[1:]
 
+		// 看看我们刚刚接收的街区里所有的孤块。
+		// 这通常只会是一个，但是如果同时挖掘和广播多个块，则可能是多个块。
+		// 工作证明最多的人最终会胜出。
+		// 这里有意在一个范围上使用循环索引，因为范围不会在每次迭代时重新评估片，也不会调整修改片的索引。
 		// Look up all orphans that are parented by the block we just
 		// accepted.  This will typically only be one, but it could
 		// be multiple if multiple blocks are mined and broadcast
@@ -237,13 +256,16 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 		return false, false, err
 	}
 
+	// 接受任何依赖于此块的孤立块(它们确实如此)
+	// 不再是孤儿)，并重复这些接受街区，直到
+	// 没有了。
 	// Accept any orphan blocks that depend on this block (they are
 	// no longer orphans) and repeat for those accepted blocks until
 	// there are no more.
-	err = b.processOrphans(blockHash, flags)
-	if err != nil {
-		return false, false, err
-	}
+	//err = b.processOrphans(blockHash, flags)
+	//if err != nil {
+	//	return false, false, err
+	//}
 
 	log.Debugf("Accepted block %v", blockHash)
 

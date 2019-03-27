@@ -74,6 +74,15 @@ type BestState struct {
 	Signature   chainhash.Hash64
 }
 
+// 当前轮块池最优快
+// 作为下一次发块依据
+type BestLastCandidate struct {
+	Hash       chainhash.Hash // The hash of the block.
+	Height     int32          // The height of the block.
+	Signature  chainhash.Hash64
+	MedianTime time.Time
+}
+
 var (
 	blockPool map[chainhash.Hash]*wire.MsgBlock
 )
@@ -191,6 +200,8 @@ type BlockChain struct {
 	// chain state can be quickly reconstructed on load.
 	stateLock     sync.RWMutex
 	stateSnapshot *BestState
+
+	bestCandidate *BestLastCandidate
 
 	// The following caches are used to efficiently keep track of the
 	// current deployment threshold state of each rule change deployment.
@@ -1161,7 +1172,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) connectBestChain(node *blockNode, block *drcutil.Block, flags BehaviorFlags) (bool, error) {
-	fastAdd := flags&BFFastAdd == BFFastAdd
+	//fastAdd := flags&BFFastAdd == BFFastAdd
 
 	flushIndexState := func() {
 		// Intentionally ignore errors writing updated node status to DB. If
@@ -1174,12 +1185,13 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *drcutil.Block, fla
 		}
 	}
 
+	//我们正在用一个新的块扩展主链(最佳链)。这是最常见的情况。
 	// We are extending the main (best) chain with a new block.  This is the
 	// most common case.
 	parentHash := &block.MsgBlock().Header.PrevBlock
 	if parentHash.IsEqual(&b.bestChain.Tip().hash) { // 如果是在最佳块后为true
 		// Skip checks if node has already been fully validated.
-		fastAdd = fastAdd || b.index.NodeStatus(node).KnownValid()
+		//fastAdd = fastAdd || b.index.NodeStatus(node).KnownValid()
 
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
@@ -1187,40 +1199,23 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *drcutil.Block, fla
 		view := NewUtxoViewpoint()
 		view.SetBestHash(parentHash)
 		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
-		if !fastAdd {
-			err := b.checkConnectBlock(node, block, view, &stxos)
-			if err == nil {
-				b.index.SetStatusFlags(node, statusValid)
-			} else if _, ok := err.(RuleError); ok {
-				b.index.SetStatusFlags(node, statusValidateFailed)
-			} else {
-				return false, err
-			}
-
-			flushIndexState()
-
-			if err != nil {
-				return false, err
-			}
+		err := b.checkConnectBlock(node, block, view, &stxos)
+		if err == nil {
+			b.index.SetStatusFlags(node, statusValid)
+		} else if _, ok := err.(RuleError); ok {
+			b.index.SetStatusFlags(node, statusValidateFailed)
+		} else {
+			return false, err
 		}
 
-		// In the fast add case the code to check the block connection
-		// was skipped, so the utxo view needs to load the referenced
-		// utxos, spend them, and add the new utxos being created by
-		// this block.
-		if fastAdd {
-			err := view.fetchInputUtxos(b.db, block)
-			if err != nil {
-				return false, err
-			}
-			err = view.connectTransactions(block, &stxos)
-			if err != nil {
-				return false, err
-			}
+		flushIndexState()
+
+		if err != nil {
+			return false, err
 		}
 
 		// Connect the block to the main chain.
-		err := b.connectBlock(node, block, view, stxos)
+		err = b.connectBlock(node, block, view, stxos)
 		if err != nil {
 			// If we got hit with a rule error, then we'll mark
 			// that status of the block as invalid and flush the
@@ -1236,40 +1231,39 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *drcutil.Block, fla
 			return false, err
 		}
 
+		// 如果这是快速添加，或者这个块节点还没有被标记为有效，那么我们将更新它的状态并再次将状态刷新到磁盘。
 		// If this is fast add, or this block node isn't yet marked as
 		// valid, then we'll update its status and flush the state to
 		// disk again.
-		if fastAdd || !b.index.NodeStatus(node).KnownValid() {
+		if !b.index.NodeStatus(node).KnownValid() {
 			b.index.SetStatusFlags(node, statusValid)
 			flushIndexState()
 		}
 
 		return true, nil
 	}
-	if fastAdd {
-		log.Warnf("fastAdd set in the side chain case? %v\n",
-			block.Hash())
-	}
 
+	// 当prevHash和最佳链不一致时，扩展侧链
 	// 我们正在扩展(或创建)一个侧链，但是这个新的侧链的累积功不足以使它成为新的链。
 	// We're extending (or creating) a side chain, but the cumulative
 	// work for this new side chain is not enough to make it the new chain.
-	if node.workSum.Cmp(b.bestChain.Tip().workSum) <= 0 {
-		// Log information about how the block is forking the chain.
-		fork := b.bestChain.FindFork(node)
-		if fork.hash.IsEqual(parentHash) {
-			log.Infof("FORK: Block %v forks the chain at height %d"+
-				"/block %v, but does not cause a reorganize",
-				node.hash, fork.height, fork.hash)
-		} else {
-			log.Infof("EXTEND FORK: Block %v extends a side chain "+
-				"which forks the chain at height %d/block %v",
-				node.hash, fork.height, fork.hash)
-		}
+	//if node.workSum.Cmp(b.bestChain.Tip().workSum) <= 0 {
+	// Log information about how the block is forking the chain.
+	//fork := b.bestChain.FindFork(node)
+	//if fork.hash.IsEqual(parentHash) {
+	//	log.Infof("FORK: Block %v forks the chain at height %d"+
+	//		"/block %v, but does not cause a reorganize",
+	//		node.hash, fork.height, fork.hash)
+	//} else {
+	//	log.Infof("EXTEND FORK: Block %v extends a side chain "+
+	//		"which forks the chain at height %d/block %v",
+	//		node.hash, fork.height, fork.hash)
+	//}
+	//return false, nil
+	//}
 
-		return false, nil
-	}
-
+	// 我们正在扩展(或创建)一个侧链，这个新的侧链的累积功大于旧的最佳侧链，所以这个侧链需要成为主链。
+	// 为了实现,找到双方的共同祖先的叉,断开的块(现在)老叉从主链,并附上块形式新链主链开始共同ancenstor(连锁的分叉的)。
 	// We're extending (or creating) a side chain and the cumulative work
 	// for this new side chain is more than the old best chain, so this side
 	// chain needs to become the main chain.  In order to accomplish that,
@@ -1277,21 +1271,24 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *drcutil.Block, fla
 	// blocks that form the (now) old fork from the main chain, and attach
 	// the blocks that form the new chain to the main chain starting at the
 	// common ancenstor (the point where the chain forked).
-	detachNodes, attachNodes := b.getReorganizeNodes(node)
+	//detachNodes, attachNodes := b.getReorganizeNodes(node)
 
 	// Reorganize the chain.
-	log.Infof("REORGANIZE: Block %v is causing a reorganize.", node.hash)
-	err := b.reorganizeChain(detachNodes, attachNodes)
+	//log.Infof("REORGANIZE: Block %v is causing a reorganize.", node.hash)
+	//err := b.reorganizeChain(detachNodes, attachNodes)
 
+	// getReorganizeNodes或reorganizeChain都可以对块索引进行未保存的更改，
+	// 因此无论是否有错误，都会刷新。索引只有在块连接失败时才会是脏的，因此我们可以忽略任何编写错误。
 	// Either getReorganizeNodes or reorganizeChain could have made unsaved
 	// changes to the block index, so flush regardless of whether there was an
 	// error. The index would only be dirty if the block failed to connect, so
 	// we can ignore any errors writing.
-	if writeErr := b.index.flushToDB(); writeErr != nil {
-		log.Warnf("Error flushing block index changes to disk: %v", writeErr)
-	}
+	//if writeErr := b.index.flushToDB(); writeErr != nil {
+	//	log.Warnf("Error flushing block index changes to disk: %v", writeErr)
+	//}
 
-	return err == nil, err
+	return false, AssertError("connectBlock must be called with a block " +
+		"that extends the main chain")
 }
 
 // isCurrent返回链是否认为它是当前的。有几个因素被用来猜测，但让链相信它是电流的关键因素是:
@@ -1348,6 +1345,31 @@ func (b *BlockChain) BestSnapshot() *BestState {
 	snapshot := b.stateSnapshot
 	b.stateLock.RUnlock()
 	return snapshot
+}
+
+// 返回当前最佳候选块
+func (b *BlockChain) BestLastCandidate() *BestLastCandidate {
+	b.stateLock.RLock()
+	candidate := b.bestCandidate
+	b.stateLock.RUnlock()
+	return candidate
+}
+
+// 返回当前最佳候选块
+func (b *BlockChain) SetBestCandidate(hash chainhash.Hash, height int32, signature chainhash.Hash64, medianTime time.Time) {
+	b.stateLock.RLock()
+	b.bestCandidate = NewBestCandidate(hash, height, signature, medianTime)
+	b.stateLock.RUnlock()
+}
+
+// 创建一个新的最佳候选块
+func NewBestCandidate(hash chainhash.Hash, height int32, signature chainhash.Hash64, medianTime time.Time) *BestLastCandidate {
+	return &BestLastCandidate{
+		Hash:       hash,
+		Height:     height,
+		Signature:  signature,
+		MedianTime: medianTime,
+	}
 }
 
 // HeaderByHash返回由给定散列标识的块头，如果不存在则返回错误。注意，这将从主链和侧链返回标题。

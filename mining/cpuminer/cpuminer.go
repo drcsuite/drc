@@ -173,7 +173,7 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 	// a new block, but the check only happens periodically, so it is
 	// possible a block was found and submitted in between.
 	msgBlock := block.MsgBlock()
-	if !msgBlock.Header.PrevBlock.IsEqual(&m.g.BestSnapshot().Hash) {
+	if !msgBlock.Header.PrevBlock.IsEqual(&m.g.BestCandidate().Hash) {
 		log.Debugf("Block submitted via CPU miner with previous "+
 			"block %s is stale", msgBlock.Header.PrevBlock)
 		return false
@@ -268,7 +268,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgCandidate,
 
 		// The current block is stale if the best block
 		// has changed.
-		best := m.g.BestSnapshot()
+		best := m.g.BestCandidate()
 		if !header.PrevBlock.IsEqual(&best.Hash) {
 			return false
 		}
@@ -347,7 +347,6 @@ out:
 		// this would otherwise end up building a new block template on
 		// a block that is in the process of becoming stale.
 		wire.ChangeCode()
-		// 修改BestSnapshot，返回最佳快照，添加sign和pk
 		m.submitBlockLock.Lock()
 		// 等待上一轮处理完成
 		if !vote.Work {
@@ -356,14 +355,14 @@ out:
 			continue
 		}
 
-		curHeight := m.g.BestSnapshot().Height
+		curHeight := m.g.BestCandidate().Height
 		if curHeight != 0 && !m.cfg.IsCurrent() {
 			m.submitBlockLock.Unlock()
 			time.Sleep(time.Second)
 			continue
 		}
 
-		preSign := m.g.BestSnapshot().Signature
+		preSign := m.g.BestCandidate().Signature
 
 		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<π
 		signature, err := m.privKey.Sign(chainhash.DoubleHashB(preSign.CloneBytes()))
@@ -377,7 +376,7 @@ out:
 
 		// 前10个块的票数和估算值
 		votes, scales := make([]uint16, 0), make([]uint16, 0)
-		prevNode := m.chain.GetBlockIndex().LookupNode(&m.g.BestSnapshot().Hash)
+		prevNode := m.chain.GetBlockIndex().LookupNode(&m.g.BestCandidate().Hash)
 		for i := 0; i < 10; i++ {
 			// 添加每个节点实际收到的票数和当时估算值
 			scales = append(scales, prevNode.Header().Scale)

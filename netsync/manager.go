@@ -66,9 +66,10 @@ type blockMsg struct {
 }
 
 type candidateMsg struct {
-	block *drcutil.Block
-	peer  *peerpkg.Peer
-	reply chan struct{}
+	block    *drcutil.Block
+	peer     *peerpkg.Peer
+	reply    chan struct{}
+	cpuMiner *cpuminer.CPUMiner
 }
 
 // invMsg将比特币inv消息及其来自的对等方打包在一起，以便块处理程序能够访问该信息。
@@ -637,7 +638,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	// 处理发块环节收到的块，
 	// 包括：验证签名，验证交易，验证weight，验证coinbase，
 	// 通过验证将块放入块池
-	_, isOrphan, err := sm.chain.ProcessBlock(bmsg.block, behaviorFlags)
+	_, _, err := sm.chain.ProcessBlock(bmsg.block, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -658,8 +659,8 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		//将错误转换为适当的拒绝消息并发送。
 		// Convert the error into an appropriate reject message and
 		// send it.
-		code, reason := mempool.ErrToRejectErr(err)
-		peer.PushRejectMsg(wire.CmdBlock, code, reason, blockHash, false)
+		//code, reason := mempool.ErrToRejectErr(err)
+		//peer.PushRejectMsg(wire.CmdBlock, code, reason, blockHash, false)
 		return
 	}
 
@@ -675,59 +676,64 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	var heightUpdate int32
 	var blkHashUpdate *chainhash.Hash
 
+	// 向发送孤儿块的对等方请求父方。
 	// Request the parents for the orphan block from the peer that sent it.
-	if isOrphan {
-		// We've just received an orphan block from a peer. In order
-		// to update the height of the peer, we try to extract the
-		// block height from the scriptSig of the coinbase transaction.
-		// Extraction is only attempted if the block's version is
-		// high enough (ver 2+).
-		header := &bmsg.block.MsgBlock().Header
-		if blockchain.ShouldHaveSerializedBlockHeight(header) {
-			coinbaseTx := bmsg.block.Transactions()[0]
-			cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
-			if err != nil {
-				log.Warnf("Unable to extract height from "+
-					"coinbase tx: %v", err)
-			} else {
-				log.Debugf("Extracted height of %v from "+
-					"orphan block", cbHeight)
-				heightUpdate = cbHeight
-				blkHashUpdate = blockHash
-			}
-		}
+	//if isOrphan {
+	//	// We've just received an orphan block from a peer. In order
+	//	// to update the height of the peer, we try to extract the
+	//	// block height from the scriptSig of the coinbase transaction.
+	//	// Extraction is only attempted if the block's version is
+	//	// high enough (ver 2+).
+	//	header := &bmsg.block.MsgBlock().Header
+	//	if blockchain.ShouldHaveSerializedBlockHeight(header) {
+	//		coinbaseTx := bmsg.block.Transactions()[0]
+	//		cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
+	//		if err != nil {
+	//			log.Warnf("Unable to extract height from "+
+	//				"coinbase tx: %v", err)
+	//		} else {
+	//			log.Debugf("Extracted height of %v from "+
+	//				"orphan block", cbHeight)
+	//			heightUpdate = cbHeight
+	//			blkHashUpdate = blockHash
+	//		}
+	//	}
+	//
+	//	orphanRoot := sm.chain.GetOrphanRoot(blockHash)
+	//	locator, err := sm.chain.LatestBlockLocator()
+	//	if err != nil {
+	//		log.Warnf("Failed to get block locator for the "+
+	//			"latest block: %v", err)
+	//	} else {
+	//		peer.PushGetBlocksMsg(locator, orphanRoot)
+	//	}
+	//} else {
+	// 当块不是孤立块时，记录有关它的信息并更新链状态。
+	// When the block is not an orphan, log information about it and
+	// update the chain state.
+	sm.progressLogger.LogBlockHeight(bmsg.block)
 
-		orphanRoot := sm.chain.GetOrphanRoot(blockHash)
-		locator, err := sm.chain.LatestBlockLocator()
-		if err != nil {
-			log.Warnf("Failed to get block locator for the "+
-				"latest block: %v", err)
-		} else {
-			peer.PushGetBlocksMsg(locator, orphanRoot)
-		}
-	} else {
-		// When the block is not an orphan, log information about it and
-		// update the chain state.
-		sm.progressLogger.LogBlockHeight(bmsg.block)
+	// Update this peer's latest block height, for future
+	// potential sync node candidacy.
+	best := sm.chain.BestSnapshot()
+	heightUpdate = best.Height
+	blkHashUpdate = &best.Hash
 
-		// Update this peer's latest block height, for future
-		// potential sync node candidacy.
-		best := sm.chain.BestSnapshot()
-		heightUpdate = best.Height
-		blkHashUpdate = &best.Hash
+	// Clear the rejected transactions.
+	sm.rejectedTxns = make(map[chainhash.Hash]struct{})
+	//}
 
-		// Clear the rejected transactions.
-		sm.rejectedTxns = make(map[chainhash.Hash]struct{})
-	}
-
-	// 更新此对等点的块高度。但是，只有当这是孤立的或我们的链是“当前的”时，才向服务器发送消息更新对等高度。如果我们从头开始同步链，这将避免发送垃圾数量的消息。
+	// 更新此对等点的块高度。
+	// 但是，只有当这是孤立的或我们的链是“当前的”时，才向服务器发送消息更新对等高度。如果我们从头开始同步链，这将避免发送垃圾数量的消息。
 	// Update the block height for this peer. But only send a message to
 	// the server for updating peer heights if this is an orphan or our
 	// chain is "current". This avoids sending a spammy amount of messages
 	// if we're syncing the chain from scratch.
 	if blkHashUpdate != nil && heightUpdate != 0 {
 		peer.UpdateLastBlockHeight(heightUpdate)
-		if isOrphan || sm.current() {
+		//if isOrphan || sm.current() {
+		if sm.current() {
+			// 更新所有已知对等点的高度
 			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
 				peer)
 		}
@@ -858,6 +864,9 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 	if err != nil || !bo {
 		log.Errorf("Failed to send block message: %v", err)
 	}
+
+	// 对收到的块做投票处理
+	bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
 }
 
 // fetchHeaderBlocks创建一个请求，并向syncPeer发送一个请求，根据当前头列表下载下一个块列表。
@@ -1558,14 +1567,14 @@ func (sm *SyncManager) QueueBlock(block *drcutil.Block, peer *peerpkg.Peer, done
 	sm.msgChan <- &blockMsg{block: block, peer: peer, reply: done}
 }
 
-func (sm *SyncManager) QueueCandidate(block *drcutil.Block, peer *peerpkg.Peer, done chan struct{}) {
+func (sm *SyncManager) QueueCandidate(block *drcutil.Block, peer *peerpkg.Peer, done chan struct{}, m *cpuminer.CPUMiner) {
 	// Don't accept more blocks if we're shutting down.
 	if atomic.LoadInt32(&sm.shutdown) != 0 {
 		done <- struct{}{}
 		return
 	}
 
-	sm.msgChan <- &candidateMsg{block: block, peer: peer, reply: done}
+	sm.msgChan <- &candidateMsg{block: block, peer: peer, reply: done, cpuMiner: m}
 }
 
 // QueueInv将传递的inv消息和对等点添加到块处理队列中。

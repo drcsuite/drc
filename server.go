@@ -649,7 +649,7 @@ func (sp *serverPeer) OnCandidate(_ *peer.Peer, msg *wire.MsgCandidate, buf []by
 	// reference implementation processes blocks in the same
 	// thread and therefore blocks further messages until
 	// the bitcoin block has been fully processed.
-	sp.server.syncManager.QueueCandidate(block, sp.Peer, sp.blockProcessed)
+	sp.server.syncManager.QueueCandidate(block, sp.Peer, sp.blockProcessed, sp.server.cpuMiner)
 	<-sp.blockProcessed
 }
 
@@ -783,6 +783,7 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 // OnGetBlocks is invoked when a peer receives a getblocks bitcoin
 // message.
 func (sp *serverPeer) OnGetBlocks(_ *peer.Peer, msg *wire.MsgGetBlocks) {
+	// 根据块定位器在最佳链中找到最近已知的块，然后获取它后面的所有块散列，直到其中一条连接。获取MaxBlocksPerMsg或遇到提供的停止散列。
 	// Find the most recent known block in the best chain based on the block
 	// locator and fetch all of the block hashes after it until either
 	// wire.MaxBlocksPerMsg have been fetched or the provided stop hash is

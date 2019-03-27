@@ -1,7 +1,6 @@
 package vote
 
 import (
-	"github.com/drcsuite/drc/wire"
 	"math/big"
 )
 
@@ -16,9 +15,8 @@ const (
 )
 
 var (
-	Pi                *big.Int
-	BestLastCandidate wire.MsgCandidate // 作为下一次发块依据
-	Work              bool
+	Pi   *big.Int
+	Work bool
 )
 
 // 计算发块的∏值
