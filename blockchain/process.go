@@ -37,19 +37,19 @@ const (
 
 var (
 	// 前一轮块池
-	prevCandidatePool map[chainhash.Hash]*wire.MsgCandidate
+	PrevCandidatePool map[chainhash.Hash]*wire.MsgCandidate
 	// 当前轮块池
-	currentCandidatePool map[chainhash.Hash]*wire.MsgCandidate
+	CurrentCandidatePool map[chainhash.Hash]*wire.MsgCandidate
 
 	// 当前轮指向池
-	currentPointPool map[chainhash.Hash][]*wire.MsgCandidate
+	CurrentPointPool map[chainhash.Hash][]*wire.MsgCandidate
 )
 
 // 获取当前轮块池，多数指向的前一轮块的Hash
 func GetBestPointBlockH() chainhash.Hash {
 	var bestHash chainhash.Hash
 	best := 0
-	for k, v := range currentPointPool {
+	for k, v := range CurrentPointPool {
 		l := len(v)
 		if l > best {
 			best = l
@@ -100,7 +100,7 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 
 func (b *BlockChain) PrevCandidateExists(hash *chainhash.Hash) bool {
 	// Check in the database.
-	exist := prevCandidatePool[*hash]
+	exist := PrevCandidatePool[*hash]
 	if exist != nil {
 		return true
 	}
@@ -109,7 +109,7 @@ func (b *BlockChain) PrevCandidateExists(hash *chainhash.Hash) bool {
 
 func (b *BlockChain) CandidateExists(hash *chainhash.Hash) bool {
 	// Check in the database.
-	exist := currentCandidatePool[*hash]
+	exist := CurrentCandidatePool[*hash]
 	if exist != nil {
 		return true
 	}
@@ -322,8 +322,8 @@ func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags)
 	}
 
 	// 加入指向池 和 当前块池
-	currentCandidatePool[*blockHash] = block.MsgCandidate()
-	points := currentPointPool[*blockHash]
+	CurrentCandidatePool[*blockHash] = block.MsgCandidate()
+	points := CurrentPointPool[*blockHash]
 	points = append(points, block.MsgCandidate())
 	log.Debugf("Accepted block %v", blockHash)
 
