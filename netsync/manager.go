@@ -69,9 +69,10 @@ type blockMsg struct {
 }
 
 type candidateMsg struct {
-	block *drcutil.Block
-	peer  *peerpkg.Peer
-	reply chan struct{}
+	block    *drcutil.Block
+	peer     *peerpkg.Peer
+	reply    chan struct{}
+	cpuMiner *cpuminer.CPUMiner
 }
 
 type signMsg struct {
@@ -646,7 +647,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	// 处理发块环节收到的块，
 	// 包括：验证签名，验证交易，验证weight，验证coinbase，
 	// 通过验证将块放入块池
-	_, isOrphan, err := sm.chain.ProcessBlock(bmsg.block, behaviorFlags)
+	_, _, err := sm.chain.ProcessBlock(bmsg.block, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -667,8 +668,8 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		//将错误转换为适当的拒绝消息并发送。
 		// Convert the error into an appropriate reject message and
 		// send it.
-		code, reason := mempool.ErrToRejectErr(err)
-		peer.PushRejectMsg(wire.CmdBlock, code, reason, blockHash, false)
+		//code, reason := mempool.ErrToRejectErr(err)
+		//peer.PushRejectMsg(wire.CmdBlock, code, reason, blockHash, false)
 		return
 	}
 
@@ -684,59 +685,64 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	var heightUpdate int32
 	var blkHashUpdate *chainhash.Hash
 
+	// 向发送孤儿块的对等方请求父方。
 	// Request the parents for the orphan block from the peer that sent it.
-	if isOrphan {
-		// We've just received an orphan block from a peer. In order
-		// to update the height of the peer, we try to extract the
-		// block height from the scriptSig of the coinbase transaction.
-		// Extraction is only attempted if the block's version is
-		// high enough (ver 2+).
-		header := &bmsg.block.MsgBlock().Header
-		if blockchain.ShouldHaveSerializedBlockHeight(header) {
-			coinbaseTx := bmsg.block.Transactions()[0]
-			cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
-			if err != nil {
-				log.Warnf("Unable to extract height from "+
-					"coinbase tx: %v", err)
-			} else {
-				log.Debugf("Extracted height of %v from "+
-					"orphan block", cbHeight)
-				heightUpdate = cbHeight
-				blkHashUpdate = blockHash
-			}
-		}
+	//if isOrphan {
+	//	// We've just received an orphan block from a peer. In order
+	//	// to update the height of the peer, we try to extract the
+	//	// block height from the scriptSig of the coinbase transaction.
+	//	// Extraction is only attempted if the block's version is
+	//	// high enough (ver 2+).
+	//	header := &bmsg.block.MsgBlock().Header
+	//	if blockchain.ShouldHaveSerializedBlockHeight(header) {
+	//		coinbaseTx := bmsg.block.Transactions()[0]
+	//		cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
+	//		if err != nil {
+	//			log.Warnf("Unable to extract height from "+
+	//				"coinbase tx: %v", err)
+	//		} else {
+	//			log.Debugf("Extracted height of %v from "+
+	//				"orphan block", cbHeight)
+	//			heightUpdate = cbHeight
+	//			blkHashUpdate = blockHash
+	//		}
+	//	}
+	//
+	//	orphanRoot := sm.chain.GetOrphanRoot(blockHash)
+	//	locator, err := sm.chain.LatestBlockLocator()
+	//	if err != nil {
+	//		log.Warnf("Failed to get block locator for the "+
+	//			"latest block: %v", err)
+	//	} else {
+	//		peer.PushGetBlocksMsg(locator, orphanRoot)
+	//	}
+	//} else {
+	// 当块不是孤立块时，记录有关它的信息并更新链状态。
+	// When the block is not an orphan, log information about it and
+	// update the chain state.
+	sm.progressLogger.LogBlockHeight(bmsg.block)
 
-		orphanRoot := sm.chain.GetOrphanRoot(blockHash)
-		locator, err := sm.chain.LatestBlockLocator()
-		if err != nil {
-			log.Warnf("Failed to get block locator for the "+
-				"latest block: %v", err)
-		} else {
-			peer.PushGetBlocksMsg(locator, orphanRoot)
-		}
-	} else {
-		// When the block is not an orphan, log information about it and
-		// update the chain state.
-		sm.progressLogger.LogBlockHeight(bmsg.block)
+	// Update this peer's latest block height, for future
+	// potential sync node candidacy.
+	best := sm.chain.BestSnapshot()
+	heightUpdate = best.Height
+	blkHashUpdate = &best.Hash
 
-		// Update this peer's latest block height, for future
-		// potential sync node candidacy.
-		best := sm.chain.BestSnapshot()
-		heightUpdate = best.Height
-		blkHashUpdate = &best.Hash
+	// Clear the rejected transactions.
+	sm.rejectedTxns = make(map[chainhash.Hash]struct{})
+	//}
 
-		// Clear the rejected transactions.
-		sm.rejectedTxns = make(map[chainhash.Hash]struct{})
-	}
-
-	// 更新此对等点的块高度。但是，只有当这是孤立的或我们的链是“当前的”时，才向服务器发送消息更新对等高度。如果我们从头开始同步链，这将避免发送垃圾数量的消息。
+	// 更新此对等点的块高度。
+	// 但是，只有当这是孤立的或我们的链是“当前的”时，才向服务器发送消息更新对等高度。如果我们从头开始同步链，这将避免发送垃圾数量的消息。
 	// Update the block height for this peer. But only send a message to
 	// the server for updating peer heights if this is an orphan or our
 	// chain is "current". This avoids sending a spammy amount of messages
 	// if we're syncing the chain from scratch.
 	if blkHashUpdate != nil && heightUpdate != 0 {
 		peer.UpdateLastBlockHeight(heightUpdate)
-		if isOrphan || sm.current() {
+		//if isOrphan || sm.current() {
+		if sm.current() {
+			// 更新所有已知对等点的高度
 			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
 				peer)
 		}
@@ -867,6 +873,9 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 	if err != nil || !bo {
 		log.Errorf("Failed to send block message: %v", err)
 	}
+
+	// 对收到的块做投票处理
+	bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
 }
 
 // 处理签名队列里的签名
@@ -1513,7 +1522,7 @@ out:
 
 // 处理投票结果，是个独立线程
 // Processing the poll result is a separate thread
-func (sm *SyncManager) VotesHandle() {
+func (sm *SyncManager) VoteHandle() {
 	creationTime := cpuminer.GetCreationTime()
 	blockHeight := cpuminer.GetBlockHeight()
 
@@ -1527,7 +1536,7 @@ func (sm *SyncManager) VotesHandle() {
 
 	// 处理当前轮的写块和投票
 	// Handles write blocks and polls for the current round
-	cpuminer.VoteProcess()
+	voteProcess()
 
 	// 10秒处理一波投票结果
 	// Process one wave of voting results 10 second
@@ -1535,9 +1544,27 @@ func (sm *SyncManager) VotesHandle() {
 	for {
 		select {
 		case <-handlingTime.C:
-			cpuminer.VoteProcess()
+			voteProcess()
 		}
 	}
+}
+
+// 投票时间到，选出获胜区块上链，处理票池
+// When it's time to vote, select the winner on the blockChain and process the pool of votes
+func voteProcess() {
+	blockHeaderHash, _ := cpuminer.GetMaxVotes()
+	blockPool := cpuminer.GetBlockPool()
+	block := blockPool[blockHeaderHash]
+	// 写入可能区块
+	MayBlock(block)
+
+	// 把本轮收到最多的上轮可能区块，写入区块链中
+	WrittenChain()
+
+	// 本轮投票结束，当前票池变成上一轮票池
+	prevTicketPool = ticketPool
+	// 清空当前票池票池
+	ticketPool = make(map[chainhash.Hash][]SignAndKey)
 }
 
 // handleblockchain通知处理来自区块链的通知。它做的事情包括请求孤立块父块和将接受的块转发给连接的对等点。
@@ -1671,14 +1698,14 @@ func (sm *SyncManager) QueueBlock(block *drcutil.Block, peer *peerpkg.Peer, done
 	sm.msgChan <- &blockMsg{block: block, peer: peer, reply: done}
 }
 
-func (sm *SyncManager) QueueCandidate(block *drcutil.Block, peer *peerpkg.Peer, done chan struct{}) {
+func (sm *SyncManager) QueueCandidate(block *drcutil.Block, peer *peerpkg.Peer, done chan struct{}, m *cpuminer.CPUMiner) {
 	// Don't accept more blocks if we're shutting down.
 	if atomic.LoadInt32(&sm.shutdown) != 0 {
 		done <- struct{}{}
 		return
 	}
 
-	sm.msgChan <- &candidateMsg{block: block, peer: peer, reply: done}
+	sm.msgChan <- &candidateMsg{block: block, peer: peer, reply: done, cpuMiner: m}
 }
 
 func (sm *SyncManager) QueueSign(msg *wire.MsgSign, peer *peerpkg.Peer, done chan struct{}) {

@@ -93,9 +93,9 @@ func (b *BlockChain) maybeAcceptBlock(block *drcutil.Block, flags BehaviorFlags)
 	// Notify the caller that the new block was accepted into the block
 	// chain.  The caller would typically want to react by relaying the
 	// inventory to other peers.
-	b.chainLock.Unlock()
-	b.sendNotification(NTBlockAccepted, block)
-	b.chainLock.Lock()
+	//b.chainLock.Unlock()
+	//b.sendNotification(NTBlockAccepted, block)
+	//b.chainLock.Lock()
 
 	return isMainChain, nil
 }

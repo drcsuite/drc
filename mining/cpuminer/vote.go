@@ -1,7 +1,6 @@
 package cpuminer
 
 import (
-	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
@@ -136,22 +135,4 @@ func GetVotes(hash chainhash.Hash) uint16 {
 	signAndKeys := ticketPool[hash]
 
 	return uint16(len(signAndKeys))
-}
-
-// 投票时间到，选出获胜区块上链，处理票池
-// When it's time to vote, select the winner on the blockChain and process the pool of votes
-func VoteProcess() {
-	blockHeaderHash, _ := GetMaxVotes()
-	blockPool := GetBlockPool()
-	block := blockPool[blockHeaderHash]
-	// 写入可能区块
-	MayBlock(block)
-
-	// 把本轮收到最多的上轮可能区块，写入区块链中
-	WrittenChain()
-
-	// 本轮投票结束，当前票池变成上一轮票池
-	prevTicketPool = ticketPool
-	// 清空当前票池票池
-	ticketPool = make(map[chainhash.Hash][]SignAndKey)
 }

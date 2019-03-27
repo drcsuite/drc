@@ -321,14 +321,14 @@ func logSkippedDeps(tx *drcutil.Tx, deps map[chainhash.Hash]*txPrioItem) {
 // on the end of the provided best chain.  In particular, it is one second after
 // the median timestamp of the last several blocks per the chain consensus
 // rules.
-func MinimumMedianTime(chainState *blockchain.BestState) time.Time {
+func MinimumMedianTime(chainState *blockchain.BestLastCandidate) time.Time {
 	return chainState.MedianTime.Add(time.Second)
 }
 
 // medianAdjustedTime returns the current time adjusted to ensure it is at least
 // one second after the median timestamp of the last several blocks per the
 // chain consensus rules.
-func medianAdjustedTime(chainState *blockchain.BestState, timeSource blockchain.MedianTimeSource) time.Time {
+func medianAdjustedTime(chainState *blockchain.BestLastCandidate, timeSource blockchain.MedianTimeSource) time.Time {
 	// The timestamp for the block must not be before the median timestamp
 	// of the last several blocks.  Thus, choose the maximum between the
 	// current time and one second after the past median time.  The current
@@ -446,7 +446,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress drcutil.Address, pubkey *chainhash.Hash33, signature *chainhash.Hash64,
 	scale uint16, reserved uint16) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
-	best := g.chain.BestSnapshot()
+	best := g.chain.BestLastCandidate()
 	nextBlockHeight := best.Height + 1
 
 	// Create a standard coinbase transaction paying to the provided
@@ -901,7 +901,7 @@ mempoolLoop:
 	//block := drcutil.NewBlock()
 	block := drcutil.NewCandidate(&msgBlock, &msgCandidate)
 	block.SetHeight(nextBlockHeight)
-	seed, err := chainhash.NewHash(chainhash.DoubleHashB(g.BestSnapshot().Signature.CloneBytes()))
+	seed, err := chainhash.NewHash(chainhash.DoubleHashB(g.BestCandidate().Signature.CloneBytes()))
 	if err := g.chain.CheckConnectBlockTemplate(block, seed, vote.BlockVerge(scale)); err != nil {
 		return nil, err
 	}
@@ -933,7 +933,7 @@ func (g *BlkTmplGenerator) UpdateBlockTime(msgBlock *wire.MsgCandidate) error {
 	// the median time of the last several blocks per the chain consensus
 	// rules.
 	wire.ChangeCode()
-	newTime := medianAdjustedTime(g.chain.BestSnapshot(), g.timeSource)
+	newTime := medianAdjustedTime(g.chain.BestLastCandidate(), g.timeSource)
 	msgBlock.Header.Timestamp = newTime
 
 	// Recalculate the difficulty if running on a network that requires it.
@@ -984,6 +984,10 @@ func (g *BlkTmplGenerator) UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight
 // This function is safe for concurrent access.
 func (g *BlkTmplGenerator) BestSnapshot() *blockchain.BestState {
 	return g.chain.BestSnapshot()
+}
+
+func (g *BlkTmplGenerator) BestCandidate() *blockchain.BestLastCandidate {
+	return g.chain.BestLastCandidate()
 }
 
 // TxSource returns the associated transaction source.
