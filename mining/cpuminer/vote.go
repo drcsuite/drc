@@ -41,7 +41,7 @@ type SignAndKey struct {
 
 // 新块验证投票，需广播块返回true
 // New block validation vote
-func (m *CPUMiner) BlockVote(msg *wire.MsgBlock) bool {
+func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) bool {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 
@@ -81,7 +81,7 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgBlock) bool {
 				weight := chainhash.DoubleHashB(headerSign.Serialize())
 				bigWeight := new(big.Int).SetBytes(weight)
 
-				voteVerge := vote.VoteVerge(msg.Header.Scale)
+				voteVerge := vote.VotesVerge(msg.Header.Scale)
 
 				// weight值小于voteVerge，有投票权，进行投票签名
 				// Weight is less than the voteVerge, has the right to vote, does the voting signature
@@ -157,7 +157,7 @@ func (m *CPUMiner) CollectVotes(msg *wire.MsgSign, headerBlock wire.BlockHeader)
 			sign := msg.Signature.CloneBytes()
 			weight := chainhash.DoubleHashB(sign)
 			bigWeight := new(big.Int).SetBytes(weight)
-			voteVerge := vote.VoteVerge(headerBlock.Scale)
+			voteVerge := vote.VotesVerge(headerBlock.Scale)
 			// weight值小于voteVerge，此节点有投票权
 			// Weight is less than the voteVerge, this node has the right to vote
 			if bigWeight.Cmp(voteVerge) <= 0 {
@@ -244,7 +244,7 @@ func GetVotes(hash chainhash.Hash) uint16 {
 
 // 检查区块
 // Check the block
-func CheckBlock(msg wire.MsgBlock) bool {
+func CheckBlock(msg wire.MsgCandidate) bool {
 
 	// 验证区块头的签名
 	// Verify the signature of the block header
@@ -264,7 +264,7 @@ func CheckBlock(msg wire.MsgBlock) bool {
 }
 
 // 投票时间到，选出获胜区块上链，处理票池
-// When it's time to vote, select the winner on the blockchain and process the pool of votes
+// When it's time to vote, select the winner on the blockChain and process the pool of votes
 func VoteProcess() {
 	blockHeaderHash, _ := GetMaxVotes()
 	blockPool := GetBlockPool()
