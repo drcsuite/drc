@@ -299,3 +299,11 @@ func NewCandidateFromBlockAndBytes(msgCandidate *wire.MsgCandidate, serializedBl
 		blockHeight:     BlockHeightUnknown,
 	}
 }
+
+// msgcandidate转msgblock
+func MsgCandidateToBlock(msgCandidate *wire.MsgCandidate) *wire.MsgBlock {
+	return &wire.MsgBlock{
+		Header:       msgCandidate.Header,
+		Transactions: msgCandidate.Transactions,
+	}
+}
