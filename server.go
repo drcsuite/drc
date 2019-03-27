@@ -653,6 +653,14 @@ func (sp *serverPeer) OnCandidate(_ *peer.Peer, msg *wire.MsgCandidate, buf []by
 	<-sp.blockProcessed
 }
 
+// 接收到签名信息调用的处理函数
+// The handler function that is called when the signature information is received
+func (sp *serverPeer) OnSign(_ *peer.Peer, msg *wire.MsgSign) {
+
+	sp.server.syncManager.QueueSign(msg, sp.Peer, sp.blockProcessed)
+	<-sp.blockProcessed
+}
+
 // OnInv在对等方接收到inv比特币消息时被调用，用于检查远程对等方公布的库存并作出相应的响应。
 // 我们将消息传递给blockmanager，它将调用QueueMessage并提供适当的响应。
 // OnInv is invoked when a peer receives an inv bitcoin message and is
@@ -1378,23 +1386,6 @@ func (sp *serverPeer) OnRead(_ *peer.Peer, bytesRead int, msg wire.Message, err 
 // the bytes sent by the server.
 func (sp *serverPeer) OnWrite(_ *peer.Peer, bytesWritten int, msg wire.Message, err error) {
 	sp.server.AddBytesSent(uint64(bytesWritten))
-}
-
-// 接收到签名信息调用的处理函数
-// The handler function that is called when the signature information is received
-func (sp *serverPeer) OnSign(_ *peer.Peer, msg *wire.MsgSign) {
-
-	// 查看块池是否有此区块,没有的话不承认该签名。新的一轮不再处理上轮投票
-	// check if the block pool has this block. If not, the signature is not recognized.
-	// The new round will no longer process the previous round of voting
-	blockPool := cpuminer.GetBlockPool()
-	if headerBlock, exist := blockPool[msg.BlockHeaderHash]; exist {
-
-		// 验证和保存签名,帮助传播签名
-		// Process and save signatures
-		sp.server.cpuMiner.CollectVotes(msg, headerBlock)
-
-	}
 }
 
 // randomUint16Number returns a random uint16 in a specified input range.  Note
