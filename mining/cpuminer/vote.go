@@ -5,7 +5,6 @@ import (
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
 	"math/big"
-	"time"
 )
 
 const (
@@ -16,10 +15,6 @@ const (
 	// 成为优势区块所需的票数差
 	// The number of votes needed to become the dominant block
 	AdvantageVoteNum = 100
-
-	// 发块时间间隔
-	// Block time interval
-	BlockTimeInterval = 10 * time.Second
 )
 
 // 区块验证投票

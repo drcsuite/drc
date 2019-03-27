@@ -2,9 +2,9 @@ package vote
 
 import (
 	"github.com/drcsuite/drc/chaincfg/chainhash"
-	"github.com/drcsuite/drc/wire"
 	"math/big"
 	"sync"
+	"time"
 )
 
 const (
@@ -15,12 +15,16 @@ const (
 	// 理想投票节点数
 	// Ideal number of voting nodes
 	IdealVoteNum = 300
+
+	// 发块时间间隔
+	// Block time interval
+	BlockTimeInterval = 10 * time.Second
 )
 
 var (
-	Pi                *big.Int
-	BestLastCandidate wire.MsgCandidate // 作为下一次发块依据
-	Work              bool
+	Pi   *big.Int
+	Work bool
+	Open = make(chan bool)
 
 	// 读写锁
 	// Read-write lock

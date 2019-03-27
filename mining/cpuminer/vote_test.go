@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/drcsuite/drc/vote"
 	"testing"
+	"time"
 )
 
 func TestEstimateScale(t *testing.T) {
@@ -18,4 +19,5 @@ func TestEstimateScale(t *testing.T) {
 func TestBlockVerge(t *testing.T) {
 	fmt.Println(vote.VotesVerge(257))
 	fmt.Println(vote.BlockVerge(257))
+	fmt.Println(10*time.Second*time.Duration(6) + 20*time.Second)
 }
