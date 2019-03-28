@@ -761,10 +761,12 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block *drcutil.Block,
 		return err
 	}
 
+	// 在本地映射中构建到事务的所有地址映射。
 	// Build all of the address to transaction mappings in a local map.
 	addrsToTxns := make(writeIndexData)
 	idx.indexBlock(addrsToTxns, block, stxos)
 
+	// 为每个地址添加所有索引项。
 	// Add all of the index entries for each address.
 	addrIdxBucket := dbTx.Metadata().Bucket(addrIndexKey)
 	for addrKey, txIdxs := range addrsToTxns {

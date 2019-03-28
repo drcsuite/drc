@@ -143,6 +143,8 @@ type Bucket interface {
 	// implementations.
 	ForEachBucket(func(k []byte) error) error
 
+	// Cursor返回一个新游标，允许对bucket进行迭代
+	// 键/值对和嵌套桶按前向或后向顺序排列。
 	// Cursor returns a new cursor, allowing for iteration over the bucket's
 	// key/value pairs and nested buckets in forward or backward order.
 	//

@@ -322,7 +322,7 @@ func logSkippedDeps(tx *drcutil.Tx, deps map[chainhash.Hash]*txPrioItem) {
 // the median timestamp of the last several blocks per the chain consensus
 // rules.
 func MinimumMedianTime(chainState *blockchain.BestLastCandidate) time.Time {
-	return chainState.MedianTime.Add(time.Second)
+	return chainState.Header.Timestamp.Add(time.Second)
 }
 
 // medianAdjustedTime returns the current time adjusted to ensure it is at least
@@ -895,13 +895,15 @@ mempoolLoop:
 		}
 	}
 
+	// 最后，根据chain consensus规则对创建的块进行全面检查，确保它正确地连接到当前最佳
+	// 链条没有问题。
 	// Finally, perform a full check on the created block against the chain
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
 	//block := drcutil.NewBlock()
 	block := drcutil.NewCandidate(&msgBlock, &msgCandidate)
 	block.SetHeight(nextBlockHeight)
-	seed, err := chainhash.NewHash(chainhash.DoubleHashB(g.BestCandidate().Signature.CloneBytes()))
+	seed, err := chainhash.NewHash(chainhash.DoubleHashB(g.BestCandidate().Header.Signature.CloneBytes()))
 	if err := g.chain.CheckConnectBlockTemplate(block, seed, vote.BlockVerge(scale)); err != nil {
 		return nil, err
 	}

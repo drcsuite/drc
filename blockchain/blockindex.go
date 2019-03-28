@@ -109,8 +109,8 @@ type blockNode struct {
 	signature chainhash.Hash64
 	publicKey chainhash.Hash33
 	scale     uint16
-	vote      uint16
 	reserved  uint16
+	Votes     uint16
 }
 
 // initBlockNode初始化给定头节点和父节点的块节点，
@@ -121,25 +121,21 @@ type blockNode struct {
 // calculating the height and workSum from the respective fields on the parent.
 // This function is NOT safe for concurrent access.  It must only be called when
 // initially creating a node.
-func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) {
-	wire.ChangeCode()
+func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode, votes uint16) {
 	*node = blockNode{
-		hash: blockHeader.BlockHash(),
-		//workSum:    CalcWork(blockHeader.Bits),
-		version: blockHeader.Version,
-		//bits:       blockHeader.Bits,
-		//nonce:      blockHeader.Nonce,
+		hash:       blockHeader.BlockHash(),
+		version:    blockHeader.Version,
 		timestamp:  blockHeader.Timestamp.Unix(),
 		merkleRoot: blockHeader.MerkleRoot,
 		signature:  blockHeader.Signature,
 		publicKey:  blockHeader.PublicKey,
 		scale:      blockHeader.Scale,
 		reserved:   blockHeader.Reserved,
+		votes:      votes,
 	}
 	if parent != nil {
 		node.parent = parent
 		node.height = parent.height + 1
-		//node.workSum = node.workSum.Add(parent.workSum, node.workSum)
 	}
 }
 
@@ -147,9 +143,9 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 // newBlockNode returns a new block node for the given block header and parent
 // node, calculating the height and workSum from the respective fields on the
 // parent. This function is NOT safe for concurrent access.
-func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode) *blockNode {
+func newBlockNode(blockHeader *wire.BlockHeader, parent *blockNode, votes uint16) *blockNode {
 	var node blockNode
-	initBlockNode(&node, blockHeader, parent)
+	initBlockNode(&node, blockHeader, parent, votes)
 	return &node
 }
 
@@ -163,7 +159,6 @@ func (node *blockNode) Header() wire.BlockHeader {
 	if node.parent != nil {
 		prevHash = &node.parent.hash
 	}
-	wire.ChangeCode()
 	return wire.BlockHeader{
 		Version:    node.version,
 		PrevBlock:  *prevHash,
@@ -173,8 +168,6 @@ func (node *blockNode) Header() wire.BlockHeader {
 		Reserved:   node.reserved,
 		Signature:  node.signature,
 		PublicKey:  node.publicKey,
-		//Bits:       node.bits,
-		//Nonce:      node.nonce,
 	}
 }
 

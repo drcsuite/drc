@@ -62,25 +62,27 @@ type orphanBlock struct {
 // However, the returned snapshot must be treated as immutable since it is
 // shared by all callers.
 type BestState struct {
-	Hash   chainhash.Hash // The hash of the block.
-	Height int32          // The height of the block.
-	//Bits        uint32         // The difficulty bits of the block.
-	BlockSize   uint64    // The size of the block.
-	BlockWeight uint64    // The weight of the block.
-	NumTxns     uint64    // The number of txns in the block.
-	TotalTxns   uint64    // The total number of txns in the chain.
-	MedianTime  time.Time // Median time as per CalcPastMedianTime.
+	Hash        chainhash.Hash // The hash of the block.
+	Height      int32          // The height of the block.
+	BlockSize   uint64         // The size of the block.
+	BlockWeight uint64         // The weight of the block.
+	NumTxns     uint64         // The number of txns in the block.
+	TotalTxns   uint64         // The total number of txns in the chain.
+	MedianTime  time.Time      // Median time as per CalcPastMedianTime.
 	PubKey      chainhash.Hash33
 	Signature   chainhash.Hash64
+	Scale       uint16
+	Reserved    uint16
+	Votes       uint16
 }
 
 // 当前轮块池最优快
 // 作为下一次发块依据
 type BestLastCandidate struct {
-	Hash       chainhash.Hash // The hash of the block.
-	Height     int32          // The height of the block.
-	Signature  chainhash.Hash64
-	MedianTime time.Time
+	Hash   chainhash.Hash // The hash of the block.
+	Height int32          // The height of the block.
+	Header wire.BlockHeader
+	Votes  uint16
 }
 
 var (
@@ -114,9 +116,8 @@ func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
 	totalTxns uint64, signature chainhash.Hash64, pubKey chainhash.Hash33, scale uint16, reserved uint16, medianTime time.Time) *BestState {
 
 	return &BestState{
-		Hash:   node.hash,
-		Height: node.height,
-		//Bits:        node.bits,
+		Hash:        node.hash,
+		Height:      node.height,
 		BlockSize:   blockSize,
 		BlockWeight: blockWeight,
 		NumTxns:     numTxns,
@@ -124,6 +125,8 @@ func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
 		MedianTime:  medianTime,
 		Signature:   signature,
 		PubKey:      pubKey,
+		Scale:       scale,
+		Reserved:    reserved,
 	}
 }
 
@@ -643,15 +646,19 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 			"spent transaction out information")
 	}
 
+	// 没有关于未知规则或版本的警告，直到链是当前的。
 	// No warnings about unknown rules or versions until the chain is
 	// current.
 	if b.isCurrent() {
+		// 如果有未知的新规则即将激活或已经激活，则发出警告。
 		// Warn if any unknown new rules are either about to activate or
 		// have already been activated.
+		wire.ChangeCode() // 修改blockNode存储
 		if err := b.warnUnknownRuleActivations(node); err != nil {
 			return err
 		}
 
+		// 如果最后一个块中有足够高的百分比具有意外版本，则发出警告。
 		// Warn if a high enough percentage of the last blocks have
 		// unexpected versions.
 		if err := b.warnUnknownVersions(node); err != nil {
@@ -659,12 +666,14 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 		}
 	}
 
+	// 在更新最佳状态之前，将任何块状态更改写入数据库。
 	// Write any block status changes to DB before updating best state.
 	err := b.index.flushToDB()
 	if err != nil {
 		return err
 	}
 
+	// 生成一个新的最佳状态快照，如果所有数据库更新都成功，该快照将用于更新数据库和以后的内存。
 	// Generate a new best state snapshot that will be used to update the
 	// database and later memory if all database updates are successful.
 	b.stateLock.RLock()
@@ -674,7 +683,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 	blockSize := uint64(block.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(block))
 
-	wire.ChangeCode()
 	pubKey := block.MsgBlock().Header.PublicKey
 	signature := block.MsgBlock().Header.Signature
 	scale := block.MsgBlock().Header.Scale
@@ -687,11 +695,12 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
-		err := dbPutBestState(dbTx, state, node.workSum)
+		err := dbPutBestState(dbTx, state)
 		if err != nil {
 			return err
 		}
 
+		// 将块散列和高度添加到跟踪主链的块索引中。
 		// Add the block hash and height to the block index which tracks
 		// the main chain.
 		err = dbPutBlockIndex(dbTx, block.Hash(), node.height)
@@ -699,6 +708,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 			return err
 		}
 
+		// 使用utxo视图的状态更新utxo集。这需要删除所有使用的utxos，并添加块创建的新utxos。
 		// Update the utxo set using the state of the utxo view.  This
 		// entails removing all of the utxos spent and adding the new
 		// ones created by the block.
@@ -707,6 +717,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 			return err
 		}
 
+		// 通过为包含事务花费的所有txos的块添加一条记录来更新事务花费日志。
 		// Update the transaction spend journal by adding a record for
 		// the block that contains all txos spent by it.
 		err = dbPutSpendJournalEntry(dbTx, block.Hash(), stxos)
@@ -714,6 +725,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 			return err
 		}
 
+		// 允许索引管理器调用当前活动的每个可选索引，同时连接块，这样它们就可以相应地更新自己。
 		// Allow the index manager to call each of the currently active
 		// optional indexes with the block being connected so they can
 		// update themselves accordingly.
@@ -808,7 +820,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *drcutil.Block, view
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
-		err := dbPutBestState(dbTx, state, node.workSum)
+		err := dbPutBestState(dbTx, state)
 		if err != nil {
 			return err
 		}
@@ -1199,7 +1211,7 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *drcutil.Block, fla
 		view := NewUtxoViewpoint()
 		view.SetBestHash(parentHash)
 		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
-		err := b.checkConnectBlock(node, block, view, &stxos)
+		err := b.checkConnectBlock(node, block, view, &stxos) // 上链前执行的检查
 		if err == nil {
 			b.index.SetStatusFlags(node, statusValid)
 		} else if _, ok := err.(RuleError); ok {
@@ -1355,20 +1367,20 @@ func (b *BlockChain) BestLastCandidate() *BestLastCandidate {
 	return candidate
 }
 
-// 返回当前最佳候选块
-func (b *BlockChain) SetBestCandidate(hash chainhash.Hash, height int32, signature chainhash.Hash64, medianTime time.Time) {
+// 设置当前最佳候选块
+func (b *BlockChain) SetBestCandidate(hash chainhash.Hash, height int32, header wire.BlockHeader, votes uint16) {
 	b.stateLock.RLock()
-	b.bestCandidate = NewBestCandidate(hash, height, signature, medianTime)
+	b.bestCandidate = NewBestCandidate(hash, height, header, votes)
 	b.stateLock.RUnlock()
 }
 
 // 创建一个新的最佳候选块
-func NewBestCandidate(hash chainhash.Hash, height int32, signature chainhash.Hash64, medianTime time.Time) *BestLastCandidate {
+func NewBestCandidate(hash chainhash.Hash, height int32, header wire.BlockHeader, votes uint16) *BestLastCandidate {
 	return &BestLastCandidate{
-		Hash:       hash,
-		Height:     height,
-		Signature:  signature,
-		MedianTime: medianTime,
+		Hash:   hash,
+		Height: height,
+		Votes:  votes,
+		Header: header,
 	}
 }
 

@@ -603,6 +603,8 @@ func (d DNSSeed) String() string {
 	return d.Host
 }
 
+// Register为比特币网络注册网络参数。
+// 如果网络已经注册(由于之前的寄存器调用，或者网络是默认网络之一)，则ErrDuplicateNet可能会出现此错误。
 // Register registers the network parameters for a Bitcoin network.  This may
 // error with ErrDuplicateNet if the network is already registered (either
 // due to a previous Register call, or the network being one of the default
@@ -627,6 +629,7 @@ func Register(params *Params) error {
 	return nil
 }
 
+// mustRegister执行与Register相同的功能，但如果出现错误，它会引发恐慌。这应该只从包init函数调用。
 // mustRegister performs the same function as Register except it panics if there
 // is an error.  This should only be called from package init functions.
 func mustRegister(params *Params) {
