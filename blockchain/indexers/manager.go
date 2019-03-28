@@ -89,6 +89,7 @@ func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *drcutil.Block
 			curTipHash, block.Hash()))
 	}
 
+	// 用连接的块通知索引器，以便它可以索引它。
 	// Notify the indexer with the connected block so it can index it.
 	if err := indexer.ConnectBlock(dbTx, block, stxo); err != nil {
 		return err

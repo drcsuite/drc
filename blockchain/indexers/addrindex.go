@@ -748,6 +748,7 @@ func (idx *AddrIndex) indexBlock(data writeIndexData, block *drcutil.Block,
 func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block *drcutil.Block,
 	stxos []blockchain.SpentTxOut) error {
 
+	// 序列化块内事务的偏移量和长度。
 	// The offset and length of the transactions within the serialized
 	// block.
 	txLocs, err := block.TxLoc()
@@ -755,6 +756,7 @@ func (idx *AddrIndex) ConnectBlock(dbTx database.Tx, block *drcutil.Block,
 		return err
 	}
 
+	// 获取与块关联的内部块ID。
 	// Get the internal block ID associated with the block.
 	blockID, err := dbFetchBlockIDByHash(dbTx, block.Hash())
 	if err != nil {

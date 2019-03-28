@@ -216,6 +216,7 @@ func storeFilter(dbTx database.Tx, block *drcutil.Block, f *gcs.Filter,
 }
 
 // ConnectBlock由索引管理器在连接到主链的新块时调用。
+// 他的索引器为每个传递的块添加散列到cf的映射。这是Indexer接口的一部分。
 // ConnectBlock is invoked by the index manager when a new block has been
 // connected to the main chain. This indexer adds a hash-to-cf mapping for
 // every passed block. This is part of the Indexer interface.
