@@ -1575,14 +1575,14 @@ func (sm *SyncManager) voteProcess() {
 	msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
 
 	// 写入最佳候选块，做为下轮发块的依据
-	sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header.Signature, msgCandidate.Header.Timestamp)
+	sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header, votes)
 
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
 	hash := blockchain.GetBestPointBlockH()
 	prevCandidate := blockchain.PrevCandidatePool[hash]
 	msgBlock := drcutil.MsgCandidateToBlock(prevCandidate)
 	block := drcutil.NewBlockFromBlockAndBytes(msgBlock, nil)
-
+	block.Votes = votes
 	sm.chain.ProcessBlock(block, blockchain.BFNone)
 
 	// 本轮投票结束，当前票池变成上一轮票池
