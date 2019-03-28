@@ -937,11 +937,7 @@ func (sm *SyncManager) CollectVotes(sign *wire.MsgSign, candidate *wire.MsgCandi
 					Signature: sign.Signature,
 					PublicKey: sign.PublicKey,
 				}
-				vote.RWSyncMutex.RLock()
-				ticketPool := vote.GetTicketPool()
-				ticketPool[sign.BlockHeaderHash] = append(ticketPool[sign.BlockHeaderHash], signAndKey)
-				vote.SetTicketPool(ticketPool)
-				vote.RWSyncMutex.RUnlock()
+				vote.UpdateTicketPool(sign.BlockHeaderHash, signAndKey)
 
 				// 收到的投票的前置块hash值跟本节点的前置hash值一样，传播该投票信息
 				// The leading block hash value for the poll received is the same as the leading hash value for the node, and the poll is propagated
@@ -1574,7 +1570,7 @@ out:
 // 投票时间到，选出获胜区块上链，处理票池
 // When it's time to vote, select the winner on the blockChain and process the pool of votes
 func (sm *SyncManager) voteProcess() {
-	blockHeaderHash, _ := cpuminer.GetMaxVotes()
+	blockHeaderHash, votes := cpuminer.GetMaxVotes()
 
 	msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
 
@@ -1586,10 +1582,11 @@ func (sm *SyncManager) voteProcess() {
 	prevCandidate := blockchain.PrevCandidatePool[hash]
 	msgBlock := drcutil.MsgCandidateToBlock(prevCandidate)
 	block := drcutil.NewBlockFromBlockAndBytes(msgBlock, nil)
+
 	sm.chain.ProcessBlock(block, blockchain.BFNone)
 
 	// 本轮投票结束，当前票池变成上一轮票池
-	vote.RWSyncMutex.RLock()
+	vote.RWSyncMutex.Lock()
 	ticketPool := vote.GetTicketPool()
 	vote.SetPrevTicketPool(ticketPool)
 	// 清空当前票池票池
@@ -1598,7 +1595,7 @@ func (sm *SyncManager) voteProcess() {
 	// 通知开始新一轮挖块
 	vote.Work = true
 
-	vote.RWSyncMutex.RUnlock()
+	vote.RWSyncMutex.Unlock()
 }
 
 // handleblockchain通知处理来自区块链的通知。它做的事情包括请求孤立块父块和将接受的块转发给连接的对等点。

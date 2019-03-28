@@ -146,7 +146,19 @@ func SetTicketPool(pool map[chainhash.Hash][]SignAndKey) {
 }
 
 // 写入之前的票池
-// // write to previous ticket pool
+// write to previous ticket pool
 func SetPrevTicketPool(pool map[chainhash.Hash][]SignAndKey) {
 	ticketPool = pool
+}
+
+// 更新当前票池，加写锁，防止同时修改票池出现错误
+// Update the current ticket pool and add write lock to prevent errors in modifying the ticket pool at the same time
+func UpdateTicketPool(hash chainhash.Hash, signAndKey SignAndKey) {
+
+	RWSyncMutex.Lock()
+	ticketPool := GetTicketPool()
+	ticketPool[hash] = append(ticketPool[hash], signAndKey)
+	SetTicketPool(ticketPool)
+	RWSyncMutex.Unlock()
+
 }

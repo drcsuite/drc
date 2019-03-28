@@ -68,11 +68,7 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 				Signature: *sign,
 				PublicKey: *pubKey,
 			}
-			vote.RWSyncMutex.RLock()
-			ticketPool := vote.GetTicketPool()
-			ticketPool[headerHash] = append(ticketPool[headerHash], signAndKey)
-			vote.SetTicketPool(ticketPool)
-			vote.RWSyncMutex.RUnlock()
+			vote.UpdateTicketPool(headerHash, signAndKey)
 
 			// 传播签名
 			// Propagate signatures
