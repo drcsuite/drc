@@ -514,6 +514,7 @@ func dbFetchTx(dbTx database.Tx, hash *chainhash.Hash) (*wire.MsgTx, error) {
 func (m *Manager) ConnectBlock(dbTx database.Tx, block *drcutil.Block,
 	stxos []blockchain.SpentTxOut) error {
 
+	// 调用当前活动的每个可选索引，使它们能够相应地进行更新。
 	// Call each of the currently active optional indexes with the block
 	// being connected so they can update accordingly.
 	for _, index := range m.enabledIndexes {

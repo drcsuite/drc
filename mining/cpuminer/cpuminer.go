@@ -346,7 +346,6 @@ out:
 		// submission, since the current block will be changing and
 		// this would otherwise end up building a new block template on
 		// a block that is in the process of becoming stale.
-		wire.ChangeCode()
 		m.submitBlockLock.Lock()
 		// 等待上一轮处理完成
 		if !vote.Work {
@@ -362,25 +361,30 @@ out:
 			continue
 		}
 
-		preSign := m.g.BestCandidate().Signature
+		preHeader := m.g.BestCandidate().Header
 
 		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<π
-		signature, err := m.privKey.Sign(chainhash.DoubleHashB(preSign.CloneBytes()))
+		signature, err := m.privKey.Sign(chainhash.DoubleHashB(preHeader.Signature.CloneBytes()))
 		if err != nil {
 			m.submitBlockLock.Unlock()
 			errStr := fmt.Sprintf("Failed to signature prevate seed: %v", err)
 			log.Errorf(errStr)
+			vote.Work = false
 			continue
 		}
 		weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signature.GenSignBytes()))
 
 		// 前10个块的票数和估算值
 		votes, scales := make([]uint16, 0), make([]uint16, 0)
-		prevNode := m.chain.GetBlockIndex().LookupNode(&m.g.BestCandidate().Hash)
-		for i := 0; i < 10; i++ {
+
+		candidate := blockchain.PrevCandidatePool[m.g.BestCandidate().Hash]
+		scales = append(scales, candidate.Header.Scale)
+		votes = append(votes, m.g.BestCandidate().Votes)
+		for i := 0; i < 9; i++ {
 			// 添加每个节点实际收到的票数和当时估算值
+			prevNode := m.chain.GetBlockIndex().LookupNode(&candidate.Header.PrevBlock)
 			scales = append(scales, prevNode.Header().Scale)
-			votes = append(votes, prevNode.Header().Scale)
+			votes = append(votes, prevNode.Votes)
 			prevNode = prevNode.Ancestor(1)
 			if prevNode == nil {
 				break
@@ -388,9 +392,10 @@ out:
 		}
 		// 计算前十个块平均规模和weight
 		scale := vote.EstimateScale(votes, scales)
-		vote.Pi = vote.BlockVerge(scale)
+		Pi := vote.BlockVerge(scale)
 		// 如果不符合规则，等待下一轮
-		if weight.Cmp(vote.Pi) >= 0 {
+		if weight.Cmp(Pi) >= 0 {
+			vote.Work = false
 			time.Sleep(time.Second)
 			continue
 		}

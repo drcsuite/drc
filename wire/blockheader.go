@@ -49,7 +49,7 @@ type BlockHeader struct {
 
 // blockHeaderLen is a constant that represents the number of bytes for a block
 // header.
-const blockHeaderLen = 80
+const blockHeaderLen = 173
 
 // BlockHash计算给定块头的块标识符哈希。
 // BlockHash computes the block identifier hash for the given block header.
@@ -126,7 +126,6 @@ func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash, sig
 // decoding block headers stored to disk, such as in a database, as opposed to
 // decoding from the wire.
 func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
-	ChangeCode()
 	return readElements(r, &bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
 		(*uint32Time)(&bh.Timestamp), &bh.Signature, &bh.PublicKey, &bh.Scale, &bh.Reserved)
 }
@@ -137,7 +136,6 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 // opposed to encoding for the wire.
 func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	sec := uint32(bh.Timestamp.Unix())
-	ChangeCode()
 	return writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
 		sec, &bh.Signature, &bh.PublicKey, bh.Scale, bh.Reserved)
 }

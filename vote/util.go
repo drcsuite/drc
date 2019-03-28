@@ -15,7 +15,7 @@ const (
 )
 
 var (
-	Pi   *big.Int
+	//Pi   *big.Int
 	Work bool
 )
 

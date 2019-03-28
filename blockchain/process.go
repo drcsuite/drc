@@ -195,7 +195,6 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
-
 	//fastAdd := flags&BFFastAdd == BFFastAdd
 
 	blockHash := block.Hash()
@@ -299,8 +298,26 @@ func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags)
 
 	//对块及其事务执行初步的完整性检查。
 	// Perform preliminary sanity checks on the block and its transactions.
-	seed := chainhash.DoubleHashH(b.BestSnapshot().Signature.CloneBytes())
-	err := checkCandidateSanity(block, &seed, vote.Pi, b.timeSource) // seed pi
+	seed := chainhash.DoubleHashH(b.BestLastCandidate().Header.Signature.CloneBytes())
+	// 计算Pi,阈值规模
+	votes, scales := make([]uint16, 0), make([]uint16, 0)
+	candidate := PrevCandidatePool[b.BestLastCandidate().Hash]
+	scales = append(scales, candidate.Header.Scale)
+	votes = append(votes, b.BestLastCandidate().Votes)
+	for i := 0; i < 9; i++ {
+		// 添加每个节点实际收到的票数和当时估算值
+		prevNode := b.GetBlockIndex().LookupNode(&candidate.Header.PrevBlock)
+		scales = append(scales, prevNode.Header().Scale)
+		votes = append(votes, prevNode.Votes)
+		prevNode = prevNode.Ancestor(1)
+		if prevNode == nil {
+			break
+		}
+	}
+	// 计算前十个块平均规模和weight
+	scale := vote.EstimateScale(votes, scales)
+	Pi := vote.BlockVerge(scale)
+	err := checkCandidateSanity(block, &seed, Pi, b.timeSource) // seed pi
 	if err != nil {
 		return false, err
 	}

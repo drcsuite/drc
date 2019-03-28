@@ -42,6 +42,7 @@ type Block struct {
 	blockHeight              int32           // Height in the main block chain
 	transactions             []*Tx           // Transactions
 	txnsGenerated            bool            // ALL wrapped transactions generated
+	Votes                    uint16
 }
 
 // MsgBlock returns the underlying wire.MsgBlock for the Block.
@@ -55,6 +56,8 @@ func (b *Block) MsgCandidate() *wire.MsgCandidate {
 	return b.msgCandidate
 }
 
+// Bytes返回块的序列化字节。这相当于在底层线路上调用Serialize。
+// 然而，MsgBlock会缓存结果，因此后续调用会更有效。
 // Bytes returns the serialized bytes for the Block.  This is equivalent to
 // calling Serialize on the underlying wire.MsgBlock, however it caches the
 // result so subsequent calls are more efficient.
