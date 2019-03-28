@@ -1,7 +1,10 @@
 package vote
 
 import (
+	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"math/big"
+	"sync"
+	"time"
 )
 
 const (
@@ -12,12 +15,36 @@ const (
 	// 理想投票节点数
 	// Ideal number of voting nodes
 	IdealVoteNum = 300
+
+	// 发块时间间隔
+	// Block time interval
+	BlockTimeInterval = 10 * time.Second
 )
 
 var (
 	//Pi   *big.Int
 	Work bool
+	Open = make(chan bool)
+
+	// 读写锁
+	// Read-write lock
+	RWSyncMutex = new(sync.RWMutex)
+	// 区块签名的票池
+	// Block signature of the ticket pool
+	ticketPool = make(map[chainhash.Hash][]SignAndKey)
+
+	// 前一区块的签名票池
+	// The signature ticket pool for the previous block
+	prevTicketPool = make(map[chainhash.Hash][]SignAndKey)
 )
+
+// 具有投票权的节点对区块的签名值和验证时用的公钥
+// The signed value of the block by the voting node and the public key used for verification
+type SignAndKey struct {
+	Signature chainhash.Hash64
+
+	PublicKey chainhash.Hash33
+}
 
 // 计算投票的∏值
 // To calculate the ∏ value of a vote
@@ -98,4 +125,28 @@ func mean(values []uint16) (meanValue uint16) {
 	}
 	meanValue = totalValue / uint16(len(values))
 	return
+}
+
+// 获取当前票池
+// Gets the current ticket pool
+func GetTicketPool() map[chainhash.Hash][]SignAndKey {
+	return ticketPool
+}
+
+// 获取之前的票池
+// Gets the previous ticket pool
+func GetPrevTicketPool() map[chainhash.Hash][]SignAndKey {
+	return prevTicketPool
+}
+
+// 写入当前票池
+// write to current ticket pool
+func SetTicketPool(pool map[chainhash.Hash][]SignAndKey) {
+	ticketPool = pool
+}
+
+// 写入之前的票池
+// // write to previous ticket pool
+func SetPrevTicketPool(pool map[chainhash.Hash][]SignAndKey) {
+	ticketPool = pool
 }

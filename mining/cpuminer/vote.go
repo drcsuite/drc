@@ -1,12 +1,10 @@
 package cpuminer
 
 import (
-	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
 	"math/big"
-	"time"
 )
 
 const (
@@ -17,31 +15,12 @@ const (
 	// 成为优势区块所需的票数差
 	// The number of votes needed to become the dominant block
 	AdvantageVoteNum = 100
-
-	// 发块时间间隔
-	// Block time interval
-	BlockTimeInterval = 10 * time.Second
 )
 
-// 区块签名的票池
-// Block signature of the ticket pool
-var ticketPool = make(map[chainhash.Hash][]SignAndKey)
+// 区块验证投票
+// Block validation vote
+func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 
-// 前一区块的签名票池
-// The signature ticket pool for the previous block
-var prevTicketPool = make(map[chainhash.Hash][]SignAndKey)
-
-// 具有投票权的节点对区块的签名值和验证时用的公钥
-// The signed value of the block by the voting node and the public key used for verification
-type SignAndKey struct {
-	Signature chainhash.Hash64
-
-	PublicKey chainhash.Hash33
-}
-
-// 新块验证投票，需广播块返回true
-// New block validation vote
-func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) bool {
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 
@@ -53,149 +32,59 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) bool {
 	// Hash the contents of the block twice
 	headerHash := msg.Header.BlockHash()
 
-	// 验证区块
-	// Verify the block
-	if CheckBlock(*msg) {
+	// 判断该块票数是否符合被投票的资格
+	// Determine whether the block is eligible to be voted on
+	if isAdvantage(headerHash) {
 
-		// 判断该块票数是否符合被投票的资格
-		// Determine whether the block is eligible to be voted on
-		if isAdvantage(headerHash) {
+		pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
+		if err != nil {
+			log.Errorf("Format conversion error: %s", err)
+		}
 
-			pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
+		// 用自己的私钥签名区块
+		// Sign the block with your own private key
+		headerSign, err := privateKey.Sign(headerHash.CloneBytes())
+		if err != nil {
+			log.Errorf("Signature error: %s", err)
+		}
+		// 计算本节点的投票weight
+		//The voting weight of this node is calculated
+		weight := chainhash.DoubleHashB(headerSign.Serialize())
+		bigWeight := new(big.Int).SetBytes(weight)
+
+		voteVerge := vote.VotesVerge(msg.Header.Scale)
+		// weight值小于voteVerge，有投票权，进行投票签名
+		// Weight is less than the voteVerge, has the right to vote, does the voting signature
+		if bigWeight.Cmp(voteVerge) <= 0 {
+
+			sign, err := chainhash.NewHash64(headerSign.Serialize())
 			if err != nil {
 				log.Errorf("Format conversion error: %s", err)
 			}
 
-			// 判断本节点在之前是否为该块投过票
-			// Determines whether this node has voted for this block before
-			if preventRepeatSign(headerHash, *pubKey) {
-
-				// 用自己的私钥签名区块
-				// Sign the block with your own private key
-				headerSign, err := privateKey.Sign(headerHash.CloneBytes())
-				if err != nil {
-					log.Errorf("Signature error: %s", err)
-				}
-				// 计算本节点的投票weight
-				//The voting weight of this node is calculated
-				weight := chainhash.DoubleHashB(headerSign.Serialize())
-				bigWeight := new(big.Int).SetBytes(weight)
-
-				voteVerge := vote.VotesVerge(msg.Header.Scale)
-
-				// weight值小于voteVerge，有投票权，进行投票签名
-				// Weight is less than the voteVerge, has the right to vote, does the voting signature
-				if bigWeight.Cmp(voteVerge) <= 0 {
-
-					sign, err := chainhash.NewHash64(headerSign.Serialize())
-					if err != nil {
-						log.Errorf("Format conversion error: %s", err)
-					}
-
-					// 维护本地票池
-					// Maintain local ticket pool
-					signAndKey := SignAndKey{
-						Signature: *sign,
-						PublicKey: *pubKey,
-					}
-					ticketPool[headerHash] = append(ticketPool[headerHash], signAndKey)
-
-					// 传播签名
-					// Propagate signatures
-					msgSign := &wire.MsgSign{
-						BlockHeaderHash: headerHash,
-						Signature:       *sign,
-						PublicKey:       *pubKey,
-					}
-					m.cfg.SendSign(msgSign)
-					return true
-
-					// weight不符合情况，传播区块,返回true
-					// weight don't conform to the situation, spread the block
-				} else {
-					return true
-				}
+			// 维护本地票池
+			// Maintain local ticket pool
+			signAndKey := vote.SignAndKey{
+				Signature: *sign,
+				PublicKey: *pubKey,
 			}
-		}
-	}
+			vote.RWSyncMutex.RLock()
+			ticketPool := vote.GetTicketPool()
+			ticketPool[headerHash] = append(ticketPool[headerHash], signAndKey)
+			vote.SetTicketPool(ticketPool)
+			vote.RWSyncMutex.RUnlock()
 
-	return false
-}
-
-// 收集签名投票，传播投票
-// Collect signatures and vote, spread the vote
-func (m *CPUMiner) CollectVotes(msg *wire.MsgSign, headerBlock wire.BlockHeader) {
-	m.Mutex.Lock()
-	defer m.Mutex.Unlock()
-
-	// 获取本节点公钥
-	// Gets the node's public key
-	publicKey := m.privKey.PubKey()
-
-	// 查看是否是自己的签名投票
-	// Check to see if it's your signature vote
-	pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
-	if err != nil {
-		log.Errorf("Format conversion error: %s", err)
-	}
-	if preventRepeatSign(msg.BlockHeaderHash, *pubKey) {
-
-		// 验证签名
-		// Verify the signature
-		signature, err := btcec.ParseSignature(msg.Signature.CloneBytes(), btcec.S256())
-		if err != nil {
-			log.Errorf("Parse error: %s", err)
-		}
-		pubKey, err := btcec.ParsePubKey(msg.PublicKey.CloneBytes(), btcec.S256())
-		if err != nil {
-			log.Errorf("Parse error: %s", err)
-		}
-		hash := msg.BlockHeaderHash.CloneBytes()
-		if signature.Verify(hash, pubKey) {
-
-			// 查看weight是否符合
-			sign := msg.Signature.CloneBytes()
-			weight := chainhash.DoubleHashB(sign)
-			bigWeight := new(big.Int).SetBytes(weight)
-			voteVerge := vote.VotesVerge(headerBlock.Scale)
-			// weight值小于voteVerge，此节点有投票权
-			// Weight is less than the voteVerge, this node has the right to vote
-			if bigWeight.Cmp(voteVerge) <= 0 {
-
-				// 维护本地票池
-				// Maintain local ticket pool
-				signAndKey := SignAndKey{
-					Signature: msg.Signature,
-					PublicKey: msg.PublicKey,
-				}
-				ticketPool[msg.BlockHeaderHash] = append(ticketPool[msg.BlockHeaderHash], signAndKey)
-
-				// 符合传播条件，传播签名
-				// If propagation conditions are met, the signature is propagated
-				m.cfg.SendSign(msg)
+			// 传播签名
+			// Propagate signatures
+			msgSign := &wire.MsgSign{
+				BlockHeaderHash: headerHash,
+				Signature:       *sign,
+				PublicKey:       *pubKey,
 			}
+
+			m.cfg.SendSign(msgSign)
 		}
 	}
-}
-
-// 避免重复投票或多次记录投票记录，如果没有重复，返回true
-// Avoid duplicate voting or multiple records voting records, if no repeat, return true
-func preventRepeatSign(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash33) bool {
-
-	// 查看签名池里是否有自己的签名,有的话返回true
-	// Checks the signature pool to see if it has its own signature and returns true
-	for headerHash, signAndKeys := range ticketPool {
-		if headerHash == blockHeaderHash {
-			// 遍历收到的区块所有的签名公钥
-			// Iterates through all the signed public keys of the received block
-			for _, signAndKey := range signAndKeys {
-				if publicKey == signAndKey.PublicKey {
-					return false
-				}
-			}
-		}
-	}
-	return true
 }
 
 // 如果当前块的票数比别的块差太多，放弃投票转发当前块
@@ -224,7 +113,7 @@ func GetMaxVotes() (chainhash.Hash, uint16) {
 	var maxVotes = 0
 	var maxBlockHash chainhash.Hash
 
-	for headerHash, signAndKeys := range ticketPool {
+	for headerHash, signAndKeys := range vote.GetTicketPool() {
 		if count := len(signAndKeys); count > maxVotes {
 			maxVotes = count
 			maxBlockHash = headerHash
@@ -236,61 +125,9 @@ func GetMaxVotes() (chainhash.Hash, uint16) {
 // 获取区块的当前票数
 // Gets the current number of votes for the block
 func GetVotes(hash chainhash.Hash) uint16 {
+	ticketPool := vote.GetTicketPool()
 
 	signAndKeys := ticketPool[hash]
 
 	return uint16(len(signAndKeys))
-}
-
-// 检查区块
-// Check the block
-func CheckBlock(msg wire.MsgCandidate) bool {
-
-	// 验证区块头的签名
-	// Verify the signature of the block header
-	signature, err := btcec.ParseSignature(msg.Header.Signature.CloneBytes(), btcec.S256())
-	if err != nil {
-		return false
-	}
-	pubKey, err := btcec.ParsePubKey(msg.Header.PublicKey.CloneBytes(), btcec.S256())
-	if err != nil {
-		return false
-	}
-	hash := msg.Header.PrevBlock.CloneBytes()
-	if signature.Verify(hash, pubKey) {
-		return true
-	}
-	return false
-}
-
-// 投票时间到，选出获胜区块上链，处理票池
-// When it's time to vote, select the winner on the blockChain and process the pool of votes
-func VoteProcess() {
-	blockHeaderHash, _ := GetMaxVotes()
-	blockPool := GetBlockPool()
-	block := blockPool[blockHeaderHash]
-	// 写入可能区块
-	MayBlock(block)
-
-	// 把本轮收到最多的上轮可能区块，写入区块链中
-	WrittenChain()
-
-	// 本轮投票结束，当前票池变成上一轮票池
-	prevTicketPool = ticketPool
-	// 清空当前票池票池
-	ticketPool = make(map[chainhash.Hash][]SignAndKey)
-}
-
-// 获取当前票池
-// Gets the current ticket pool
-func GetTicketPool() map[chainhash.Hash][]SignAndKey {
-
-	return ticketPool
-}
-
-// 获取之前的票池
-// Gets the previous ticket pool
-func GetPrevTicketPool() map[chainhash.Hash][]SignAndKey {
-
-	return prevTicketPool
 }

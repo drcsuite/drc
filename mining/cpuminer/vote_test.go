@@ -2,9 +2,9 @@ package cpuminer
 
 import (
 	"fmt"
-	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"testing"
+	"time"
 )
 
 func TestEstimateScale(t *testing.T) {
@@ -19,17 +19,5 @@ func TestEstimateScale(t *testing.T) {
 func TestBlockVerge(t *testing.T) {
 	fmt.Println(vote.VotesVerge(257))
 	fmt.Println(vote.BlockVerge(257))
-}
-
-func TestTicketPool(t *testing.T) {
-	var signAndKey []SignAndKey
-	signAndKeys := append(signAndKey, SignAndKey{chainhash.Hash64{1}, chainhash.Hash33{2}})
-	ticketPool[chainhash.Hash{1}] = append(signAndKeys, SignAndKey{chainhash.Hash64{3}, chainhash.Hash33{4}})
-	ticketPool[chainhash.Hash{2}] = append(signAndKeys, SignAndKey{chainhash.Hash64{5}, chainhash.Hash33{6}})
-
-	for key, value := range ticketPool {
-		fmt.Println("key:", key, ",value:", value)
-	}
-	fmt.Println(ticketPool[chainhash.Hash{2}])
-	fmt.Println(chainhash.Hash{1, 2, 3, 5} == chainhash.Hash{1, 2, 3, 5})
+	fmt.Println(10*time.Second*time.Duration(6) + 20*time.Second)
 }

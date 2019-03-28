@@ -126,6 +126,10 @@ type MessageListeners struct {
 
 	OnCandidate func(p *Peer, msg *wire.MsgCandidate, buf []byte)
 
+	// 当对等方接收到签名消息时调用它。
+	// OnSign is invoked when a peer receives a signed message.
+	OnSign func(p *Peer, msg *wire.MsgSign)
+
 	// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
 	OnCFilter func(p *Peer, msg *wire.MsgCFilter)
 
@@ -217,10 +221,6 @@ type MessageListeners struct {
 	// not an error in the write occurred.  This can be useful for
 	// circumstances such as keeping track of server-wide byte counts.
 	OnWrite func(p *Peer, bytesWritten int, msg wire.Message, err error)
-
-	// 当对等方接收到签名消息时调用它。
-	// OnSign is invoked when a peer receives a signed message.
-	OnSign func(p *Peer, msg *wire.MsgSign)
 }
 
 // Config is the struct to hold configuration options useful to Peer.

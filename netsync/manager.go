@@ -6,7 +6,10 @@ package netsync
 
 import (
 	"container/list"
+	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
+	"github.com/drcsuite/drc/vote"
+	"math/big"
 
 	"sync"
 	"sync/atomic"
@@ -70,6 +73,12 @@ type candidateMsg struct {
 	peer     *peerpkg.Peer
 	reply    chan struct{}
 	cpuMiner *cpuminer.CPUMiner
+}
+
+type signMsg struct {
+	sign  *wire.MsgSign
+	peer  *peerpkg.Peer
+	reply chan struct{}
 }
 
 // invMsg将比特币inv消息及其来自的对等方打包在一起，以便块处理程序能够访问该信息。
@@ -869,6 +878,108 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 	bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
 }
 
+// 处理签名队列里的签名
+func (sm *SyncManager) handleSignMsg(msg *signMsg) {
+	peer := msg.peer
+	_, exists := sm.peerStates[peer]
+	if !exists {
+		log.Warnf("Received block message from unknown peer %s", peer)
+		return
+	}
+
+	// 查看块池是否有此区块,没有的话不承认该签名。新的一轮不再处理上轮投票
+	// check if the block pool has this block. If not, the signature is not recognized.
+	// The new round will no longer process the previous round of voting
+
+	blockPool := blockchain.CurrentCandidatePool
+	if headerBlock, exist := blockPool[msg.sign.BlockHeaderHash]; exist {
+
+		// 验证和保存签名,帮助传播签名
+		// Process and save signatures
+		sm.CollectVotes(msg.sign, headerBlock)
+
+	}
+}
+
+// 收集签名投票，传播投票
+// Collect signatures and vote, spread the vote
+func (sm *SyncManager) CollectVotes(sign *wire.MsgSign, candidate *wire.MsgCandidate) {
+	// 查看之前是否收到过该签名投票
+	// Check to see if you have received the signature vote before
+	if preventRepeatSign(sign.BlockHeaderHash, sign.PublicKey) {
+
+		// 验证签名
+		// Verify the signature
+		signature, err := btcec.ParseSignature(sign.Signature.CloneBytes(), btcec.S256())
+		if err != nil {
+			log.Errorf("Parse error: %s", err)
+		}
+		pubKey, err := btcec.ParsePubKey(sign.PublicKey.CloneBytes(), btcec.S256())
+		if err != nil {
+			log.Errorf("Parse error: %s", err)
+		}
+		hash := sign.BlockHeaderHash.CloneBytes()
+		if signature.Verify(hash, pubKey) {
+
+			// 查看weight是否符合
+			// Check whether weight is consistent
+			signBytes := sign.Signature.CloneBytes()
+			weight := chainhash.DoubleHashB(signBytes)
+			bigWeight := new(big.Int).SetBytes(weight)
+			voteVerge := vote.VotesVerge(candidate.Header.Scale)
+			// weight值小于voteVerge，此节点有投票权
+			// Weight is less than the voteVerge, this node has the right to vote
+			if bigWeight.Cmp(voteVerge) <= 0 {
+
+				// 维护本地票池
+				// Maintain local ticket pool
+				signAndKey := vote.SignAndKey{
+					Signature: sign.Signature,
+					PublicKey: sign.PublicKey,
+				}
+				vote.RWSyncMutex.RLock()
+				ticketPool := vote.GetTicketPool()
+				ticketPool[sign.BlockHeaderHash] = append(ticketPool[sign.BlockHeaderHash], signAndKey)
+				vote.SetTicketPool(ticketPool)
+				vote.RWSyncMutex.RUnlock()
+
+				// 收到的投票的前置块hash值跟本节点的前置hash值一样，传播该投票信息
+				// The leading block hash value for the poll received is the same as the leading hash value for the node, and the poll is propagated
+				lastCandidate := sm.chain.BestLastCandidate()
+
+				if candidate.Header.PrevBlock == lastCandidate.Hash {
+
+					bo, err := sm.SendSign(sign)
+					if err != nil || !bo {
+						log.Errorf("Failed to send sign message: %v", err)
+					}
+				}
+			}
+		}
+	}
+}
+
+// 避免重复收集投票，如果没有重复，返回true
+// Avoid duplicate voting or multiple records voting records, if no repeat, return true
+func preventRepeatSign(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash33) bool {
+
+	// 查看签名池里是否有该投票节点的投票
+	// Check the signature pool for the vote node
+	for headerHash, signAndKeys := range vote.GetTicketPool() {
+		if headerHash == blockHeaderHash {
+			// 遍历收到的区块所有的签名公钥
+			// Iterates through all the signed public keys of the received block
+			for _, signAndKey := range signAndKeys {
+				if publicKey == signAndKey.PublicKey {
+					// 之前已经收到过该投票，不收集不传播，返回false
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
 // fetchHeaderBlocks创建一个请求，并向syncPeer发送一个请求，根据当前头列表下载下一个块列表。
 // fetchHeaderBlocks creates and sends a request to the syncPeer for the next
 // list of blocks to be downloaded based on the current list of headers.
@@ -1352,6 +1463,10 @@ out:
 				sm.handleCadidateMsg(msg)
 				msg.reply <- struct{}{}
 
+			case *signMsg:
+				sm.handleSignMsg(msg)
+				msg.reply <- struct{}{}
+
 			case *invMsg:
 				sm.handleInvMsg(msg)
 
@@ -1410,12 +1525,32 @@ out:
 // 处理投票结果，是个独立线程
 // Processing the poll result is a separate thread
 func (sm *SyncManager) VoteHandle() {
-	creationTime := cpuminer.GetCreationTime()
-	blockHeight := cpuminer.GetBlockHeight()
+
+	// 等待同步完成
+	// Wait for synchronization to complete
+	openTime := time.NewTimer(time.Second)
+out:
+	for {
+		select {
+		case <-openTime.C:
+
+		case <-vote.Open:
+			openTime.Stop()
+			break out
+		}
+	}
+
+	// 创世时间
+	// creation time
+	creationTime := chaincfg.MainNetParams.GenesisBlock.Header.Timestamp
+	// 同步的最新块时间
+	// the latest block time for synchronization
+	bestLastCandidate := sm.chain.BestLastCandidate()
+	blockHeight := bestLastCandidate.Height
 
 	// 根据最新块，计算10秒发块定时器启动的时间
 	// According to the latest block, calculate the start time of the 10-second block timer
-	laterTime := creationTime.Add(blockHeight*cpuminer.BlockTimeInterval + 20*time.Second)
+	laterTime := creationTime.Add(vote.BlockTimeInterval*time.Duration(blockHeight) + 20*time.Second)
 	nowTime := time.Now()
 	t := time.NewTimer(laterTime.Sub(nowTime))
 	<-t.C
@@ -1423,7 +1558,7 @@ func (sm *SyncManager) VoteHandle() {
 
 	// 处理当前轮的写块和投票
 	// Handles write blocks and polls for the current round
-	cpuminer.VoteProcess()
+	sm.voteProcess()
 
 	// 10秒处理一波投票结果
 	// Process one wave of voting results 10 second
@@ -1431,9 +1566,39 @@ func (sm *SyncManager) VoteHandle() {
 	for {
 		select {
 		case <-handlingTime.C:
-			cpuminer.VoteProcess()
+			sm.voteProcess()
 		}
 	}
+}
+
+// 投票时间到，选出获胜区块上链，处理票池
+// When it's time to vote, select the winner on the blockChain and process the pool of votes
+func (sm *SyncManager) voteProcess() {
+	blockHeaderHash, _ := cpuminer.GetMaxVotes()
+
+	msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
+
+	// 写入最佳候选块，做为下轮发块的依据
+	sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header.Signature, msgCandidate.Header.Timestamp)
+
+	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
+	hash := blockchain.GetBestPointBlockH()
+	prevCandidate := blockchain.PrevCandidatePool[hash]
+	msgBlock := drcutil.MsgCandidateToBlock(prevCandidate)
+	block := drcutil.NewBlockFromBlockAndBytes(msgBlock, nil)
+	sm.chain.ProcessBlock(block, blockchain.BFNone)
+
+	// 本轮投票结束，当前票池变成上一轮票池
+	vote.RWSyncMutex.RLock()
+	ticketPool := vote.GetTicketPool()
+	vote.SetPrevTicketPool(ticketPool)
+	// 清空当前票池票池
+	vote.SetTicketPool(make(map[chainhash.Hash][]vote.SignAndKey))
+
+	// 通知开始新一轮挖块
+	vote.Work = true
+
+	vote.RWSyncMutex.RUnlock()
 }
 
 // handleblockchain通知处理来自区块链的通知。它做的事情包括请求孤立块父块和将接受的块转发给连接的对等点。
@@ -1575,6 +1740,16 @@ func (sm *SyncManager) QueueCandidate(block *drcutil.Block, peer *peerpkg.Peer, 
 	}
 
 	sm.msgChan <- &candidateMsg{block: block, peer: peer, reply: done, cpuMiner: m}
+}
+
+func (sm *SyncManager) QueueSign(msg *wire.MsgSign, peer *peerpkg.Peer, done chan struct{}) {
+	// Don't accept more blocks if we're shutting down.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		done <- struct{}{}
+		return
+	}
+
+	sm.msgChan <- &signMsg{sign: msg, peer: peer, reply: done}
 }
 
 // QueueInv将传递的inv消息和对等点添加到块处理队列中。
