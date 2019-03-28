@@ -113,7 +113,8 @@ func (b *BlockChain) setBlock(hash *chainhash.Hash, block *wire.MsgBlock) bool {
 // newBestState为给定的参数返回一个新的best stats实例。
 // newBestState returns a new best stats instance for the given parameters.
 func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
-	totalTxns uint64, signature chainhash.Hash64, pubKey chainhash.Hash33, scale uint16, reserved uint16, medianTime time.Time) *BestState {
+	totalTxns uint64, signature chainhash.Hash64, pubKey chainhash.Hash33,
+	scale uint16, reserved uint16, medianTime time.Time, votes uint16) *BestState {
 
 	return &BestState{
 		Hash:        node.hash,
@@ -127,6 +128,7 @@ func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
 		PubKey:      pubKey,
 		Scale:       scale,
 		Reserved:    reserved,
+		Votes:       votes,
 	}
 }
 
@@ -653,7 +655,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 		// 如果有未知的新规则即将激活或已经激活，则发出警告。
 		// Warn if any unknown new rules are either about to activate or
 		// have already been activated.
-		wire.ChangeCode() // 修改blockNode存储
 		if err := b.warnUnknownRuleActivations(node); err != nil {
 			return err
 		}
@@ -690,7 +691,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 
 	// 添加signature和pubKey
 	state := newBestState(node, blockSize, blockWeight, numTxns,
-		curTotalTxns+numTxns, signature, pubKey, scale, reserved, node.CalcPastMedianTime())
+		curTotalTxns+numTxns, signature, pubKey, scale, reserved, node.CalcPastMedianTime(), block.Votes)
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
@@ -816,7 +817,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *drcutil.Block, view
 	reserved := block.MsgBlock().Header.Reserved
 
 	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
-		newTotalTxns, signature, pubKey, scale, reserved, prevNode.CalcPastMedianTime())
+		newTotalTxns, signature, pubKey, scale, reserved, prevNode.CalcPastMedianTime(), block.Votes)
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.

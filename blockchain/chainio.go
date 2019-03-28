@@ -1047,7 +1047,8 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState) error {
 		signature: snapshot.Signature,
 		pubKey:    snapshot.PubKey,
 		scale:     snapshot.Scale,
-		reserved:  snapshot.reserved,
+		reserved:  snapshot.Reserved,
+		votes:     snapshot.Votes,
 	})
 
 	// Store the current best chain state into the database.
@@ -1084,7 +1085,7 @@ func (b *BlockChain) createChainState() error {
 	reserved := genesisBlock.MsgBlock().Header.Reserved
 
 	b.stateSnapshot = newBestState(node, blockSize, blockWeight, numTxns,
-		numTxns, sign, pubKey, scale, reserved, time.Unix(node.timestamp, 0))
+		numTxns, sign, pubKey, scale, reserved, time.Unix(node.timestamp, 0), 1)
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
@@ -1327,10 +1328,9 @@ func (b *BlockChain) initChainState() error {
 		blockWeight := uint64(GetBlockWeight(drcutil.NewBlock(&block)))
 		numTxns := uint64(len(block.Transactions))
 
-		wire.ChangeCode()
 		// tip 作为blockNode添加sign和pk
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
-			numTxns, state.totalTxns, tip.signature, tip.publicKey, tip.scale, tip.reserved, tip.CalcPastMedianTime())
+			numTxns, state.totalTxns, tip.signature, tip.publicKey, tip.scale, tip.reserved, tip.CalcPastMedianTime(), tip.Votes)
 
 		return nil
 	})
@@ -1439,7 +1439,11 @@ func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	if err != nil {
 		return err
 	}
-	w.WriteByte(byte(node.votes))
+	var buf []byte
+	buf = make([]byte, 8)
+	votes := buf[:8][:2]
+	byteOrder.PutUint16(votes, node.Votes)
+	_, err = w.Write(votes)
 	if err != nil {
 		return err
 	}

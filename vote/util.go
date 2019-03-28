@@ -22,7 +22,6 @@ const (
 )
 
 var (
-	//Pi   *big.Int
 	Work bool
 	Open = make(chan bool)
 

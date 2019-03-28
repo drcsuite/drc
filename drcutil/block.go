@@ -210,6 +210,9 @@ func (b *Block) TxHash(txNum int) (*chainhash.Hash, error) {
 	return tx.Hash(), nil
 }
 
+// TxLoc返回原始块中每个事务的偏移量和长度。
+//它用于允许对原始字节中的事务进行快速索引
+//流。
 // TxLoc returns the offsets and lengths of each transaction in a raw block.
 // It is used to allow fast indexing into transactions within the raw byte
 // stream.

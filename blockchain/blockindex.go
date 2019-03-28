@@ -131,7 +131,7 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 		publicKey:  blockHeader.PublicKey,
 		scale:      blockHeader.Scale,
 		reserved:   blockHeader.Reserved,
-		votes:      votes,
+		Votes:      votes,
 	}
 	if parent != nil {
 		node.parent = parent
