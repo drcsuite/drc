@@ -109,6 +109,11 @@ type Config struct {
 	// for incoming connections.
 	Listeners []net.Listener
 
+	// OnAccept是一个回调函数，它在入站连接被触发时触发
+	//接受。关闭连接是调用者的责任。
+	//关闭连接失败将导致连接管理器
+	//认为这种联系仍然活跃，因此不受欢迎
+	//副作用，例如仍然计算最大连接限制。
 	// OnAccept is a callback that is fired when an inbound connection is
 	// accepted.  It is the caller's responsibility to close the connection.
 	// Failure to close the connection will result in the connection manager
