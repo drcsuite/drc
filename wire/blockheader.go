@@ -106,7 +106,6 @@ func (h *BlockHeader) Serialize(w io.Writer) error {
 func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash, signature *chainhash.Hash64, publickey *chainhash.Hash33,
 	scale uint16, reserved uint16) *BlockHeader {
 
-	ChangeCode()
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
 	return &BlockHeader{

@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/drcsuite/drc/wire"
 	"io"
 	"net"
 	"os"
@@ -474,6 +475,7 @@ func loadConfig() (*config, []string, error) {
 	if !(preCfg.RegressionTest || preCfg.SimNet) || preCfg.ConfigFile !=
 		defaultConfigFile {
 
+		fmt.Println("config: ", preCfg)
 		if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
 			err := createDefaultConfigFile(preCfg.ConfigFile)
 			if err != nil {
@@ -864,7 +866,9 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
+	// 检查挖掘地址是否有效，并保存已解析的版本。
 	// Check mining addresses are valid and saved parsed versions.
+	wire.ChangeCode("loadConfig")
 	cfg.miningAddrs = make([]drcutil.Address, 0, len(cfg.MiningAddrs))
 	for _, strAddr := range cfg.MiningAddrs {
 		addr, err := drcutil.DecodeAddress(strAddr, activeNetParams.Params)
@@ -885,6 +889,7 @@ func loadConfig() (*config, []string, error) {
 		cfg.miningAddrs = append(cfg.miningAddrs, addr)
 	}
 
+	// 确保在设置generate标志时至少有一个挖掘地址。
 	// Ensure there is at least one mining address when the generate flag is
 	// set.
 	if cfg.Generate && len(cfg.MiningAddrs) == 0 {

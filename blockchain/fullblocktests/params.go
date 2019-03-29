@@ -38,10 +38,6 @@ func fromHex(s string) []byte {
 	return r
 }
 
-func change1() {
-	wire.ChangeCode()
-}
-
 var (
 	// bigOne is 1 represented as a big.Int.  It is defined here to avoid
 	// the overhead of creating it multiple times.

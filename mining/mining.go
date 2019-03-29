@@ -847,7 +847,7 @@ mempoolLoop:
 	// Calculate the required difficulty for the block.  The timestamp
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
-	wire.ChangeCode()
+	wire.ChangeCode("NewBlockTemplete")
 	// 在header中加入publickey
 	ts := medianAdjustedTime(best, g.timeSource)
 	//reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
@@ -934,7 +934,7 @@ func (g *BlkTmplGenerator) UpdateBlockTime(msgBlock *wire.MsgCandidate) error {
 	// The new timestamp is potentially adjusted to ensure it comes after
 	// the median time of the last several blocks per the chain consensus
 	// rules.
-	wire.ChangeCode()
+	wire.ChangeCode("UpdateBlockTime")
 	newTime := medianAdjustedTime(g.chain.BestLastCandidate(), g.timeSource)
 	msgBlock.Header.Timestamp = newTime
 

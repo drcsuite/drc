@@ -809,7 +809,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *drcutil.Block, view
 	blockWeight := uint64(GetBlockWeight(prevBlock))
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
 
-	wire.ChangeCode()
+	wire.ChangeCode("disconnectBlock")
 	// 添加signature和pubKey
 	pubKey := block.MsgBlock().Header.PublicKey
 	signature := block.MsgBlock().Header.Signature
@@ -1318,7 +1318,7 @@ func (b *BlockChain) isCurrent() bool {
 	// Not current if the latest main (best) chain height is before the
 	// latest known good checkpoint (when checkpoints are enabled).
 
-	wire.ChangeCode()
+	wire.ChangeCode("isCurrent")
 	//checkpoint := b.LatestCheckpoint()
 	//if checkpoint != nil && b.bestChain.Tip().height < checkpoint.Height {
 	//	return false
@@ -1764,7 +1764,7 @@ func (b *BlockChain) LocateHeaders(locator BlockLocator, hashStop *chainhash.Has
 }
 
 func (b *BlockChain) GetBlockIndex() *blockIndex {
-	wire.ChangeCode()
+	wire.ChangeCode("GetBlockIndex")
 	return b.index
 }
 
@@ -1875,7 +1875,7 @@ func New(config *Config) (*BlockChain, error) {
 	// Generate a checkpoint by height map from the provided checkpoints
 	// and assert the provided checkpoints are sorted by height as required.
 	//var checkpointsByHeight map[int32]*chaincfg.Checkpoint
-	wire.ChangeCode()
+	wire.ChangeCode("NewBlockChain")
 	//var prevCheckpointHeight int32
 	//if len(config.Checkpoints) > 0 {
 	//	checkpointsByHeight = make(map[int32]*chaincfg.Checkpoint)

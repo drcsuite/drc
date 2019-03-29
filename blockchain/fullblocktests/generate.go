@@ -335,7 +335,6 @@ func calcMerkleRoot(txns []*wire.MsgTx) chainhash.Hash {
 // so the 'nextBlock' function can properly detect when a nonce was modified by
 // a munge function.
 func solveBlock(header *wire.BlockHeader) bool {
-	wire.ChangeCode()
 	// sbResult is used by the solver goroutines to send results.
 	type sbResult struct {
 		found bool
@@ -530,7 +529,7 @@ func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, mungers
 		ts = g.tip.Header.Timestamp.Add(time.Second)
 	}
 
-	wire.ChangeCode()
+	wire.ChangeCode("nextBlock")
 	block := wire.MsgBlock{
 		Header: wire.BlockHeader{
 			Version:    1,

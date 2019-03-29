@@ -331,7 +331,7 @@ func CheckTransactionSanity(tx *drcutil.Tx) error {
 //    difficulty is not performed.
 func checkProofOfWork(header *wire.BlockHeader, powLimit *big.Int, flags BehaviorFlags) error {
 	// The target difficulty must be larger than zero.
-	wire.ChangeCode()
+	wire.ChangeCode("checkProofOfWork")
 	//target := CompactToBig(header.Bits)
 	//if target.Sign() <= 0 {
 	//	str := fmt.Sprintf("block target difficulty of %064x is too low",
@@ -830,7 +830,7 @@ func checkSerializedHeight(coinbaseTx *drcutil.Tx, wantHeight int32) error {
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode *blockNode, flags BehaviorFlags) error {
 	//fastAdd := flags&BFFastAdd == BFFastAdd
-	wire.ChangeCode()
+	wire.ChangeCode("checkBlockHeaderContext")
 	prevSignB := prevNode.signature.CloneBytes()
 	seed := chainhash.DoubleHashB(prevSignB)
 	signB := header.Signature.CloneBytes()
@@ -850,9 +850,8 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	votes, scales := make([]uint16, 0), make([]uint16, 0)
 	for i := 0; i < 10; i++ {
 		// 添加每个节点实际收到的票数和当时估算值
-		wire.ChangeCode()
 		scales = append(scales, prevNode.Header().Scale)
-		votes = append(votes, prevNode.Header().Scale)
+		votes = append(votes, prevNode.Votes)
 		prevNode = prevNode.Ancestor(1)
 		if prevNode == nil {
 			break

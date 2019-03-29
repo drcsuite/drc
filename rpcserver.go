@@ -1118,7 +1118,6 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 
 	params := s.cfg.ChainParams
 	blockHeader := &blk.MsgBlock().Header
-	wire.ChangeCode()
 	blockReply := btcjson.GetBlockVerboseResult{
 		Hash:         c.Hash,
 		Version:      blockHeader.Version,
@@ -1363,7 +1362,6 @@ func handleGetBlockHeader(s *rpcServer, cmd interface{}, closeChan <-chan struct
 	}
 
 	//params := s.cfg.ChainParams
-	wire.ChangeCode()
 	blockHeaderReply := btcjson.GetBlockHeaderVerboseResult{
 		Hash:          c.Hash,
 		Confirmations: int64(1 + best.Height - blockHeight),
@@ -1579,7 +1577,6 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		//}
 		//template = blkTemplate
 		msgBlock = template.Block
-		wire.ChangeCode()
 		//targetDifficulty = fmt.Sprintf("%064x",
 		//	blockchain.CompactToBig(msgBlock.Header.Bits))
 
@@ -1640,7 +1637,6 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 
 		// Set locals for convenience.
 		msgBlock = template.Block
-		wire.ChangeCode()
 		//targetDifficulty = fmt.Sprintf("%064x",
 		//	blockchain.CompactToBig(msgBlock.Header.Bits))
 
@@ -1738,7 +1734,6 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 	// implied by the included or omission of fields:
 	//  Including MinTime -> time/decrement
 	//  Omitting CoinbaseTxn -> coinbase, generation
-	wire.ChangeCode()
 	//targetDifficulty := fmt.Sprintf("%064x", blockchain.CompactToBig(header.Bits))
 	templateID := encodeTemplateID(state.prevHash, state.lastGenerated)
 	reply := btcjson.GetBlockTemplateResult{
@@ -2457,7 +2452,6 @@ func handleGetNetworkHashPS(s *rpcServer, cmd interface{}, closeChan <-chan stru
 			minTimestamp = header.Timestamp
 			maxTimestamp = minTimestamp
 		} else {
-			wire.ChangeCode()
 			//totalWork.Add(totalWork, blockchain.CalcWork(header.Bits))
 
 			if minTimestamp.After(header.Timestamp) {

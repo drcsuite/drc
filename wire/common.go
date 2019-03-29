@@ -743,8 +743,8 @@ func RandomUint64() (uint64, error) {
 	return randomUint64(rand.Reader)
 }
 
-func ChangeCode() {
-	fmt.Println("此处已修改")
+func ChangeCode(n string) {
+	fmt.Println(n, "此处已修改")
 }
 
 func TestChangeCode() {

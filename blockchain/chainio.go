@@ -1077,7 +1077,7 @@ func (b *BlockChain) createChainState() error {
 	blockSize := uint64(genesisBlock.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(genesisBlock))
 
-	wire.ChangeCode()
+	wire.ChangeCode("createChainState")
 	// 为创世块添加pk和sign
 	sign := genesisBlock.MsgBlock().Header.Signature
 	pubKey := genesisBlock.MsgBlock().Header.PublicKey
@@ -1348,7 +1348,7 @@ func (b *BlockChain) initChainState() error {
 // deserializeBlockRow parses a value in the block index bucket into a block
 // header and block status bitfield.
 func deserializeBlockRow(blockRow []byte) (*wire.BlockHeader, blockStatus, uint16, error) {
-	wire.ChangeCode()
+	wire.ChangeCode("deserializeBlockRow")
 	buffer := bytes.NewReader(blockRow)
 
 	var header wire.BlockHeader

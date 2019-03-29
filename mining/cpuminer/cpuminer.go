@@ -225,7 +225,6 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 // new transactions and enough time has elapsed without finding a solution.
 func (m *CPUMiner) solveBlock(msgBlock *wire.MsgCandidate,
 	ticker *time.Ticker, quit chan struct{}) bool {
-	wire.ChangeCode()
 
 	// Choose a random extra nonce offset for this block template and
 	// worker.
@@ -460,7 +459,6 @@ out:
 func (m *CPUMiner) miningWorkerController() {
 	// launchWorkers groups common code to launch a specified number of
 	// workers for generating blocks.
-	wire.ChangeCode()
 	var runningWorkers []chan struct{}
 	launchWorkers := func(numWorkers uint32) {
 		for i := uint32(0); i < numWorkers; i++ {
@@ -648,7 +646,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 
 	m.speedMonitorQuit = make(chan struct{})
 	m.wg.Add(1)
-	wire.ChangeCode()
+	wire.ChangeCode("GenerateNBlocks")
 	//go m.speedMonitor()
 
 	m.Unlock()
@@ -728,7 +726,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 // Use Start to begin the mining process.  See the documentation for CPUMiner
 // type for more details.
 func New(cfg *Config) *CPUMiner {
-	wire.ChangeCode()
+	wire.ChangeCode("NewCpuMiner")
 	// 生成公私钥，放入cpuminer
 	privKey, err := btcec.NewPrivateKey(btcec.S256())
 	if err != nil {

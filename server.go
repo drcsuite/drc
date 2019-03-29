@@ -2445,6 +2445,7 @@ func (s *server) Start() {
 
 	// Start the CPU miner if generation is enabled.
 	if cfg.Generate {
+		fmt.Println("开始发块")
 		s.cpuMiner.Start()
 	}
 }
