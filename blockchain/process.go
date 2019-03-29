@@ -9,6 +9,8 @@ import (
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/database"
 	"github.com/drcsuite/drc/drcutil"
+	"github.com/drcsuite/drc/vote"
+	"github.com/drcsuite/drc/wire"
 )
 
 // behavior flags是一个位掩码，它定义了在执行链处理和一致规则检查时对正常行为的调整。
@@ -28,9 +30,34 @@ const (
 	// not be performed.
 	BFNoPoWCheck
 
+	// BFNone是一个方便的值，专门指出没有标志。
 	// BFNone is a convenience value to specifically indicate no flags.
 	BFNone BehaviorFlags = 0
 )
+
+var (
+	// 前一轮块池
+	PrevCandidatePool map[chainhash.Hash]*wire.MsgCandidate
+	// 当前轮块池
+	CurrentCandidatePool map[chainhash.Hash]*wire.MsgCandidate
+
+	// 当前轮指向池
+	CurrentPointPool map[chainhash.Hash][]*wire.MsgCandidate
+)
+
+// 获取当前轮块池，多数指向的前一轮块的Hash
+func GetBestPointBlockH() chainhash.Hash {
+	var bestHash chainhash.Hash
+	best := 0
+	for k, v := range CurrentPointPool {
+		l := len(v)
+		if l > best {
+			best = l
+			bestHash = k
+		}
+	}
+	return bestHash
+}
 
 // block exists确定具有给定散列的块是否存在于主链或任何侧链中。
 // blockExists determines whether a block with the given hash exists either in
@@ -71,6 +98,24 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 	return exists, err
 }
 
+func (b *BlockChain) PrevCandidateExists(hash *chainhash.Hash) bool {
+	// Check in the database.
+	exist := PrevCandidatePool[*hash]
+	if exist != nil {
+		return true
+	}
+	return false
+}
+
+func (b *BlockChain) CandidateExists(hash *chainhash.Hash) bool {
+	// Check in the database.
+	exist := CurrentCandidatePool[*hash]
+	if exist != nil {
+		return true
+	}
+	return false
+}
+
 //确定是否存在依赖于传递的块散列的孤子(如果为真，则不再是孤子)，并可能接受它们。
 // processOrphans determines if there are any orphans which depend on the passed
 // block hash (they are no longer orphans if true) and potentially accepts them.
@@ -93,6 +138,10 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 		processHashes[0] = nil // Prevent GC leak.
 		processHashes = processHashes[1:]
 
+		// 看看我们刚刚接收的街区里所有的孤块。
+		// 这通常只会是一个，但是如果同时挖掘和广播多个块，则可能是多个块。
+		// 工作证明最多的人最终会胜出。
+		// 这里有意在一个范围上使用循环索引，因为范围不会在每次迭代时重新评估片，也不会调整修改片的索引。
 		// Look up all orphans that are parented by the block we just
 		// accepted.  This will typically only be one, but it could
 		// be multiple if multiple blocks are mined and broadcast
@@ -130,12 +179,14 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 	return nil
 }
 
-//ProcessBlock是处理将新块插入到块链中的主要工作部件。
+// ProcessBlock是处理将新块插入到块链中的主要工作部件。
+// 它包括拒绝重复块、确保块遵循所有规则、孤立处理和插入到块链以及最佳链选择和重组等功能。
 // ProcessBlock is the main workhorse for handling insertion of new blocks into
 // the block chain.  It includes functionality such as rejecting duplicate
 // blocks, ensuring blocks follow all rules, orphan handling, and insertion into
 // the block chain along with best chain selection and reorganization.
 //
+// 当处理过程中没有发生错误时，第一个返回值指示该块是否在主链上，第二个返回值指示该块是否是孤儿。
 // When no errors occurred during processing, the first return value indicates
 // whether or not the block is on the main chain and the second indicates
 // whether or not the block is an orphan.
@@ -144,12 +195,12 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
-
 	//fastAdd := flags&BFFastAdd == BFFastAdd
 
 	blockHash := block.Hash()
 	log.Tracef("Processing block %v", blockHash)
 
+	// 该块不能已经存在于主链或侧链中。
 	// The block must not already exist in the main chain or side chains.
 	exists, err := b.blockExists(blockHash)
 	if err != nil {
@@ -160,16 +211,11 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 		return false, false, ruleError(ErrDuplicateBlock, str)
 	}
 
+	//该块不能作为孤儿存在。
 	// The block must not already exist as an orphan.
 	if _, exists := b.orphans[*blockHash]; exists {
 		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
 		return false, false, ruleError(ErrDuplicateBlock, str)
-	}
-
-	// Perform preliminary sanity checks on the block and its transactions.
-	err = checkBlockSanity(block, b.chainParams.PowLimit, b.timeSource, flags)
-	if err != nil {
-		return false, false, err
 	}
 
 	// Find the previous checkpoint and perform some additional checks based
@@ -179,40 +225,6 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 	// used to eat memory, and ensuring expected (versus claimed) proof of
 	// work requirements since the previous checkpoint are met.
 	blockHeader := &block.MsgBlock().Header
-	//checkpointNode, err := b.findPreviousCheckpoint()
-	//if err != nil {
-	//	return false, false, err
-	//}
-	//if checkpointNode != nil {
-	//	// Ensure the block timestamp is after the checkpoint timestamp.
-	//	checkpointTime := time.Unix(checkpointNode.timestamp, 0)
-	//	if blockHeader.Timestamp.Before(checkpointTime) {
-	//		str := fmt.Sprintf("block %v has timestamp %v before "+
-	//			"last checkpoint timestamp %v", blockHash,
-	//			blockHeader.Timestamp, checkpointTime)
-	//		return false, false, ruleError(ErrCheckpointTimeTooOld, str)
-	//	}
-	//	if !fastAdd {
-	//		wire.ChangeCode()
-	//		// Even though the checks prior to now have already ensured the
-	//		// proof of work exceeds the claimed amount, the claimed amount
-	//		// is a field in the block header which could be forged.  This
-	//		// check ensures the proof of work is at least the minimum
-	//		// expected based on elapsed time since the last checkpoint and
-	//		// maximum adjustment allowed by the retarget rules.
-	//		//duration := blockHeader.Timestamp.Sub(checkpointTime)
-	//		//requiredTarget := CompactToBig(b.calcEasiestDifficulty(
-	//		//	checkpointNode.bits, duration))
-	//		//currentTarget := CompactToBig(blockHeader.Bits)
-	//		//if currentTarget.Cmp(requiredTarget) > 0 {
-	//		//	str := fmt.Sprintf("block target difficulty of %064x "+
-	//		//		"is too low when compared to the previous "+
-	//		//		"checkpoint", currentTarget)
-	//		//	return false, false, ruleError(ErrDifficultyTooLow, str)
-	//		//}
-	//	}
-	//}
-
 	// Handle orphan blocks.
 	prevHash := &blockHeader.PrevBlock
 	prevHashExists, err := b.blockExists(prevHash)
@@ -226,6 +238,16 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 		return false, true, nil
 	}
 
+	//对块及其事务执行初步的完整性检查。
+	// Perform preliminary sanity checks on the block and its transactions.
+	node := b.index.LookupNode(prevHash)
+	seed := chainhash.DoubleHashH(node.signature.CloneBytes())
+	Pi := vote.BlockVerge(blockHeader.Scale)
+	err = checkBlockSanity(block, &seed, Pi, b.timeSource) // seed pi
+	if err != nil {
+		return false, false, err
+	}
+
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
 	isMainChain, err := b.maybeAcceptBlock(block, flags)
@@ -233,15 +255,94 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 		return false, false, err
 	}
 
+	// 接受任何依赖于此块的孤立块(它们确实如此)
+	// 不再是孤儿)，并重复这些接受街区，直到
+	// 没有了。
 	// Accept any orphan blocks that depend on this block (they are
 	// no longer orphans) and repeat for those accepted blocks until
 	// there are no more.
-	err = b.processOrphans(blockHash, flags)
-	if err != nil {
-		return false, false, err
-	}
+	//err = b.processOrphans(blockHash, flags)
+	//if err != nil {
+	//	return false, false, err
+	//}
 
 	log.Debugf("Accepted block %v", blockHash)
 
 	return isMainChain, false, nil
+}
+
+// 处理发块阶段收到的块，并将该块放入块池和指向池
+func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags) (bool, error) {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	//fastAdd := flags&BFFastAdd == BFFastAdd
+
+	blockHash := block.CandidateHash()
+	log.Tracef("Processing block %v", blockHash)
+
+	// 该块不能已经存在于块池中
+	// The block must not already exist in the main chain or side chains.
+	exists := b.CandidateExists(blockHash)
+	if exists {
+		str := fmt.Sprintf("already have block %v", blockHash)
+		return false, ruleError(ErrDuplicateBlock, str)
+	}
+
+	//该块不能作为孤儿存在。
+	// The block must not already exist as an orphan.
+	if _, exists := b.orphans[*blockHash]; exists {
+		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
+		return false, ruleError(ErrDuplicateBlock, str)
+	}
+
+	//对块及其事务执行初步的完整性检查。
+	// Perform preliminary sanity checks on the block and its transactions.
+	seed := chainhash.DoubleHashH(b.BestLastCandidate().Header.Signature.CloneBytes())
+	// 计算Pi,阈值规模
+	votes, scales := make([]uint16, 0), make([]uint16, 0)
+	candidate := PrevCandidatePool[b.BestLastCandidate().Hash]
+	scales = append(scales, candidate.Header.Scale)
+	votes = append(votes, b.BestLastCandidate().Votes)
+	for i := 0; i < 9; i++ {
+		// 添加每个节点实际收到的票数和当时估算值
+		prevNode := b.GetBlockIndex().LookupNode(&candidate.Header.PrevBlock)
+		scales = append(scales, prevNode.Header().Scale)
+		votes = append(votes, prevNode.Votes)
+		prevNode = prevNode.Ancestor(1)
+		if prevNode == nil {
+			break
+		}
+	}
+	// 计算前十个块平均规模和weight
+	scale := vote.EstimateScale(votes, scales)
+	Pi := vote.BlockVerge(scale)
+	err := checkCandidateSanity(block, &seed, Pi, b.timeSource) // seed pi
+	if err != nil {
+		return false, err
+	}
+
+	// Find the previous checkpoint and perform some additional checks based
+	// on the checkpoint.  This provides a few nice properties such as
+	// preventing old side chain blocks before the last checkpoint,
+	// rejecting easy to mine, but otherwise bogus, blocks that could be
+	// used to eat memory, and ensuring expected (versus claimed) proof of
+	// work requirements since the previous checkpoint are met.
+	blockHeader := &block.MsgCandidate().Header
+
+	// 处理该块前项块
+	prevHash := &blockHeader.PrevBlock
+	prevHashExists := b.PrevCandidateExists(prevHash)
+	if !prevHashExists {
+		str := fmt.Sprintf("The preceding block of this block does not exist: %v", blockHash)
+		return false, ruleError(ErrDuplicateBlock, str)
+	}
+
+	// 加入指向池 和 当前块池
+	CurrentCandidatePool[*blockHash] = block.MsgCandidate()
+	points := CurrentPointPool[*blockHash]
+	points = append(points, block.MsgCandidate())
+	log.Debugf("Accepted block %v", blockHash)
+
+	return true, nil
 }

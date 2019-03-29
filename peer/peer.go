@@ -124,6 +124,12 @@ type MessageListeners struct {
 	// OnBlock is invoked when a peer receives a block bitcoin message.
 	OnBlock func(p *Peer, msg *wire.MsgBlock, buf []byte)
 
+	OnCandidate func(p *Peer, msg *wire.MsgCandidate, buf []byte)
+
+	// 当对等方接收到签名消息时调用它。
+	// OnSign is invoked when a peer receives a signed message.
+	OnSign func(p *Peer, msg *wire.MsgSign)
+
 	// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
 	OnCFilter func(p *Peer, msg *wire.MsgCFilter)
 
@@ -489,6 +495,7 @@ func (p *Peer) String() string {
 	return fmt.Sprintf("%s (%s)", p.addr, directionString(p.inbound))
 }
 
+// UpdateLastBlockHeight更新对等点的最后一个已知块。
 // UpdateLastBlockHeight updates the last known block for the peer.
 //
 // This function is safe for concurrent access.
@@ -1388,6 +1395,7 @@ out:
 		switch msg := rmsg.(type) {
 		case *wire.MsgVersion:
 			// Limit to one version message per peer.
+			// 每个对等点限制一个版本消息。
 			p.PushRejectMsg(msg.Command(), wire.RejectDuplicate,
 				"duplicate version message", nil, true)
 			break out
@@ -1448,6 +1456,16 @@ out:
 		case *wire.MsgBlock:
 			if p.cfg.Listeners.OnBlock != nil {
 				p.cfg.Listeners.OnBlock(p, msg, buf)
+			}
+
+		case *wire.MsgCandidate:
+			if p.cfg.Listeners.OnCandidate != nil {
+				p.cfg.Listeners.OnCandidate(p, msg, buf)
+			}
+
+		case *wire.MsgSign:
+			if p.cfg.Listeners.OnSign != nil {
+				p.cfg.Listeners.OnSign(p, msg)
 			}
 
 		case *wire.MsgInv:
@@ -1907,6 +1925,7 @@ func (p *Peer) Disconnect() {
 	close(p.quit)
 }
 
+// 等待来自远程对等点的下一条消息。
 // readRemoteVersionMsg waits for the next message to arrive from the remote
 // peer.  If the next message is not a version message or the version is not
 // acceptable then return an error.
@@ -1917,6 +1936,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 		return err
 	}
 
+	// 如果第一个消息不是版本消息，通知客户机并断开连接。
 	// Notify and disconnect clients if the first message is not a version
 	// message.
 	msg, ok := remoteMsg.(*wire.MsgVersion)
@@ -1928,11 +1948,13 @@ func (p *Peer) readRemoteVersionMsg() error {
 		return errors.New(reason)
 	}
 
+	// 检测自连接。
 	// Detect self connections.
 	if !allowSelfConns && sentNonces.Exists(msg.Nonce) {
 		return errors.New("disconnecting peer connected to self")
 	}
 
+	// 协商协议版本，并将服务设置为远程对等方所宣传的内容。
 	// Negotiate the protocol version and set the services to what the remote
 	// peer advertised.
 	p.flagsMtx.Lock()
@@ -1944,6 +1966,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 	log.Debugf("Negotiated protocol version %d for peer %s",
 		p.protocolVersion, p)
 
+	// 更新一组统计数据，包括基于块的统计数据和对等点的时间偏移量。
 	// Updating a bunch of stats including block based stats, and the
 	// peer's time offset.
 	p.statsMtx.Lock()
@@ -1952,12 +1975,14 @@ func (p *Peer) readRemoteVersionMsg() error {
 	p.timeOffset = msg.Timestamp.Unix() - time.Now().Unix()
 	p.statsMtx.Unlock()
 
+	// 设置对等方的ID、用户代理，并可能启用指定证人支持的标志。
 	// Set the peer's ID, user agent, and potentially the flag which
 	// specifies the witness support is enabled.
 	p.flagsMtx.Lock()
 	p.id = atomic.AddInt32(&nodeCount, 1)
 	p.userAgent = msg.UserAgent
 
+	// 确定对等方是否愿意接收带有事务的见证数据。
 	// Determine if the peer would like to receive witness data with
 	// transactions, or not.
 	if p.services&wire.SFNodeWitness == wire.SFNodeWitness {
@@ -1974,6 +1999,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 		p.wireEncoding = wire.WitnessEncoding
 	}
 
+	// 如果指定，调用回调
 	// Invoke the callback if specified.
 	if p.cfg.Listeners.OnVersion != nil {
 		rejectMsg := p.cfg.Listeners.OnVersion(p, msg)
@@ -1983,6 +2009,7 @@ func (p *Peer) readRemoteVersionMsg() error {
 		}
 	}
 
+	// 通知和断开具有太旧协议版本的客户机。
 	// Notify and disconnect clients that have a protocol version that is
 	// too old.
 	//
@@ -2076,6 +2103,7 @@ func (p *Peer) writeLocalVersionMsg() error {
 	return p.writeMessage(localVerMsg, wire.LatestEncoding)
 }
 
+// ateinboundprotocol等待从对等端接收一个版本消息，然后发送我们的版本消息。如果事件没有按该顺序发生，则返回一个错误。
 // negotiateInboundProtocol waits to receive a version message from the peer
 // then sends our version message. If the events do not occur in that order then
 // it returns an error.
@@ -2141,7 +2169,8 @@ func (p *Peer) start() error {
 	return nil
 }
 
-// AssociateConnection关联对等点。在对等点已连接时调用此函数将不起作用。
+// AssociateConnection关联对等点。
+// 在对等点已连接时调用此函数将不起作用。
 // AssociateConnection associates the given conn to the peer.   Calling this
 // function when the peer is already connected will have no effect.
 func (p *Peer) AssociateConnection(conn net.Conn) {
@@ -2225,6 +2254,7 @@ func newPeerBase(origCfg *Config, inbound bool) *Peer {
 	return &p
 }
 
+// NewInboundPeer返回一个新的入站比特币对等点。使用Start开始处理传入和传出的消息。
 // NewInboundPeer returns a new inbound bitcoin peer. Use Start to begin
 // processing incoming and outgoing messages.
 func NewInboundPeer(cfg *Config) *Peer {

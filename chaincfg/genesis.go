@@ -58,10 +58,10 @@ var genesisCoinbaseTx = wire.MsgTx{
 // genesisHash is the hash of the first block in the block chain for the main
 // network (genesis block).
 var genesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet happy.
-	0x6f, 0xe2, 0x8c, 0x0a, 0xb6, 0xf1, 0xb3, 0x72,
-	0xc1, 0xa6, 0xa2, 0x46, 0xae, 0x63, 0xf7, 0x4f,
-	0x93, 0x1e, 0x83, 0x65, 0xe1, 0x5a, 0x08, 0x9c,
-	0x68, 0xd6, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0xfe, 0xf9, 0xcd, 0xf0, 0x3f, 0x00, 0x80, 0x99,
+	0x24, 0xbf, 0xbc, 0x38, 0xed, 0x72, 0x16, 0xd4,
+	0xd8, 0xba, 0xde, 0x84, 0x32, 0x2d, 0x85, 0x46,
+	0x58, 0x9d, 0x83, 0xd6, 0xe0, 0x00, 0x99, 0xd9,
 })
 
 // genesisMerkleRoot is the hash of the first transaction in the genesis block
@@ -72,10 +72,6 @@ var genesisMerkleRoot = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet 
 	0x7f, 0xc8, 0x1b, 0xc3, 0x88, 0x8a, 0x51, 0x32,
 	0x3a, 0x9f, 0xb8, 0xaa, 0x4b, 0x1e, 0x5e, 0x4a,
 })
-
-func change1() {
-	wire.ChangeCode()
-}
 
 // genesisBlock定义了区块链的genesis区块，它作为主网络的公共事务分类账。
 // genesisBlock defines the genesis block of the block chain which serves as the
@@ -90,8 +86,6 @@ var genesisBlock = wire.MsgBlock{
 		PublicKey:  chainhash.Hash33{},       // 000000000000000000000000000000000000000000000000000000000000000000
 		Scale:      1,
 		Reserved:   0,
-		//Bits:       0x1d00ffff,               // 486604799 [00000000ffff0000000000000000000000000000000000000000000000000000]
-		//Nonce:      0x7c2bac1d,               // 2083236893
 	},
 	Transactions: []*wire.MsgTx{&genesisCoinbaseTx},
 }
@@ -109,10 +103,6 @@ var regTestGenesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet
 // block for the regression test network.  It is the same as the merkle root for
 // the main network.
 var regTestGenesisMerkleRoot = genesisMerkleRoot
-
-func chnage2() {
-	wire.ChangeCode()
-}
 
 // regTestGenesisBlock defines the genesis block of the block chain which serves
 // as the public transaction ledger for the regression test network.
@@ -142,10 +132,6 @@ var testNet3GenesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go ve
 // for the main network.
 var testNet3GenesisMerkleRoot = genesisMerkleRoot
 
-func change3() {
-	wire.ChangeCode()
-}
-
 // testNet3GenesisBlock defines the genesis block of the block chain which
 // serves as the public transaction ledger for the test network (version 3).
 var testNet3GenesisBlock = wire.MsgBlock{
@@ -173,10 +159,6 @@ var simNetGenesisHash = chainhash.Hash([chainhash.HashSize]byte{ // Make go vet 
 // block for the simulation test network.  It is the same as the merkle root for
 // the main network.
 var simNetGenesisMerkleRoot = genesisMerkleRoot
-
-func change4() {
-	wire.ChangeCode()
-}
 
 // simNetGenesisBlock defines the genesis block of the block chain which serves
 // as the public transaction ledger for the simulation test network.

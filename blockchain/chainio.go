@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"math/big"
+	"io"
 	"sync"
 	"time"
 
@@ -953,7 +953,11 @@ type bestChainState struct {
 	hash      chainhash.Hash
 	height    uint32
 	totalTxns uint64
-	workSum   *big.Int
+	scale     uint16
+	reserved  uint16
+	votes     uint16
+	signature chainhash.Hash64
+	pubKey    chainhash.Hash33
 }
 
 // serializeBestChainState返回所传递的块best chain状态的序列化。
@@ -961,9 +965,9 @@ type bestChainState struct {
 // chain state.  This is data to be stored in the chain state bucket.
 func serializeBestChainState(state bestChainState) []byte {
 	// Calculate the full size needed to serialize the chain state.
-	workSumBytes := state.workSum.Bytes()
-	workSumBytesLen := uint32(len(workSumBytes))
-	serializedLen := chainhash.HashSize + 4 + 8 + 4 + workSumBytesLen
+	//workSumBytes := state.workSum.Bytes()
+	//workSumBytesLen := uint32(len(workSumBytes))
+	serializedLen := chainhash.HashSize + 4 + 8 + 2 + 2 + 2 + chainhash.Hash64Size + chainhash.Hash33Size
 
 	// Serialize the chain state.
 	serializedData := make([]byte, serializedLen)
@@ -973,9 +977,16 @@ func serializeBestChainState(state bestChainState) []byte {
 	offset += 4
 	byteOrder.PutUint64(serializedData[offset:], state.totalTxns)
 	offset += 8
-	byteOrder.PutUint32(serializedData[offset:], workSumBytesLen)
-	offset += 4
-	copy(serializedData[offset:], workSumBytes)
+	byteOrder.PutUint16(serializedData[offset:], state.scale)
+	offset += 2
+	byteOrder.PutUint16(serializedData[offset:], state.reserved)
+	offset += 2
+	byteOrder.PutUint16(serializedData[offset:], state.votes)
+	offset += 2
+	copy(serializedData[offset:offset+chainhash.Hash64Size], state.signature[:])
+	offset += uint32(chainhash.Hash64Size)
+	copy(serializedData[offset:offset+chainhash.HashSize], state.pubKey[:])
+	offset += uint32(chainhash.Hash33Size)
 	return serializedData[:]
 }
 
@@ -986,7 +997,7 @@ func serializeBestChainState(state bestChainState) []byte {
 func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	// Ensure the serialized data has enough bytes to properly deserialize
 	// the hash, height, total transactions, and work sum length.
-	if len(serializedData) < chainhash.HashSize+16 {
+	if len(serializedData) < chainhash.HashSize+chainhash.Hash64Size+chainhash.Hash33Size+18 {
 		return bestChainState{}, database.Error{
 			ErrorCode:   database.ErrCorruption,
 			Description: "corrupt best chain state",
@@ -1000,33 +1011,44 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	offset += 4
 	state.totalTxns = byteOrder.Uint64(serializedData[offset : offset+8])
 	offset += 8
-	workSumBytesLen := byteOrder.Uint32(serializedData[offset : offset+4])
-	offset += 4
+	state.scale = byteOrder.Uint16(serializedData[offset : offset+2])
+	offset += 2
+	state.reserved = byteOrder.Uint16(serializedData[offset : offset+2])
+	offset += 2
+	state.votes = byteOrder.Uint16(serializedData[offset : offset+2])
+	offset += 2
+	copy(state.signature[:], serializedData[offset:offset+chainhash.Hash64Size])
+	offset += uint32(chainhash.Hash64Size)
+	copy(state.pubKey[:], serializedData[offset:offset+chainhash.Hash33Size])
+	offset += uint32(chainhash.Hash33Size)
 
 	// Ensure the serialized data has enough bytes to deserialize the work
 	// sum.
-	if uint32(len(serializedData[offset:])) < workSumBytesLen {
-		return bestChainState{}, database.Error{
-			ErrorCode:   database.ErrCorruption,
-			Description: "corrupt best chain state",
-		}
-	}
-	workSumBytes := serializedData[offset : offset+workSumBytesLen]
-	state.workSum = new(big.Int).SetBytes(workSumBytes)
-
+	//if uint32(len(serializedData[offset:])) < workSumBytesLen {
+	//	return bestChainState{}, database.Error{
+	//		ErrorCode:   database.ErrCorruption,
+	//		Description: "corrupt best chain state",
+	//	}
+	//}
+	//workSumBytes := serializedData[offset : offset+workSumBytesLen]
+	//state.workSum = new(big.Int).SetBytes(workSumBytes)
 	return state, nil
 }
 
 // dbPutBestState使用现有的数据库事务使用给定的参数更新最佳链状态。
 // dbPutBestState uses an existing database transaction to update the best chain
 // state with the given parameters.
-func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) error {
+func dbPutBestState(dbTx database.Tx, snapshot *BestState) error {
 	// Serialize the current best chain state.
 	serializedData := serializeBestChainState(bestChainState{
 		hash:      snapshot.Hash,
 		height:    uint32(snapshot.Height),
 		totalTxns: snapshot.TotalTxns,
-		workSum:   workSum,
+		signature: snapshot.Signature,
+		pubKey:    snapshot.PubKey,
+		scale:     snapshot.Scale,
+		reserved:  snapshot.Reserved,
+		votes:     snapshot.Votes,
 	})
 
 	// Store the current best chain state into the database.
@@ -1042,7 +1064,7 @@ func (b *BlockChain) createChainState() error {
 	genesisBlock := drcutil.NewBlock(b.chainParams.GenesisBlock)
 	genesisBlock.SetHeight(0)
 	header := &genesisBlock.MsgBlock().Header
-	node := newBlockNode(header, nil)
+	node := newBlockNode(header, nil, 1)
 	node.status = statusDataStored | statusValid
 	b.bestChain.SetTip(node)
 
@@ -1055,7 +1077,7 @@ func (b *BlockChain) createChainState() error {
 	blockSize := uint64(genesisBlock.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(genesisBlock))
 
-	wire.ChangeCode()
+	wire.ChangeCode("createChainState")
 	// 为创世块添加pk和sign
 	sign := genesisBlock.MsgBlock().Header.Signature
 	pubKey := genesisBlock.MsgBlock().Header.PublicKey
@@ -1063,7 +1085,7 @@ func (b *BlockChain) createChainState() error {
 	reserved := genesisBlock.MsgBlock().Header.Reserved
 
 	b.stateSnapshot = newBestState(node, blockSize, blockWeight, numTxns,
-		numTxns, sign, pubKey, scale, reserved, time.Unix(node.timestamp, 0))
+		numTxns, sign, pubKey, scale, reserved, time.Unix(node.timestamp, 0), 1)
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
@@ -1130,7 +1152,7 @@ func (b *BlockChain) createChainState() error {
 		}
 
 		// Store the current best chain state into the database.
-		err = dbPutBestState(dbTx, b.stateSnapshot, node.workSum)
+		err = dbPutBestState(dbTx, b.stateSnapshot)
 		if err != nil {
 			return err
 		}
@@ -1159,6 +1181,7 @@ func (b *BlockChain) initChainState() error {
 	}
 
 	if !initialized {
+		// 此时数据库还没有初始化，所以要将它和链状态初始化到genesis块。
 		// At this point the database has not already been initialized, so
 		// initialize both it and the chain state to the genesis block.
 		return b.createChainState()
@@ -1171,8 +1194,11 @@ func (b *BlockChain) initChainState() error {
 		}
 	}
 
+	// 尝试从数据库加载链状态。
 	// Attempt to load the chain state from the database.
 	err = b.db.View(func(dbTx database.Tx) error {
+		//从数据库元数据中获取存储的链状态。当它不存在时，
+		// 这意味着数据库还没有初始化，以便与chain一起使用，所以现在要在一个可写的数据库事务下允许这样做。
 		// Fetch the stored chain state from the database metadata.
 		// When it doesn't exist, it means the database hasn't been
 		// initialized for use with chain yet, so break out now to allow
@@ -1184,6 +1210,11 @@ func (b *BlockChain) initChainState() error {
 			return err
 		}
 
+		//从数据中加载所有的头信息
+		//建立相应的块索引。自
+		//节点数量已知，执行单个alloc
+		//相对于一大堆要减少的小问题
+		// GC的压力。
 		// Load all of the headers from the data for the known best
 		// chain and construct the block index accordingly.  Since the
 		// number of nodes are already known, perform a single alloc
@@ -1193,6 +1224,8 @@ func (b *BlockChain) initChainState() error {
 
 		blockIndexBucket := dbTx.Metadata().Bucket(blockIndexBucketName)
 
+		// 确定有多少块将被加载到索引中，这样我们就可以
+		// 分配适当的金额。
 		// Determine how many blocks will be loaded into the index so we can
 		// allocate the right amount.
 		var blockCount int32
@@ -1206,11 +1239,14 @@ func (b *BlockChain) initChainState() error {
 		var lastNode *blockNode
 		cursor = blockIndexBucket.Cursor()
 		for ok := cursor.First(); ok; ok = cursor.Next() {
-			header, status, err := deserializeBlockRow(cursor.Value())
+			header, status, votes, err := deserializeBlockRow(cursor.Value())
 			if err != nil {
 				return err
 			}
 
+			//确定父块节点。因为我们迭代了块头
+			//按照高度的顺序，如果这些块大部分是线性的，则有
+			//很有可能前面处理的头是父头。
 			// Determine the parent block node. Since we iterate block headers
 			// in order of height, if the blocks are mostly linear there is a
 			// very good chance the previous header processed is the parent.
@@ -1235,10 +1271,12 @@ func (b *BlockChain) initChainState() error {
 				}
 			}
 
+			//初始化块节点，连接它，
+			//并将其添加到块索引中。
 			// Initialize the block node for the block, connect it,
 			// and add it to the block index.
 			node := &blockNodes[i]
-			initBlockNode(node, header, parent)
+			initBlockNode(node, header, parent, votes)
 			node.status = status
 			b.index.addNode(node)
 
@@ -1290,10 +1328,9 @@ func (b *BlockChain) initChainState() error {
 		blockWeight := uint64(GetBlockWeight(drcutil.NewBlock(&block)))
 		numTxns := uint64(len(block.Transactions))
 
-		wire.ChangeCode()
 		// tip 作为blockNode添加sign和pk
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
-			numTxns, state.totalTxns, tip.signature, tip.publicKey, tip.scale, tip.reserved, tip.CalcPastMedianTime())
+			numTxns, state.totalTxns, tip.signature, tip.publicKey, tip.scale, tip.reserved, tip.CalcPastMedianTime(), tip.Votes)
 
 		return nil
 	})
@@ -1307,24 +1344,34 @@ func (b *BlockChain) initChainState() error {
 	return b.index.flushToDB()
 }
 
-//反序列化blockrow将块索引桶中的值解析为块头和块状态位字段。
+//反序列化blockrow将块索引桶中的值解析为块头和块状态位、票数字段。
 // deserializeBlockRow parses a value in the block index bucket into a block
 // header and block status bitfield.
-func deserializeBlockRow(blockRow []byte) (*wire.BlockHeader, blockStatus, error) {
+func deserializeBlockRow(blockRow []byte) (*wire.BlockHeader, blockStatus, uint16, error) {
+	wire.ChangeCode("deserializeBlockRow")
 	buffer := bytes.NewReader(blockRow)
 
 	var header wire.BlockHeader
 	err := header.Deserialize(buffer)
 	if err != nil {
-		return nil, statusNone, err
+		return nil, statusNone, 0, err
 	}
 
 	statusByte, err := buffer.ReadByte()
 	if err != nil {
-		return nil, statusNone, err
+		return nil, statusNone, 0, err
 	}
 
-	return &header, blockStatus(statusByte), nil
+	// 获取票
+	var buf []byte
+	buf = make([]byte, 8)
+	votes := buf[:8][:2]
+	if _, err := io.ReadFull(buffer, votes); err != nil {
+		return nil, statusNone, 0, err
+	}
+	v := byteOrder.Uint16(buf)
+
+	return &header, blockStatus(statusByte), v, nil
 }
 
 //dbFetchHeaderByHash使用一个现有的数据库事务来检索提供的散列的块头。
@@ -1382,7 +1429,7 @@ func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*drcutil.Block, erro
 // index bucket. This overwrites the current entry if there exists one.
 func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	// Serialize block data to be stored.
-	w := bytes.NewBuffer(make([]byte, 0, blockHdrSize+1))
+	w := bytes.NewBuffer(make([]byte, 0, blockHdrSize+3))
 	header := node.Header()
 	err := header.Serialize(w)
 	if err != nil {
@@ -1392,8 +1439,17 @@ func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	if err != nil {
 		return err
 	}
+	var buf []byte
+	buf = make([]byte, 8)
+	votes := buf[:8][:2]
+	byteOrder.PutUint16(votes, node.Votes)
+	_, err = w.Write(votes)
+	if err != nil {
+		return err
+	}
 	value := w.Bytes()
 
+	// 将块头数据写入块索引桶。
 	// Write block header data to block index bucket.
 	blockIndexBucket := dbTx.Metadata().Bucket(blockIndexBucketName)
 	key := blockIndexKey(&node.hash, uint32(node.height))

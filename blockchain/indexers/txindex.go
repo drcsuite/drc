@@ -393,6 +393,7 @@ func (idx *TxIndex) Create(dbTx database.Tx) error {
 }
 
 // ConnectBlock由索引管理器在连接到主链的新块时调用。
+// 此索引器为传递的块中的每个事务添加散列到事务的映射。
 // ConnectBlock is invoked by the index manager when a new block has been
 // connected to the main chain.  This indexer adds a hash-to-transaction mapping
 // for every transaction in the passed block.

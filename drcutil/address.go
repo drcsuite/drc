@@ -168,6 +168,7 @@ func DecodeAddress(addr string, defaultNet *chaincfg.Params) (Address, error) {
 		}
 	}
 
+	// 序列化的公钥如果未压缩/混合，则为65字节(130个十六进制字符);如果压缩，则为33字节(66个十六进制字符)。
 	// Serialized public keys are either 65 bytes (130 hex chars) if
 	// uncompressed/hybrid or 33 bytes (66 hex chars) if compressed.
 	if len(addr) == 130 || len(addr) == 66 {

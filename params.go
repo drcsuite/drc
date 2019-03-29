@@ -9,6 +9,7 @@ import (
 	"github.com/drcsuite/drc/wire"
 )
 
+// activeNetParams是指向当前活跃的比特币网络的特定参数的指针。
 // activeNetParams is a pointer to the parameters specific to the
 // currently active bitcoin network.
 var activeNetParams = &mainNetParams
@@ -20,6 +21,12 @@ type params struct {
 	rpcPort string
 }
 
+// mainNetParams包含特定于主网络的参数
+// (wire.MainNet)。注意:RPC端口与
+// 参考实现，因为btcd不处理钱包请求。的
+// 独立钱包进程监听已知端口并转发请求
+// 它不处理btcd。这种方法允许钱包处理
+// 模拟完整的参考实现RPC API。
 // mainNetParams contains parameters specific to the main network
 // (wire.MainNet).  NOTE: The RPC port is intentionally different than the
 // reference implementation because btcd does not handle wallet requests.  The
@@ -35,25 +42,25 @@ var mainNetParams = params{
 // network (wire.TestNet).  NOTE: The RPC port is intentionally different
 // than the reference implementation - see the mainNetParams comment for
 // details.
-var regressionNetParams = params{
-	Params:  &chaincfg.RegressionNetParams,
-	rpcPort: "18334",
-}
+//var regressionNetParams = params{
+//	Params:  &chaincfg.RegressionNetParams,
+//	rpcPort: "18334",
+//}
 
 // testNet3Params contains parameters specific to the test network (version 3)
 // (wire.TestNet3).  NOTE: The RPC port is intentionally different than the
 // reference implementation - see the mainNetParams comment for details.
-var testNet3Params = params{
-	Params:  &chaincfg.TestNet3Params,
-	rpcPort: "18334",
-}
+//var testNet3Params = params{
+//	Params:  &chaincfg.TestNet3Params,
+//	rpcPort: "18334",
+//}
 
 // simNetParams contains parameters specific to the simulation test network
 // (wire.SimNet).
-var simNetParams = params{
-	Params:  &chaincfg.SimNetParams,
-	rpcPort: "18556",
-}
+//var simNetParams = params{
+//	Params:  &chaincfg.SimNetParams,
+//	rpcPort: "18556",
+//}
 
 // netName returns the name used when referring to a bitcoin network.  At the
 // time of writing, btcd currently places blocks for testnet version 3 in the

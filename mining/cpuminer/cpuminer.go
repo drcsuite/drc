@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/drcsuite/drc/btcec"
+	"github.com/drcsuite/drc/vote"
 	"math/big"
 	"math/rand"
 	"runtime"
@@ -69,6 +70,8 @@ type Config struct {
 	ProcessBlock func(*drcutil.Block, blockchain.BehaviorFlags) (bool, error)
 
 	SendBlock func(*drcutil.Block) (bool, error)
+
+	SendSign func(*wire.MsgSign) (bool, error)
 
 	// ConnectedCount defines the function to use to obtain how many other
 	// peers the server is connected to.  This is used by the automatic
@@ -170,15 +173,19 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 	// a new block, but the check only happens periodically, so it is
 	// possible a block was found and submitted in between.
 	msgBlock := block.MsgBlock()
-	if !msgBlock.Header.PrevBlock.IsEqual(&m.g.BestSnapshot().Hash) {
+	if !msgBlock.Header.PrevBlock.IsEqual(&m.g.BestCandidate().Hash) {
 		log.Debugf("Block submitted via CPU miner with previous "+
 			"block %s is stale", msgBlock.Header.PrevBlock)
 		return false
 	}
 
 	// 采用后稳策略，先广播块信息，
-	b, e := m.cfg.SendBlock(block)
-	isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
+	b, err := m.cfg.SendBlock(block)
+	if !b || err != nil {
+		log.Errorf("Failed to send block message: %v", err)
+		return false
+	}
+	//isOrphan, err := m.cfg.ProcessBlock(block, blockchain.BFNone)
 
 	// Process this block using the same rules as blocks coming from other
 	// nodes.  This will in turn relay it to the network like normal.
@@ -194,10 +201,10 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 
 		//log.Debugf("Block submitted via CPU miner rejected: %v", err)
 		//return false
-		if isOrphan {
-			log.Debugf("Block submitted via CPU miner is an orphan")
-			return false
-		}
+		//if isOrphan {
+		//	log.Debugf("Block submitted via CPU miner is an orphan")
+		//	return false
+		//}
 	}
 
 	// The block was accepted.
@@ -216,9 +223,8 @@ func (m *CPUMiner) submitBlock(block *drcutil.Block) bool {
 // This function will return early with false when conditions that trigger a
 // stale block such as a new block showing up or periodically when there are
 // new transactions and enough time has elapsed without finding a solution.
-func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock,
+func (m *CPUMiner) solveBlock(msgBlock *wire.MsgCandidate,
 	ticker *time.Ticker, quit chan struct{}) bool {
-	wire.ChangeCode()
 
 	// Choose a random extra nonce offset for this block template and
 	// worker.
@@ -261,7 +267,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock,
 
 		// The current block is stale if the best block
 		// has changed.
-		best := m.g.BestSnapshot()
+		best := m.g.BestCandidate()
 		if !header.PrevBlock.IsEqual(&best.Hash) {
 			return false
 		}
@@ -339,42 +345,56 @@ out:
 		// submission, since the current block will be changing and
 		// this would otherwise end up building a new block template on
 		// a block that is in the process of becoming stale.
-		wire.ChangeCode()
-		// 修改BestSnapshot，返回最佳快照，添加sign和pk
 		m.submitBlockLock.Lock()
-		curHeight := m.g.BestSnapshot().Height
+		// 等待上一轮处理完成
+		if !vote.Work {
+			m.submitBlockLock.Unlock()
+			time.Sleep(time.Second)
+			continue
+		}
+
+		curHeight := m.g.BestCandidate().Height
 		if curHeight != 0 && !m.cfg.IsCurrent() {
 			m.submitBlockLock.Unlock()
 			time.Sleep(time.Second)
 			continue
 		}
 
-		preSign := m.g.BestSnapshot().Signature
+		preHeader := m.g.BestCandidate().Header
 
 		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<π
-		signature, err := m.privKey.Sign(chainhash.DoubleHashB(preSign.CloneBytes()))
+		signature, err := m.privKey.Sign(chainhash.DoubleHashB(preHeader.Signature.CloneBytes()))
 		if err != nil {
 			m.submitBlockLock.Unlock()
 			errStr := fmt.Sprintf("Failed to signature prevate seed: %v", err)
 			log.Errorf(errStr)
+			vote.Work = false
 			continue
 		}
 		weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signature.GenSignBytes()))
 
+		// 前10个块的票数和估算值
 		votes, scales := make([]uint16, 0), make([]uint16, 0)
-		prevNode := m.chain.GetBlockIndex().LookupNode(&m.g.BestSnapshot().Hash)
-		// 计算前十个块平均weight
-		for i := 0; i < 10; i++ {
+
+		candidate := blockchain.PrevCandidatePool[m.g.BestCandidate().Hash]
+		scales = append(scales, candidate.Header.Scale)
+		votes = append(votes, m.g.BestCandidate().Votes)
+		for i := 0; i < 9; i++ {
+			// 添加每个节点实际收到的票数和当时估算值
+			prevNode := m.chain.GetBlockIndex().LookupNode(&candidate.Header.PrevBlock)
 			scales = append(scales, prevNode.Header().Scale)
-			votes = append(votes, prevNode.Header().Scale)
+			votes = append(votes, prevNode.Votes)
 			prevNode = prevNode.Ancestor(1)
 			if prevNode == nil {
-				continue
+				break
 			}
 		}
-		scale := EstimateScale(votes, scales)
-		pi := VoteVerge(scale)
-		if weight.Cmp(pi) >= 0 {
+		// 计算前十个块平均规模和weight
+		scale := vote.EstimateScale(votes, scales)
+		Pi := vote.BlockVerge(scale)
+		// 如果不符合规则，等待下一轮
+		if weight.Cmp(Pi) >= 0 {
+			vote.Work = false
 			time.Sleep(time.Second)
 			continue
 		}
@@ -387,7 +407,8 @@ out:
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		pubKey, err := chainhash.NewHash33((btcec.PublicKey)(m.privKey.PublicKey).SerializeCompressed())
+		pk := (btcec.PublicKey)(m.privKey.PublicKey)
+		pubKey, err := chainhash.NewHash33(pk.SerializeCompressed())
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
 				"template: %v", err)
@@ -413,12 +434,16 @@ out:
 		// with false when conditions that trigger a stale block, so
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
-		if m.solveBlock(template.Block, ticker, quit) {
+		if m.solveBlock(template.Candidate, ticker, quit) {
 
-			block := drcutil.NewBlock(template.Block)
+			block := drcutil.NewCandidate(template.Block, template.Candidate)
 
 			// 将块信息提交给对等点
-			m.submitBlock(block)
+			bo := m.submitBlock(block)
+			if bo {
+				vote.Work = false
+				m.BlockVote(block.MsgCandidate())
+			}
 		}
 	}
 
@@ -434,7 +459,6 @@ out:
 func (m *CPUMiner) miningWorkerController() {
 	// launchWorkers groups common code to launch a specified number of
 	// workers for generating blocks.
-	wire.ChangeCode()
 	var runningWorkers []chan struct{}
 	launchWorkers := func(numWorkers uint32) {
 		for i := uint32(0); i < numWorkers; i++ {
@@ -622,7 +646,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 
 	m.speedMonitorQuit = make(chan struct{})
 	m.wg.Add(1)
-	wire.ChangeCode()
+	wire.ChangeCode("GenerateNBlocks")
 	//go m.speedMonitor()
 
 	m.Unlock()
@@ -702,7 +726,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 // Use Start to begin the mining process.  See the documentation for CPUMiner
 // type for more details.
 func New(cfg *Config) *CPUMiner {
-	wire.ChangeCode()
+	wire.ChangeCode("NewCpuMiner")
 	// 生成公私钥，放入cpuminer
 	privKey, err := btcec.NewPrivateKey(btcec.S256())
 	if err != nil {

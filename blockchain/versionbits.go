@@ -5,6 +5,7 @@
 package blockchain
 
 import (
+	"github.com/drcsuite/drc/wire"
 	"math"
 
 	"github.com/drcsuite/drc/chaincfg"
@@ -213,16 +214,17 @@ func (b *BlockChain) calcNextBlockVersion(prevNode *blockNode) (int32, error) {
 	// activation at the next threshold window change.
 	expectedVersion := uint32(vbTopBits)
 	for id := 0; id < len(b.chainParams.Deployments); id++ {
-		deployment := &b.chainParams.Deployments[id]
-		cache := &b.deploymentCaches[id]
-		checker := deploymentChecker{deployment: deployment, chain: b}
-		state, err := b.thresholdState(prevNode, checker, cache)
-		if err != nil {
-			return 0, err
-		}
-		if state == ThresholdStarted || state == ThresholdLockedIn {
-			expectedVersion |= uint32(1) << deployment.BitNumber
-		}
+		wire.ChangeCode("Threshold,calcSequenceLock")
+		//deployment := &b.chainParams.Deployments[id]
+		//cache := &b.deploymentCaches[id]
+		//checker := deploymentChecker{deployment: deployment, chain: b}
+		//state, err := b.thresholdState(prevNode, checker, cache)
+		//if err != nil {
+		//	return 0, err
+		//}
+		//if state == ThresholdStarted || state == ThresholdLockedIn {
+		//expectedVersion |= uint32(1) << deployment.BitNumber
+		//}
 	}
 	return int32(expectedVersion), nil
 }
@@ -250,28 +252,29 @@ func (b *BlockChain) CalcNextBlockVersion() (int32, error) {
 func (b *BlockChain) warnUnknownRuleActivations(node *blockNode) error {
 	// Warn if any unknown new rules are either about to activate or have
 	// already been activated.
+	wire.ChangeCode("Threshold,calcSequenceLock")
 	for bit := uint32(0); bit < vbNumBits; bit++ {
-		checker := bitConditionChecker{bit: bit, chain: b}
-		cache := &b.warningCaches[bit]
-		state, err := b.thresholdState(node.parent, checker, cache)
-		if err != nil {
-			return err
-		}
+		//checker := bitConditionChecker{bit: bit, chain: b}
+		//cache := &b.warningCaches[bit]
+		//state, err := b.thresholdState(node.parent, checker, cache)
+		//if err != nil {
+		//	return err
+		//}
 
-		switch state {
-		case ThresholdActive:
-			if !b.unknownRulesWarned {
-				log.Warnf("Unknown new rules activated (bit %d)",
-					bit)
-				b.unknownRulesWarned = true
-			}
-
-		case ThresholdLockedIn:
-			window := int32(checker.MinerConfirmationWindow())
-			activationHeight := window - (node.height % window)
-			log.Warnf("Unknown new rules are about to activate in "+
-				"%d blocks (bit %d)", activationHeight, bit)
-		}
+		//switch state {
+		//case ThresholdActive:
+		//	if !b.unknownRulesWarned {
+		//		log.Warnf("Unknown new rules activated (bit %d)",
+		//			bit)
+		//		b.unknownRulesWarned = true
+		//	}
+		//
+		//case ThresholdLockedIn:
+		//	window := int32(checker.MinerConfirmationWindow())
+		//	activationHeight := window - (node.height % window)
+		//	log.Warnf("Unknown new rules are about to activate in "+
+		//		"%d blocks (bit %d)", activationHeight, bit)
+		//}
 	}
 
 	return nil

@@ -141,6 +141,10 @@ type sendMsg struct {
 	data interface{}
 }
 
+type sendSignature struct {
+	data interface{}
+}
+
 // updatePeerHeightsMsg is a message sent from the blockmanager to the server
 // after a new block has been accepted. The purpose of the message is to update
 // the heights of peers that were known to announce the block before we
@@ -228,6 +232,7 @@ type server struct {
 	query                chan interface{}
 	relayInv             chan relayMsg
 	sendMsg              chan sendMsg
+	sendSignature        chan sendSignature
 	broadcast            chan broadcastMsg
 	peerHeightsUpdate    chan updatePeerHeightsMsg
 	wg                   sync.WaitGroup
@@ -450,20 +455,20 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 		// After soft-fork activation, only make outbound
 		// connection to peers if they flag that they're segwit
 		// enabled.
-		chain := sp.server.chain
-		segwitActive, err := chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-		if err != nil {
-			peerLog.Errorf("Unable to query for segwit soft-fork state: %v",
-				err)
-			return nil
-		}
+		//chain := sp.server.chain
+		//segwitActive, err := chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
+		//if err != nil {
+		//	peerLog.Errorf("Unable to query for segwit soft-fork state: %v",
+		//		err)
+		//	return nil
+		//}
 
-		if segwitActive && !sp.IsWitnessEnabled() {
-			peerLog.Infof("Disconnecting non-segwit peer %v, isn't segwit "+
-				"enabled and we need more segwit enabled peers", sp)
-			sp.Disconnect()
-			return nil
-		}
+		//if segwitActive && !sp.IsWitnessEnabled() {
+		//	peerLog.Infof("Disconnecting non-segwit peer %v, isn't segwit "+
+		//		"enabled and we need more segwit enabled peers", sp)
+		//	sp.Disconnect()
+		//	return nil
+		//}
 
 		// Advertise the local address when the server accepts incoming
 		// connections and it believes itself to be close to the best known tip.
@@ -601,6 +606,8 @@ func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
 	sp.AddKnownInventory(iv)
 
 	// 将块排队等待块管理器处理，并故意进一步接收块，直到比特币块被完全处理并知道是好是坏。
+	// 这有助于防止恶意的对等程序在断开连接(或断开连接)和浪费内存之前排队等待一堆坏块。
+	// 此外，这种行为至少依赖于块接受测试工具，因为引用实现在同一线程中处理块，因此在比特币块完全处理之前会阻止进一步的消息。
 	// Queue the block up to be handled by the block
 	// manager and intentionally block further receives
 	// until the bitcoin block is fully processed and known
@@ -613,6 +620,44 @@ func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
 	// thread and therefore blocks further messages until
 	// the bitcoin block has been fully processed.
 	sp.server.syncManager.QueueBlock(block, sp.Peer, sp.blockProcessed)
+	<-sp.blockProcessed
+}
+
+func (sp *serverPeer) OnCandidate(_ *peer.Peer, msg *wire.MsgCandidate, buf []byte) {
+
+	// 将原始MsgBlock转换为btcutil块，该块提供了一些方便的方法和诸如散列缓存之类的东西。
+	// Convert the raw MsgBlock to a drcutil.Block which provides some
+	// convenience methods and things such as hash caching.
+	block := drcutil.NewCandidateFromBlockAndBytes(msg, buf)
+
+	// 将块添加到对等节点的已知目录中。
+	// Add the block to the known inventory for the peer.
+	iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
+	sp.AddKnownInventory(iv)
+
+	// 将块排队等待块管理器处理，并故意进一步接收块，直到比特币块被完全处理并知道是好是坏。
+	// 这有助于防止恶意的对等程序在断开连接(或断开连接)和浪费内存之前排队等待一堆坏块。
+	// 此外，这种行为至少依赖于块接受测试工具，因为引用实现在同一线程中处理块，因此在比特币块完全处理之前会阻止进一步的消息。
+	// Queue the block up to be handled by the block
+	// manager and intentionally block further receives
+	// until the bitcoin block is fully processed and known
+	// good or bad.  This helps prevent a malicious peer
+	// from queuing up a bunch of bad blocks before
+	// disconnecting (or being disconnected) and wasting
+	// memory.  Additionally, this behavior is depended on
+	// by at least the block acceptance test tool as the
+	// reference implementation processes blocks in the same
+	// thread and therefore blocks further messages until
+	// the bitcoin block has been fully processed.
+	sp.server.syncManager.QueueCandidate(block, sp.Peer, sp.blockProcessed, sp.server.cpuMiner)
+	<-sp.blockProcessed
+}
+
+// 接收到签名信息调用的处理函数
+// The handler function that is called when the signature information is received
+func (sp *serverPeer) OnSign(_ *peer.Peer, msg *wire.MsgSign) {
+
+	sp.server.syncManager.QueueSign(msg, sp.Peer, sp.blockProcessed)
 	<-sp.blockProcessed
 }
 
@@ -746,6 +791,7 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 // OnGetBlocks is invoked when a peer receives a getblocks bitcoin
 // message.
 func (sp *serverPeer) OnGetBlocks(_ *peer.Peer, msg *wire.MsgGetBlocks) {
+	// 根据块定位器在最佳链中找到最近已知的块，然后获取它后面的所有块散列，直到其中一条连接。获取MaxBlocksPerMsg或遇到提供的停止散列。
 	// Find the most recent known block in the best chain based on the block
 	// locator and fetch all of the block hashes after it until either
 	// wire.MaxBlocksPerMsg have been fetched or the provided stop hash is
@@ -1799,9 +1845,24 @@ func (s *server) handleSendBlockMsg(state *peerState, msg sendMsg) {
 		// Queue the inventory to be relayed with the next batch.
 		// It will be ignored if the peer is already known to
 		// have the inventory.
-		block := msg.data.(wire.MsgBlock)
+		block := msg.data.(wire.MsgCandidate)
 		var dc chan<- struct{}
 		sp.QueueMessageWithEncoding(&block, dc, wire.BaseEncoding)
+	})
+}
+
+func (s *server) handleSendSignMsg(state *peerState, msg sendSignature) {
+	state.forAllPeers(func(sp *serverPeer) {
+		if !sp.Connected() {
+			return
+		}
+
+		// Queue the inventory to be relayed with the next batch.
+		// It will be ignored if the peer is already known to
+		// have the inventory.
+		sign := msg.data.(wire.MsgSign)
+		var dc chan<- struct{}
+		sp.QueueMessageWithEncoding(&sign, dc, wire.BaseEncoding)
 	})
 }
 
@@ -2002,6 +2063,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnMemPool:      sp.OnMemPool,
 			OnTx:           sp.OnTx,
 			OnBlock:        sp.OnBlock,
+			OnCandidate:    sp.OnCandidate,
 			OnInv:          sp.OnInv,
 			OnHeaders:      sp.OnHeaders,
 			OnGetData:      sp.OnGetData,
@@ -2018,6 +2080,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnAddr:         sp.OnAddr,
 			OnRead:         sp.OnRead,
 			OnWrite:        sp.OnWrite,
+			OnSign:         sp.OnSign,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but
@@ -2040,6 +2103,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 }
 
 // 当建立新的入站连接时，连接管理器将调用inboundPeerConnected。
+// 它初始化一个新的入站服务器对等实例，将其与连接关联，并启动goroutine等待断开连接。
 // inboundPeerConnected is invoked by the connection manager when a new inbound
 // connection is established.  It initializes a new inbound server peer
 // instance, associates it with the connection, and starts a goroutine to wait
@@ -2073,6 +2137,7 @@ func (s *server) outboundPeerConnected(c *connmgr.ConnReq, conn net.Conn) {
 	s.addrManager.Attempt(sp.NA())
 }
 
+// peerDoneHandler通过通知服务器它已经完成并执行了其他需要的清理来处理对等断开。
 // peerDoneHandler handles peer disconnects by notifiying the server that it's
 // done along with other performing other desirable cleanup.
 func (s *server) peerDoneHandler(sp *serverPeer) {
@@ -2151,11 +2216,15 @@ out:
 			s.handleBanPeerMsg(state, p)
 
 		// New inventory to potentially be relayed to other peers.
+		// 新inv可能会转发给其他同行。
 		case invMsg := <-s.relayInv:
 			s.handleRelayInvMsg(state, invMsg)
 
 		case sendMsg := <-s.sendMsg:
 			s.handleSendBlockMsg(state, sendMsg)
+
+		case sendSignature := <-s.sendSignature:
+			s.handleSendSignMsg(state, sendSignature)
 
 		// Message to broadcast to all connected peers except those
 		// which are excluded by the message.
@@ -2219,6 +2288,10 @@ func (s *server) SendBlock(data interface{}) {
 	s.sendMsg <- sendMsg{data: data}
 }
 
+func (s *server) SendSign(data interface{}) {
+	s.sendSignature <- sendSignature{data: data}
+}
+
 // BroadcastMessage sends msg to all peers currently connected to the server
 // except those in the passed peers to exclude.
 func (s *server) BroadcastMessage(msg wire.Message, exclPeers ...*serverPeer) {
@@ -2264,6 +2337,8 @@ func (s *server) NetTotals() (uint64, uint64) {
 		atomic.LoadUint64(&s.bytesSent)
 }
 
+// UpdatePeerHeights更新已发布最新连接主链块或已识别孤儿的所有对等节点的高度。
+// 这些高度更新允许我们动态刷新对等点高度，确保同步对等点选择能够访问每个对等点的最新块高度。
 // UpdatePeerHeights updates the heights of all peers who have have announced
 // the latest connected main chain block, or a recognized orphan. These height
 // updates allow us to dynamically refresh peer heights, ensuring sync peer
@@ -2357,18 +2432,20 @@ func (s *server) Start() {
 		go s.upnpUpdateThread()
 	}
 
-	if !cfg.DisableRPC {
-		s.wg.Add(1)
-
-		// Start the rebroadcastHandler, which ensures user tx received by
-		// the RPC server are rebroadcast until being included in a block.
-		go s.rebroadcastHandler()
-
-		s.rpcServer.Start()
-	}
+	//if !cfg.DisableRPC {
+	//	s.wg.Add(1)
+	//
+	//	//启动rebroadcastHandler，它确保RPC服务器接收到的用户tx被重新广播，直到包含在一个块中。
+	//	// Start the rebroadcastHandler, which ensures user tx received by
+	//	// the RPC server are rebroadcast until being included in a block.
+	//	go s.rebroadcastHandler()
+	//
+	//	s.rpcServer.Start()
+	//}
 
 	// Start the CPU miner if generation is enabled.
 	if cfg.Generate {
+		fmt.Println("开始发块")
 		s.cpuMiner.Start()
 	}
 }
@@ -2495,6 +2572,7 @@ func parseListeners(addrs []string) ([]net.Addr, error) {
 }
 
 func (s *server) upnpUpdateThread() {
+	// 为了防止代码重复，我们每15分钟续租一次。
 	// Go off immediately to prevent code duplication, thereafter we renew
 	// lease every 15 minutes.
 	timer := time.NewTimer(0 * time.Second)
@@ -2706,6 +2784,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		return nil, err
 	}
 
+	// 在数据库中搜索一个FeeEstimator状态。如果找不到或无法加载，则创建一个新的。
 	// Search for a FeeEstimator state in the database. If none can be found
 	// or if it cannot be loaded, create a new one.
 	db.Update(func(tx database.Tx) error {
@@ -2754,11 +2833,11 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		CalcSequenceLock: func(tx *drcutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
 			return s.chain.CalcSequenceLock(tx, view, true)
 		},
-		IsDeploymentActive: s.chain.IsDeploymentActive,
-		SigCache:           s.sigCache,
-		HashCache:          s.hashCache,
-		AddrIndex:          s.addrIndex,
-		FeeEstimator:       s.feeEstimator,
+		//IsDeploymentActive: s.chain.IsDeploymentActive,
+		SigCache:     s.sigCache,
+		HashCache:    s.hashCache,
+		AddrIndex:    s.addrIndex,
+		FeeEstimator: s.feeEstimator,
 	}
 	s.txMemPool = mempool.New(&txC)
 
@@ -2798,6 +2877,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		MiningAddrs:            cfg.miningAddrs,
 		ProcessBlock:           s.syncManager.ProcessBlock,
 		SendBlock:              s.syncManager.SendBlock,
+		SendSign:               s.syncManager.SendSign,
 		ConnectedCount:         s.ConnectedCount,
 		IsCurrent:              s.syncManager.IsCurrent,
 		Chain:                  s.chain,

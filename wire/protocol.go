@@ -146,6 +146,7 @@ type BitcoinNet uint32
 // this package does not provide that functionality since it's generally a
 // better idea to simply disconnect clients that are misbehaving over TCP.
 const (
+	// MainNet是主要的比特币网络。
 	// MainNet represents the main bitcoin network.
 	MainNet BitcoinNet = 0xd9b4bef9
 

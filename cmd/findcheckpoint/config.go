@@ -28,7 +28,7 @@ var (
 	btcdHomeDir     = drcutil.AppDataDir("btcd", false)
 	defaultDataDir  = filepath.Join(btcdHomeDir, "data")
 	knownDbTypes    = database.SupportedDrivers()
-	activeNetParams = &chaincfg.MainNetParams
+	activeNetParams = &chaincfg.MainNetParams // 存储数据路径
 )
 
 // config defines the configuration options for findcheckpoint.
@@ -97,18 +97,18 @@ func loadConfig() (*config, []string, error) {
 	numNets := 0
 	// Count number of network flags passed; assign active network params
 	// while we're at it
-	if cfg.TestNet3 {
-		numNets++
-		activeNetParams = &chaincfg.TestNet3Params
-	}
-	if cfg.RegressionTest {
-		numNets++
-		activeNetParams = &chaincfg.RegressionNetParams
-	}
-	if cfg.SimNet {
-		numNets++
-		activeNetParams = &chaincfg.SimNetParams
-	}
+	//if cfg.TestNet3 {
+	//	numNets++
+	//	activeNetParams = &chaincfg.TestNet3Params
+	//}
+	//if cfg.RegressionTest {
+	//	numNets++
+	//	activeNetParams = &chaincfg.RegressionNetParams
+	//}
+	//if cfg.SimNet {
+	//	numNets++
+	//	activeNetParams = &chaincfg.SimNetParams
+	//}
 	if numNets > 1 {
 		str := "%s: The testnet, regtest, and simnet params can't be " +
 			"used together -- choose one of the three"

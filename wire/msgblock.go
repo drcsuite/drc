@@ -57,6 +57,7 @@ func (msg *MsgBlock) ClearTransactions() {
 	msg.Transactions = make([]*MsgTx, 0, defaultTransactionAlloc)
 }
 
+// BtcDecode使用比特币协议编码将r解码到接收端。这是消息接口实现的一部分。有关存储到磁盘(如数据库中)的解码块，请参阅反序列化，而不是从线路解码块。
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 // See Deserialize for decoding blocks stored to disk, such as in a database, as
@@ -230,6 +231,7 @@ func (msg *MsgBlock) SerializeNoWitness(w io.Writer) error {
 func (msg *MsgBlock) SerializeSize() int {
 	// Block header bytes + Serialized varint size for the number of
 	// transactions.
+	// 173 + 交易数量 + 所有交易
 	n := blockHeaderLen + VarIntSerializeSize(uint64(len(msg.Transactions)))
 
 	for _, tx := range msg.Transactions {
@@ -239,6 +241,7 @@ func (msg *MsgBlock) SerializeSize() int {
 	return n
 }
 
+// serializesizestrip返回序列化块所需的字节数，不包括任何见证数据(如果有的话)。
 // SerializeSizeStripped returns the number of bytes it would take to serialize
 // the block, excluding any witness data (if any).
 func (msg *MsgBlock) SerializeSizeStripped() int {
@@ -270,6 +273,10 @@ func (msg *MsgBlock) MaxPayloadLength(pver uint32) uint32 {
 
 // BlockHash computes the block identifier hash for this block.
 func (msg *MsgBlock) BlockHash() chainhash.Hash {
+	return msg.Header.BlockHash()
+}
+
+func (msg *MsgCandidate) BlockHash() chainhash.Hash {
 	return msg.Header.BlockHash()
 }
 

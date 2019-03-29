@@ -275,6 +275,7 @@ func performServiceCommand(command string) error {
 // returned to the caller so the application can determine whether to exit (when
 // running as a service) or launch in normal interactive mode.
 func serviceMain() (bool, error) {
+	//如果我们以交互方式运行(或者由于错误无法确定)，请不要作为服务运行。
 	// Don't run as a service if we're running interactively (or that can't
 	// be determined due to an error).
 	isInteractive, err := svc.IsAnInteractiveSession()

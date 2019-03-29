@@ -50,6 +50,8 @@ type Indexer interface {
 	// every load, including the case the index was just created.
 	Init() error
 
+	// ConnectBlock在新块连接到主链时调用。
+	// 在一个块中花费的输出集也被传递进来，这样索引器就可以访问在需要时花费的各种输出脚本。
 	// ConnectBlock is invoked when a new block has been connected to the
 	// main chain. The set of output spent within a block is also passed in
 	// so indexers can access the pevious output scripts input spent if

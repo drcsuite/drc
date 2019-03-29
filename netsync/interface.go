@@ -26,6 +26,8 @@ type PeerNotifier interface {
 
 	SendBlock(data interface{})
 
+	SendSign(data interface{})
+
 	TransactionConfirmed(tx *drcutil.Tx)
 }
 

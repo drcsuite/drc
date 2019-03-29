@@ -6,15 +6,15 @@ import (
 	"github.com/drcsuite/drc/btcec"
 )
 
-func main() {
-	//testCipherAndSign()
-	//ptr()
-	//ptrint()
-	//GenesisBlock()
-
-	Array()
-	fmt.Println(" Hello, DRC!")
-}
+//func main() {
+//	//testCipherAndSign()
+//	//ptr()
+//	//ptrint()
+//	//GenesisBlock()
+//
+//	Array()
+//	fmt.Println(" Hello, DRC!")
+//}
 
 func testCipherAndSign() {
 	// cipher

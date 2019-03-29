@@ -5,9 +5,9 @@
 package mining
 
 import (
-	"bytes"
 	"container/heap"
 	"fmt"
+	"github.com/drcsuite/drc/vote"
 	"time"
 
 	"github.com/drcsuite/drc/blockchain"
@@ -192,6 +192,8 @@ type BlockTemplate struct {
 	// requirement.
 	Block *wire.MsgBlock
 
+	Candidate *wire.MsgCandidate
+
 	// Fees contains the amount of fees each transaction in the generated
 	// template pays in base units.  Since the first transaction is the
 	// coinbase, the first entry (offset 0) will contain the negative of the
@@ -318,14 +320,14 @@ func logSkippedDeps(tx *drcutil.Tx, deps map[chainhash.Hash]*txPrioItem) {
 // on the end of the provided best chain.  In particular, it is one second after
 // the median timestamp of the last several blocks per the chain consensus
 // rules.
-func MinimumMedianTime(chainState *blockchain.BestState) time.Time {
-	return chainState.MedianTime.Add(time.Second)
+func MinimumMedianTime(chainState *blockchain.BestLastCandidate) time.Time {
+	return chainState.Header.Timestamp.Add(time.Second)
 }
 
 // medianAdjustedTime returns the current time adjusted to ensure it is at least
 // one second after the median timestamp of the last several blocks per the
 // chain consensus rules.
-func medianAdjustedTime(chainState *blockchain.BestState, timeSource blockchain.MedianTimeSource) time.Time {
+func medianAdjustedTime(chainState *blockchain.BestLastCandidate, timeSource blockchain.MedianTimeSource) time.Time {
 	// The timestamp for the block must not be before the median timestamp
 	// of the last several blocks.  Thus, choose the maximum between the
 	// current time and one second after the past median time.  The current
@@ -443,7 +445,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress drcutil.Address, pubkey *chainhash.Hash33, signature *chainhash.Hash64,
 	scale uint16, reserved uint16) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
-	best := g.chain.BestSnapshot()
+	best := g.chain.BestLastCandidate()
 	nextBlockHeight := best.Height + 1
 
 	// Create a standard coinbase transaction paying to the provided
@@ -608,12 +610,12 @@ mempoolLoop:
 	// so then this means that we'll include any transactions with witness
 	// data in the mempool, and also add the witness commitment as an
 	// OP_RETURN output in the coinbase transaction.
-	segwitState, err := g.chain.ThresholdState(chaincfg.DeploymentSegwit)
-	if err != nil {
-		return nil, err
-	}
-	segwitActive := segwitState == blockchain.ThresholdActive
-
+	//segwitState, err := g.chain.ThresholdState(chaincfg.DeploymentSegwit)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//segwitActive := segwitState == blockchain.ThresholdActive
+	wire.ChangeCode("Threshold,calcSequenceLock")
 	witnessIncluded := false
 
 	// Choose which transactions make it into the block.
@@ -623,44 +625,44 @@ mempoolLoop:
 		prioItem := heap.Pop(priorityQueue).(*txPrioItem)
 		tx := prioItem.tx
 
-		switch {
+		//switch {
 		// If segregated witness has not been activated yet, then we
 		// shouldn't include any witness transactions in the block.
-		case !segwitActive && tx.HasWitness():
-			continue
+		//case !segwitActive && tx.HasWitness():
+		//	continue
 
 		// Otherwise, Keep track of if we've included a transaction
 		// with witness data or not. If so, then we'll need to include
 		// the witness commitment as the last output in the coinbase
 		// transaction.
-		case segwitActive && !witnessIncluded && tx.HasWitness():
-			// If we're about to include a transaction bearing
-			// witness data, then we'll also need to include a
-			// witness commitment in the coinbase transaction.
-			// Therefore, we account for the additional weight
-			// within the block with a model coinbase tx with a
-			// witness commitment.
-			coinbaseCopy := drcutil.NewTx(coinbaseTx.MsgTx().Copy())
-			coinbaseCopy.MsgTx().TxIn[0].Witness = [][]byte{
-				bytes.Repeat([]byte("a"),
-					blockchain.CoinbaseWitnessDataLen),
-			}
-			coinbaseCopy.MsgTx().AddTxOut(&wire.TxOut{
-				PkScript: bytes.Repeat([]byte("a"),
-					blockchain.CoinbaseWitnessPkScriptLength),
-			})
-
-			// In order to accurately account for the weight
-			// addition due to this coinbase transaction, we'll add
-			// the difference of the transaction before and after
-			// the addition of the commitment to the block weight.
-			weightDiff := blockchain.GetTransactionWeight(coinbaseCopy) -
-				blockchain.GetTransactionWeight(coinbaseTx)
-
-			blockWeight += uint32(weightDiff)
-
-			witnessIncluded = true
-		}
+		//case segwitActive && !witnessIncluded && tx.HasWitness():
+		//	// If we're about to include a transaction bearing
+		//	// witness data, then we'll also need to include a
+		//	// witness commitment in the coinbase transaction.
+		//	// Therefore, we account for the additional weight
+		//	// within the block with a model coinbase tx with a
+		//	// witness commitment.
+		//	coinbaseCopy := drcutil.NewTx(coinbaseTx.MsgTx().Copy())
+		//	coinbaseCopy.MsgTx().TxIn[0].Witness = [][]byte{
+		//		bytes.Repeat([]byte("a"),
+		//			blockchain.CoinbaseWitnessDataLen),
+		//	}
+		//	coinbaseCopy.MsgTx().AddTxOut(&wire.TxOut{
+		//		PkScript: bytes.Repeat([]byte("a"),
+		//			blockchain.CoinbaseWitnessPkScriptLength),
+		//	})
+		//
+		//	// In order to accurately account for the weight
+		//	// addition due to this coinbase transaction, we'll add
+		//	// the difference of the transaction before and after
+		//	// the addition of the commitment to the block weight.
+		//	weightDiff := blockchain.GetTransactionWeight(coinbaseCopy) -
+		//		blockchain.GetTransactionWeight(coinbaseTx)
+		//
+		//	blockWeight += uint32(weightDiff)
+		//
+		//	witnessIncluded = true
+		//}
 
 		// Grab any transactions which depend on this one.
 		deps := dependers[*tx.Hash()]
@@ -680,7 +682,7 @@ mempoolLoop:
 		// Enforce maximum signature operation cost per block.  Also
 		// check for overflow.
 		sigOpCost, err := blockchain.GetSigOpCost(tx, false,
-			blockUtxos, true, segwitActive)
+			blockUtxos, true, false)
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"GetSigOpCost: %v", tx.Hash(), err)
@@ -844,7 +846,7 @@ mempoolLoop:
 	// Calculate the required difficulty for the block.  The timestamp
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
-	wire.ChangeCode()
+	wire.ChangeCode("NewBlockTemplete")
 	// 在header中加入publickey
 	ts := medianAdjustedTime(best, g.timeSource)
 	//reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
@@ -862,7 +864,18 @@ mempoolLoop:
 	// Create a new block ready to be solved.
 	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
 	var msgBlock wire.MsgBlock
+	var msgCandidate wire.MsgCandidate
 	msgBlock.Header = wire.BlockHeader{
+		Version:    nextBlockVersion,
+		PrevBlock:  best.Hash,
+		MerkleRoot: *merkles[len(merkles)-1],
+		Timestamp:  ts,
+		PublicKey:  *pubkey,
+		Signature:  *signature,
+		Scale:      scale,
+		Reserved:   reserved,
+	}
+	msgCandidate.Header = wire.BlockHeader{
 		Version:    nextBlockVersion,
 		PrevBlock:  best.Hash,
 		MerkleRoot: *merkles[len(merkles)-1],
@@ -876,14 +889,21 @@ mempoolLoop:
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {
 			return nil, err
 		}
+		if err := msgCandidate.AddTransaction(tx.MsgTx()); err != nil {
+			return nil, err
+		}
 	}
 
+	// 最后，根据chain consensus规则对创建的块进行全面检查，确保它正确地连接到当前最佳
+	// 链条没有问题。
 	// Finally, perform a full check on the created block against the chain
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
-	block := drcutil.NewBlock(&msgBlock)
+	//block := drcutil.NewBlock()
+	block := drcutil.NewCandidate(&msgBlock, &msgCandidate)
 	block.SetHeight(nextBlockHeight)
-	if err := g.chain.CheckConnectBlockTemplate(block); err != nil {
+	seed, err := chainhash.NewHash(chainhash.DoubleHashB(g.BestCandidate().Header.Signature.CloneBytes()))
+	if err := g.chain.CheckConnectBlockTemplate(block, seed, vote.BlockVerge(scale)); err != nil {
 		return nil, err
 	}
 
@@ -894,6 +914,7 @@ mempoolLoop:
 
 	return &BlockTemplate{
 		Block:             &msgBlock,
+		Candidate:         &msgCandidate,
 		Fees:              txFees,
 		SigOpCosts:        txSigOpCosts,
 		Height:            nextBlockHeight,
@@ -908,12 +929,12 @@ mempoolLoop:
 // consensus rules.  Finally, it will update the target difficulty if needed
 // based on the new time for the test networks since their target difficulty can
 // change based upon time.
-func (g *BlkTmplGenerator) UpdateBlockTime(msgBlock *wire.MsgBlock) error {
+func (g *BlkTmplGenerator) UpdateBlockTime(msgBlock *wire.MsgCandidate) error {
 	// The new timestamp is potentially adjusted to ensure it comes after
 	// the median time of the last several blocks per the chain consensus
 	// rules.
-	wire.ChangeCode()
-	newTime := medianAdjustedTime(g.chain.BestSnapshot(), g.timeSource)
+	wire.ChangeCode("UpdateBlockTime")
+	newTime := medianAdjustedTime(g.chain.BestLastCandidate(), g.timeSource)
 	msgBlock.Header.Timestamp = newTime
 
 	// Recalculate the difficulty if running on a network that requires it.
@@ -964,6 +985,10 @@ func (g *BlkTmplGenerator) UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight
 // This function is safe for concurrent access.
 func (g *BlkTmplGenerator) BestSnapshot() *blockchain.BestState {
 	return g.chain.BestSnapshot()
+}
+
+func (g *BlkTmplGenerator) BestCandidate() *blockchain.BestLastCandidate {
+	return g.chain.BestLastCandidate()
 }
 
 // TxSource returns the associated transaction source.

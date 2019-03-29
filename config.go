@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/drcsuite/drc/wire"
 	"io"
 	"net"
 	"os"
@@ -474,6 +475,7 @@ func loadConfig() (*config, []string, error) {
 	if !(preCfg.RegressionTest || preCfg.SimNet) || preCfg.ConfigFile !=
 		defaultConfigFile {
 
+		fmt.Println("config: ", preCfg)
 		if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
 			err := createDefaultConfigFile(preCfg.ConfigFile)
 			if err != nil {
@@ -532,20 +534,20 @@ func loadConfig() (*config, []string, error) {
 	numNets := 0
 	// Count number of network flags passed; assign active network params
 	// while we're at it
-	if cfg.TestNet3 {
-		numNets++
-		activeNetParams = &testNet3Params
-	}
-	if cfg.RegressionTest {
-		numNets++
-		activeNetParams = &regressionNetParams
-	}
-	if cfg.SimNet {
-		numNets++
-		// Also disable dns seeding on the simulation test network.
-		activeNetParams = &simNetParams
-		cfg.DisableDNSSeed = true
-	}
+	//if cfg.TestNet3 {
+	//	numNets++
+	//	activeNetParams = &testNet3Params
+	//}
+	//if cfg.RegressionTest {
+	//	numNets++
+	//	activeNetParams = &regressionNetParams
+	//}
+	//if cfg.SimNet {
+	//	numNets++
+	//	// Also disable dns seeding on the simulation test network.
+	//	activeNetParams = &simNetParams
+	//	cfg.DisableDNSSeed = true
+	//}
 	if numNets > 1 {
 		str := "%s: The testnet, regtest, segnet, and simnet params " +
 			"can't be used together -- choose one of the four"
@@ -864,7 +866,9 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
+	// 检查挖掘地址是否有效，并保存已解析的版本。
 	// Check mining addresses are valid and saved parsed versions.
+	wire.ChangeCode("loadConfig")
 	cfg.miningAddrs = make([]drcutil.Address, 0, len(cfg.MiningAddrs))
 	for _, strAddr := range cfg.MiningAddrs {
 		addr, err := drcutil.DecodeAddress(strAddr, activeNetParams.Params)
@@ -885,6 +889,7 @@ func loadConfig() (*config, []string, error) {
 		cfg.miningAddrs = append(cfg.miningAddrs, addr)
 	}
 
+	// 确保在设置generate标志时至少有一个挖掘地址。
 	// Ensure there is at least one mining address when the generate flag is
 	// set.
 	if cfg.Generate && len(cfg.MiningAddrs) == 0 {
@@ -953,14 +958,14 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Check the checkpoints for syntax errors.
-	cfg.addCheckpoints, err = parseCheckpoints(cfg.AddCheckpoints)
-	if err != nil {
-		str := "%s: Error parsing checkpoints: %v"
-		err := fmt.Errorf(str, funcName, err)
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, usageMessage)
-		return nil, nil, err
-	}
+	//cfg.addCheckpoints, err = parseCheckpoints(cfg.AddCheckpoints)
+	//if err != nil {
+	//	str := "%s: Error parsing checkpoints: %v"
+	//	err := fmt.Errorf(str, funcName, err)
+	//	fmt.Fprintln(os.Stderr, err)
+	//	fmt.Fprintln(os.Stderr, usageMessage)
+	//	return nil, nil, err
+	//}
 
 	// Tor stream isolation requires either proxy or onion proxy to be set.
 	if cfg.TorIsolation && cfg.Proxy == "" && cfg.OnionProxy == "" {

@@ -25,7 +25,6 @@ import (
 // with the solution. False is returned if no solution exists.
 func solveBlock(header *wire.BlockHeader, targetDifficulty *big.Int) bool {
 	// sbResult is used by the solver goroutines to send results.
-	wire.ChangeCode()
 	type sbResult struct {
 		found bool
 		nonce uint32
@@ -184,7 +183,6 @@ func CreateBlock(prevBlock *drcutil.Block, inclusionTxs []*drcutil.Tx,
 	}
 	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
 	var block wire.MsgBlock
-	wire.ChangeCode()
 	block.Header = wire.BlockHeader{
 		Version:    blockVersion,
 		PrevBlock:  *prevHash,

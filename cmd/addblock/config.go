@@ -110,7 +110,6 @@ func loadConfig() (*config, []string, error) {
 
 	// Count number of network flags passed; assign active network params
 	// while we're at it
-	wire.ChangeCode()
 	//if cfg.TestNet3 {
 	//	numNets++
 	//	activeNetParams = &chaincfg.TestNet3Params

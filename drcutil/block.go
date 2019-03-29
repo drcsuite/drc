@@ -34,13 +34,15 @@ func (e OutOfRangeError) Error() string {
 // transactions on their first access so subsequent accesses don't have to
 // repeat the relatively expensive hashing operations.
 type Block struct {
-	msgBlock                 *wire.MsgBlock  // Underlying MsgBlock
+	msgBlock                 *wire.MsgBlock // Underlying MsgBlock
+	msgCandidate             *wire.MsgCandidate
 	serializedBlock          []byte          // Serialized bytes for the block
 	serializedBlockNoWitness []byte          // Serialized bytes for block w/o witness data
 	blockHash                *chainhash.Hash // Cached block hash
 	blockHeight              int32           // Height in the main block chain
 	transactions             []*Tx           // Transactions
 	txnsGenerated            bool            // ALL wrapped transactions generated
+	Votes                    uint16
 }
 
 // MsgBlock returns the underlying wire.MsgBlock for the Block.
@@ -49,6 +51,13 @@ func (b *Block) MsgBlock() *wire.MsgBlock {
 	return b.msgBlock
 }
 
+func (b *Block) MsgCandidate() *wire.MsgCandidate {
+	// Return the cached block.
+	return b.msgCandidate
+}
+
+// Bytes返回块的序列化字节。这相当于在底层线路上调用Serialize。
+// 然而，MsgBlock会缓存结果，因此后续调用会更有效。
 // Bytes returns the serialized bytes for the Block.  This is equivalent to
 // calling Serialize on the underlying wire.MsgBlock, however it caches the
 // result so subsequent calls are more efficient.
@@ -103,6 +112,18 @@ func (b *Block) Hash() *chainhash.Hash {
 
 	// Cache the block hash and return it.
 	hash := b.msgBlock.BlockHash()
+	b.blockHash = &hash
+	return &hash
+}
+
+func (b *Block) CandidateHash() *chainhash.Hash {
+	// Return the cached block hash if it has already been generated.
+	if b.blockHash != nil {
+		return b.blockHash
+	}
+
+	// Cache the block hash and return it.
+	hash := b.msgCandidate.BlockHash()
 	b.blockHash = &hash
 	return &hash
 }
@@ -189,6 +210,9 @@ func (b *Block) TxHash(txNum int) (*chainhash.Hash, error) {
 	return tx.Hash(), nil
 }
 
+// TxLoc返回原始块中每个事务的偏移量和长度。
+//它用于允许对原始字节中的事务进行快速索引
+//流。
 // TxLoc returns the offsets and lengths of each transaction in a raw block.
 // It is used to allow fast indexing into transactions within the raw byte
 // stream.
@@ -224,6 +248,14 @@ func NewBlock(msgBlock *wire.MsgBlock) *Block {
 	return &Block{
 		msgBlock:    msgBlock,
 		blockHeight: BlockHeightUnknown,
+	}
+}
+
+func NewCandidate(msgBlock *wire.MsgBlock, msgCandidate *wire.MsgCandidate) *Block {
+	return &Block{
+		msgBlock:     msgBlock,
+		msgCandidate: msgCandidate,
+		blockHeight:  BlockHeightUnknown,
 	}
 }
 
@@ -263,5 +295,21 @@ func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock, serializedBlock []byte) 
 		msgBlock:        msgBlock,
 		serializedBlock: serializedBlock,
 		blockHeight:     BlockHeightUnknown,
+	}
+}
+
+func NewCandidateFromBlockAndBytes(msgCandidate *wire.MsgCandidate, serializedBlock []byte) *Block {
+	return &Block{
+		msgCandidate:    msgCandidate,
+		serializedBlock: serializedBlock,
+		blockHeight:     BlockHeightUnknown,
+	}
+}
+
+// msgcandidate转msgblock
+func MsgCandidateToBlock(msgCandidate *wire.MsgCandidate) *wire.MsgBlock {
+	return &wire.MsgBlock{
+		Header:       msgCandidate.Header,
+		Transactions: msgCandidate.Transactions,
 	}
 }
