@@ -2215,6 +2215,7 @@ out:
 			s.handleBanPeerMsg(state, p)
 
 		// New inventory to potentially be relayed to other peers.
+		// 新inv可能会转发给其他同行。
 		case invMsg := <-s.relayInv:
 			s.handleRelayInvMsg(state, invMsg)
 
