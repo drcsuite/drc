@@ -1247,11 +1247,12 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	// Query for the Version Bits state for the segwit soft-fork
 	// deployment. If segwit is active, we'll switch over to enforcing all
 	// the new rules.
-	segwitState, err := b.deploymentState(node.parent, chaincfg.DeploymentSegwit)
-	if err != nil {
-		return err
-	}
-	enforceSegWit := segwitState == ThresholdActive
+	wire.ChangeCode("Threshold,calcSequenceLock")
+	//segwitState, err := b.deploymentState(node.parent, chaincfg.DeploymentSegwit)
+	//if err != nil {
+	//	return err
+	//}
+	//enforceSegWit := segwitState == ThresholdActive
 
 	// The number of signature operations must be less than the maximum
 	// allowed per block.  Note that the preliminary sanity checks on a
@@ -1268,8 +1269,9 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		// countP2SHSigOps for whether or not the transaction is
 		// a coinbase transaction rather than having to do a
 		// full coinbase check again.
+		wire.ChangeCode("Threshold,calcSequenceLock")
 		sigOpCost, err := GetSigOpCost(tx, i == 0, view, enforceBIP0016,
-			enforceSegWit)
+			false)
 		if err != nil {
 			return err
 		}
@@ -1372,49 +1374,50 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 
 	// Enforce CHECKSEQUENCEVERIFY during all block validation checks once
 	// the soft-fork deployment is fully active.
-	csvState, err := b.deploymentState(node.parent, chaincfg.DeploymentCSV)
-	if err != nil {
-		return err
-	}
-	if csvState == ThresholdActive {
-		// If the CSV soft-fork is now active, then modify the
-		// scriptFlags to ensure that the CSV op code is properly
-		// validated during the script checks bleow.
-		scriptFlags |= txscript.ScriptVerifyCheckSequenceVerify
+	//csvState, err := b.deploymentState(node.parent, chaincfg.DeploymentCSV)
+	//if err != nil {
+	//	return err
+	//}
+	wire.ChangeCode("Threshold,calcSequenceLock")
+	//if csvState == ThresholdActive {
+	// If the CSV soft-fork is now active, then modify the
+	// scriptFlags to ensure that the CSV op code is properly
+	// validated during the script checks bleow.
+	scriptFlags |= txscript.ScriptVerifyCheckSequenceVerify
 
-		// We obtain the MTP of the *previous* block in order to
-		// determine if transactions in the current block are final.
-		medianTime := node.parent.CalcPastMedianTime()
+	// We obtain the MTP of the *previous* block in order to
+	// determine if transactions in the current block are final.
+	medianTime := node.parent.CalcPastMedianTime()
 
-		// Additionally, if the CSV soft-fork package is now active,
-		// then we also enforce the relative sequence number based
-		// lock-times within the inputs of all transactions in this
-		// candidate block.
-		for _, tx := range block.Transactions() {
-			// A transaction can only be included within a block
-			// once the sequence locks of *all* its inputs are
-			// active.
-			sequenceLock, err := b.calcSequenceLock(node, tx, view,
-				false)
-			if err != nil {
-				return err
-			}
-			if !SequenceLockActive(sequenceLock, node.height,
-				medianTime) {
-				str := fmt.Sprintf("block contains " +
-					"transaction whose input sequence " +
-					"locks are not met")
-				return ruleError(ErrUnfinalizedTx, str)
-			}
+	// Additionally, if the CSV soft-fork package is now active,
+	// then we also enforce the relative sequence number based
+	// lock-times within the inputs of all transactions in this
+	// candidate block.
+	for _, tx := range block.Transactions() {
+		// A transaction can only be included within a block
+		// once the sequence locks of *all* its inputs are
+		// active.
+		sequenceLock, err := b.calcSequenceLock(node, tx, view,
+			false)
+		if err != nil {
+			return err
+		}
+		if !SequenceLockActive(sequenceLock, node.height,
+			medianTime) {
+			str := fmt.Sprintf("block contains " +
+				"transaction whose input sequence " +
+				"locks are not met")
+			return ruleError(ErrUnfinalizedTx, str)
 		}
 	}
+	//}
 
 	// Enforce the segwit soft-fork package once the soft-fork has shifted
 	// into the "active" version bits state.
-	if enforceSegWit {
-		scriptFlags |= txscript.ScriptVerifyWitness
-		scriptFlags |= txscript.ScriptStrictMultiSig
-	}
+	//if enforceSegWit {
+	//	scriptFlags |= txscript.ScriptVerifyWitness
+	//	scriptFlags |= txscript.ScriptStrictMultiSig
+	//}
 
 	// Now that the inexpensive checks are done and have passed, verify the
 	// transactions are actually allowed to spend the coins by running the

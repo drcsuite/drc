@@ -290,11 +290,12 @@ func (sm *SyncManager) startSync() {
 	// Once the segwit soft-fork package has activated, we only
 	// want to sync from peers which are witness enabled to ensure
 	// that we fully validate all blockchain data.
-	segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-	if err != nil {
-		log.Errorf("Unable to query for segwit soft-fork state: %v", err)
-		return
-	}
+	wire.ChangeCode("Threshold,calcSequenceLock")
+	//segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
+	//if err != nil {
+	//	log.Errorf("Unable to query for segwit soft-fork state: %v", err)
+	//	return
+	//}
 
 	best := sm.chain.BestSnapshot()
 	var bestPeer *peerpkg.Peer
@@ -303,10 +304,10 @@ func (sm *SyncManager) startSync() {
 			continue
 		}
 
-		if segwitActive && !peer.IsWitnessEnabled() {
-			log.Debugf("peer %v not witness enabled, skipping", peer)
-			continue
-		}
+		//if segwitActive && !peer.IsWitnessEnabled() {
+		//	log.Debugf("peer %v not witness enabled, skipping", peer)
+		//	continue
+		//}
 
 		// Remove sync candidate peers that are no longer candidates due
 		// to passing their latest known block.  NOTE: The < is
@@ -324,6 +325,7 @@ func (sm *SyncManager) startSync() {
 		bestPeer = peer
 	}
 
+	//如果选择了最佳对等点，则从该对等点开始同步。
 	// Start syncing from the best peer if one was selected.
 	if bestPeer != nil {
 		// Clear the requestedBlocks if the sync peer changes, otherwise
@@ -331,7 +333,7 @@ func (sm *SyncManager) startSync() {
 		// to send.
 		sm.requestedBlocks = make(map[chainhash.Hash]struct{})
 
-		//locator, err := sm.chain.LatestBlockLocator()
+		locator, err := sm.chain.LatestBlockLocator()
 		if err != nil {
 			log.Errorf("Failed to get block locator for the "+
 				"latest block: %v", err)
@@ -368,7 +370,7 @@ func (sm *SyncManager) startSync() {
 		//		"%d from peer %s", best.Height+1,
 		//		sm.nextCheckpoint.Height, bestPeer.Addr())
 		//} else {
-		//	bestPeer.PushGetBlocksMsg(locator, &zeroHash)
+		bestPeer.PushGetBlocksMsg(locator, &zeroHash)
 		//}
 		sm.syncPeer = bestPeer
 	} else {
@@ -398,14 +400,15 @@ func (sm *SyncManager) isSyncCandidate(peer *peerpkg.Peer) bool {
 	// The peer is not a candidate for sync if it's not a full
 	// node. Additionally, if the segwit soft-fork package has
 	// activated, then the peer must also be upgraded.
-	segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-	if err != nil {
-		log.Errorf("Unable to query for segwit "+
-			"soft-fork state: %v", err)
-	}
+	//segwitActive, err := sm.chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
+	//if err != nil {
+	//	log.Errorf("Unable to query for segwit "+
+	//		"soft-fork state: %v", err)
+	//}
+	wire.ChangeCode("Threshold,calcSequenceLock")
 	nodeServices := peer.Services()
 	if nodeServices&wire.SFNodeNetwork != wire.SFNodeNetwork ||
-		(segwitActive && !peer.IsWitnessEnabled()) {
+		(false && !peer.IsWitnessEnabled()) {
 		return false
 	}
 	//}
@@ -435,6 +438,7 @@ func (sm *SyncManager) handleNewPeerMsg(peer *peerpkg.Peer) {
 		requestedBlocks: make(map[chainhash.Hash]struct{}),
 	}
 
+	//如果需要的话，通过选择最佳候选项开始同步。
 	// Start syncing by choosing the best candidate if needed.
 	if isSyncCandidate && sm.syncPeer == nil {
 		sm.startSync()

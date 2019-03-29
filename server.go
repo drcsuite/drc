@@ -455,20 +455,20 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 		// After soft-fork activation, only make outbound
 		// connection to peers if they flag that they're segwit
 		// enabled.
-		chain := sp.server.chain
-		segwitActive, err := chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
-		if err != nil {
-			peerLog.Errorf("Unable to query for segwit soft-fork state: %v",
-				err)
-			return nil
-		}
+		//chain := sp.server.chain
+		//segwitActive, err := chain.IsDeploymentActive(chaincfg.DeploymentSegwit)
+		//if err != nil {
+		//	peerLog.Errorf("Unable to query for segwit soft-fork state: %v",
+		//		err)
+		//	return nil
+		//}
 
-		if segwitActive && !sp.IsWitnessEnabled() {
-			peerLog.Infof("Disconnecting non-segwit peer %v, isn't segwit "+
-				"enabled and we need more segwit enabled peers", sp)
-			sp.Disconnect()
-			return nil
-		}
+		//if segwitActive && !sp.IsWitnessEnabled() {
+		//	peerLog.Infof("Disconnecting non-segwit peer %v, isn't segwit "+
+		//		"enabled and we need more segwit enabled peers", sp)
+		//	sp.Disconnect()
+		//	return nil
+		//}
 
 		// Advertise the local address when the server accepts incoming
 		// connections and it believes itself to be close to the best known tip.
@@ -2833,11 +2833,11 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		CalcSequenceLock: func(tx *drcutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
 			return s.chain.CalcSequenceLock(tx, view, true)
 		},
-		IsDeploymentActive: s.chain.IsDeploymentActive,
-		SigCache:           s.sigCache,
-		HashCache:          s.hashCache,
-		AddrIndex:          s.addrIndex,
-		FeeEstimator:       s.feeEstimator,
+		//IsDeploymentActive: s.chain.IsDeploymentActive,
+		SigCache:     s.sigCache,
+		HashCache:    s.hashCache,
+		AddrIndex:    s.addrIndex,
+		FeeEstimator: s.feeEstimator,
 	}
 	s.txMemPool = mempool.New(&txC)
 

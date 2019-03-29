@@ -5,7 +5,6 @@
 package mining
 
 import (
-	"bytes"
 	"container/heap"
 	"fmt"
 	"github.com/drcsuite/drc/vote"
@@ -611,12 +610,12 @@ mempoolLoop:
 	// so then this means that we'll include any transactions with witness
 	// data in the mempool, and also add the witness commitment as an
 	// OP_RETURN output in the coinbase transaction.
-	segwitState, err := g.chain.ThresholdState(chaincfg.DeploymentSegwit)
-	if err != nil {
-		return nil, err
-	}
-	segwitActive := segwitState == blockchain.ThresholdActive
-
+	//segwitState, err := g.chain.ThresholdState(chaincfg.DeploymentSegwit)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//segwitActive := segwitState == blockchain.ThresholdActive
+	wire.ChangeCode("Threshold,calcSequenceLock")
 	witnessIncluded := false
 
 	// Choose which transactions make it into the block.
@@ -626,44 +625,44 @@ mempoolLoop:
 		prioItem := heap.Pop(priorityQueue).(*txPrioItem)
 		tx := prioItem.tx
 
-		switch {
+		//switch {
 		// If segregated witness has not been activated yet, then we
 		// shouldn't include any witness transactions in the block.
-		case !segwitActive && tx.HasWitness():
-			continue
+		//case !segwitActive && tx.HasWitness():
+		//	continue
 
 		// Otherwise, Keep track of if we've included a transaction
 		// with witness data or not. If so, then we'll need to include
 		// the witness commitment as the last output in the coinbase
 		// transaction.
-		case segwitActive && !witnessIncluded && tx.HasWitness():
-			// If we're about to include a transaction bearing
-			// witness data, then we'll also need to include a
-			// witness commitment in the coinbase transaction.
-			// Therefore, we account for the additional weight
-			// within the block with a model coinbase tx with a
-			// witness commitment.
-			coinbaseCopy := drcutil.NewTx(coinbaseTx.MsgTx().Copy())
-			coinbaseCopy.MsgTx().TxIn[0].Witness = [][]byte{
-				bytes.Repeat([]byte("a"),
-					blockchain.CoinbaseWitnessDataLen),
-			}
-			coinbaseCopy.MsgTx().AddTxOut(&wire.TxOut{
-				PkScript: bytes.Repeat([]byte("a"),
-					blockchain.CoinbaseWitnessPkScriptLength),
-			})
-
-			// In order to accurately account for the weight
-			// addition due to this coinbase transaction, we'll add
-			// the difference of the transaction before and after
-			// the addition of the commitment to the block weight.
-			weightDiff := blockchain.GetTransactionWeight(coinbaseCopy) -
-				blockchain.GetTransactionWeight(coinbaseTx)
-
-			blockWeight += uint32(weightDiff)
-
-			witnessIncluded = true
-		}
+		//case segwitActive && !witnessIncluded && tx.HasWitness():
+		//	// If we're about to include a transaction bearing
+		//	// witness data, then we'll also need to include a
+		//	// witness commitment in the coinbase transaction.
+		//	// Therefore, we account for the additional weight
+		//	// within the block with a model coinbase tx with a
+		//	// witness commitment.
+		//	coinbaseCopy := drcutil.NewTx(coinbaseTx.MsgTx().Copy())
+		//	coinbaseCopy.MsgTx().TxIn[0].Witness = [][]byte{
+		//		bytes.Repeat([]byte("a"),
+		//			blockchain.CoinbaseWitnessDataLen),
+		//	}
+		//	coinbaseCopy.MsgTx().AddTxOut(&wire.TxOut{
+		//		PkScript: bytes.Repeat([]byte("a"),
+		//			blockchain.CoinbaseWitnessPkScriptLength),
+		//	})
+		//
+		//	// In order to accurately account for the weight
+		//	// addition due to this coinbase transaction, we'll add
+		//	// the difference of the transaction before and after
+		//	// the addition of the commitment to the block weight.
+		//	weightDiff := blockchain.GetTransactionWeight(coinbaseCopy) -
+		//		blockchain.GetTransactionWeight(coinbaseTx)
+		//
+		//	blockWeight += uint32(weightDiff)
+		//
+		//	witnessIncluded = true
+		//}
 
 		// Grab any transactions which depend on this one.
 		deps := dependers[*tx.Hash()]
@@ -683,7 +682,7 @@ mempoolLoop:
 		// Enforce maximum signature operation cost per block.  Also
 		// check for overflow.
 		sigOpCost, err := blockchain.GetSigOpCost(tx, false,
-			blockUtxos, true, segwitActive)
+			blockUtxos, true, false)
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
 				"GetSigOpCost: %v", tx.Hash(), err)

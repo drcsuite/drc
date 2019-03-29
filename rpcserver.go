@@ -1260,28 +1260,28 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 
 		// Query the chain for the current status of the deployment as
 		// identified by its deployment ID.
-		deploymentStatus, err := chain.ThresholdState(uint32(deployment))
-		if err != nil {
-			context := "Failed to obtain deployment status"
-			return nil, internalRPCError(err.Error(), context)
-		}
+		//deploymentStatus, err := chain.ThresholdState(uint32(deployment))
+		//if err != nil {
+		//	context := "Failed to obtain deployment status"
+		//	return nil, internalRPCError(err.Error(), context)
+		//}
 
 		// Attempt to convert the current deployment status into a
 		// human readable string. If the status is unrecognized, then a
 		// non-nil error is returned.
-		statusString, err := softForkStatus(deploymentStatus)
-		if err != nil {
-			return nil, &btcjson.RPCError{
-				Code: btcjson.ErrRPCInternal.Code,
-				Message: fmt.Sprintf("unknown deployment status: %v",
-					deploymentStatus),
-			}
-		}
+		//statusString, err := softForkStatus(deploymentStatus)
+		//if err != nil {
+		//	return nil, &btcjson.RPCError{
+		//		Code: btcjson.ErrRPCInternal.Code,
+		//		Message: fmt.Sprintf("unknown deployment status: %v",
+		//			deploymentStatus),
+		//	}
+		//}
 
 		// Finally, populate the soft-fork description with all the
 		// information gathered above.
 		chainInfo.Bip9SoftForks[forkName] = &btcjson.Bip9SoftForkDescription{
-			Status:    strings.ToLower(statusString),
+			//Status:    strings.ToLower(statusString),
 			Bit:       deploymentDetails.BitNumber,
 			StartTime: int64(deploymentDetails.StartTime),
 			Timeout:   int64(deploymentDetails.ExpireTime),

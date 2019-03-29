@@ -442,16 +442,17 @@ func (b *BlockChain) calcSequenceLock(node *blockNode, tx *drcutil.Tx, utxoView 
 
 	// If we're performing block validation, then we need to query the BIP9
 	// state.
-	if !csvSoftforkActive {
-		// Obtain the latest BIP9 version bits state for the
-		// CSV-package soft-fork deployment. The adherence of sequence
-		// locks depends on the current soft-fork state.
-		csvState, err := b.deploymentState(node.parent, chaincfg.DeploymentCSV)
-		if err != nil {
-			return nil, err
-		}
-		csvSoftforkActive = csvState == ThresholdActive
-	}
+	wire.ChangeCode("Threshold,calcSequenceLock")
+	//if !csvSoftforkActive {
+	// Obtain the latest BIP9 version bits state for the
+	// CSV-package soft-fork deployment. The adherence of sequence
+	// locks depends on the current soft-fork state.
+	//csvState, err := b.deploymentState(node.parent, chaincfg.DeploymentCSV)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//csvSoftforkActive = csvState == ThresholdActive
+	//}
 
 	// If the transaction's version is less than 2, and BIP 68 has not yet
 	// been activated then sequence locks are disabled. Additionally,
@@ -1937,9 +1938,10 @@ func New(config *Config) (*BlockChain, error) {
 	}
 
 	// Initialize rule change threshold state caches.
-	if err := b.initThresholdCaches(); err != nil {
-		return nil, err
-	}
+	wire.ChangeCode("Threshold,calcSequenceLock")
+	//if err := b.initThresholdCaches(); err != nil {
+	//	return nil, err
+	//}
 
 	bestNode := b.bestChain.Tip()
 	log.Infof("Chain state (height %d, hash %v, totaltx %d, work %v)",
