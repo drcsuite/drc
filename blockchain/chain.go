@@ -1892,27 +1892,27 @@ func New(config *Config) (*BlockChain, error) {
 	//}
 
 	params := config.ChainParams
-	targetTimespan := int64(params.TargetTimespan / time.Second)
-	targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
-	adjustmentFactor := params.RetargetAdjustmentFactor
+	//targetTimespan := int64(params.TargetTimespan / time.Second)
+	//targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
+	//adjustmentFactor := params.RetargetAdjustmentFactor
 	b := BlockChain{
 		//checkpoints:         config.Checkpoints,
 		//checkpointsByHeight: checkpointsByHeight,
-		db:                  config.DB,
-		chainParams:         params,
-		timeSource:          config.TimeSource,
-		sigCache:            config.SigCache,
-		indexManager:        config.IndexManager,
-		minRetargetTimespan: targetTimespan / adjustmentFactor,
-		maxRetargetTimespan: targetTimespan * adjustmentFactor,
-		blocksPerRetarget:   int32(targetTimespan / targetTimePerBlock),
-		index:               newBlockIndex(config.DB, params),
-		hashCache:           config.HashCache,
-		bestChain:           newChainView(nil),
-		orphans:             make(map[chainhash.Hash]*orphanBlock),
-		prevOrphans:         make(map[chainhash.Hash][]*orphanBlock),
-		warningCaches:       newThresholdCaches(vbNumBits),
-		deploymentCaches:    newThresholdCaches(chaincfg.DefinedDeployments),
+		db:           config.DB,
+		chainParams:  params,
+		timeSource:   config.TimeSource,
+		sigCache:     config.SigCache,
+		indexManager: config.IndexManager,
+		//minRetargetTimespan: targetTimespan / adjustmentFactor,
+		//maxRetargetTimespan: targetTimespan * adjustmentFactor,
+		//blocksPerRetarget:   int32(targetTimespan / targetTimePerBlock),
+		index:            newBlockIndex(config.DB, params),
+		hashCache:        config.HashCache,
+		bestChain:        newChainView(nil),
+		orphans:          make(map[chainhash.Hash]*orphanBlock),
+		prevOrphans:      make(map[chainhash.Hash][]*orphanBlock),
+		warningCaches:    newThresholdCaches(vbNumBits),
+		deploymentCaches: newThresholdCaches(chaincfg.DefinedDeployments),
 	}
 
 	// Initialize the chain state from the passed database.  When the db

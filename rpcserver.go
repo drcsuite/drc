@@ -127,27 +127,27 @@ type commandHandler func(*rpcServer, interface{}, <-chan struct{}) (interface{},
 // a dependency loop.
 var rpcHandlers map[string]commandHandler
 var rpcHandlersBeforeInit = map[string]commandHandler{
-	"addnode":               handleAddNode,
-	"createrawtransaction":  handleCreateRawTransaction,
-	"debuglevel":            handleDebugLevel,
-	"decoderawtransaction":  handleDecodeRawTransaction,
-	"decodescript":          handleDecodeScript,
-	"estimatefee":           handleEstimateFee,
-	"generate":              handleGenerate,
-	"getaddednodeinfo":      handleGetAddedNodeInfo,
-	"getbestblock":          handleGetBestBlock,
-	"getbestblockhash":      handleGetBestBlockHash,
-	"getblock":              handleGetBlock,
-	"getblockchaininfo":     handleGetBlockChainInfo,
-	"getblockcount":         handleGetBlockCount,
-	"getblockhash":          handleGetBlockHash,
-	"getblockheader":        handleGetBlockHeader,
-	"getblocktemplate":      handleGetBlockTemplate,
-	"getcfilter":            handleGetCFilter,
-	"getcfilterheader":      handleGetCFilterHeader,
-	"getconnectioncount":    handleGetConnectionCount,
-	"getcurrentnet":         handleGetCurrentNet,
-	"getdifficulty":         handleGetDifficulty,
+	"addnode":              handleAddNode,
+	"createrawtransaction": handleCreateRawTransaction,
+	"debuglevel":           handleDebugLevel,
+	"decoderawtransaction": handleDecodeRawTransaction,
+	"decodescript":         handleDecodeScript,
+	"estimatefee":          handleEstimateFee,
+	"generate":             handleGenerate,
+	"getaddednodeinfo":     handleGetAddedNodeInfo,
+	"getbestblock":         handleGetBestBlock,
+	"getbestblockhash":     handleGetBestBlockHash,
+	"getblock":             handleGetBlock,
+	"getblockchaininfo":    handleGetBlockChainInfo,
+	"getblockcount":        handleGetBlockCount,
+	"getblockhash":         handleGetBlockHash,
+	"getblockheader":       handleGetBlockHeader,
+	"getblocktemplate":     handleGetBlockTemplate,
+	"getcfilter":           handleGetCFilter,
+	"getcfilterheader":     handleGetCFilterHeader,
+	"getconnectioncount":   handleGetConnectionCount,
+	"getcurrentnet":        handleGetCurrentNet,
+	//"getdifficulty":         handleGetDifficulty,
 	"getgenerate":           handleGetGenerate,
 	"gethashespersec":       handleGetHashesPerSec,
 	"getheaders":            handleGetHeaders,
@@ -1195,7 +1195,7 @@ func handleGetBlockChainInfo(s *rpcServer, cmd interface{}, closeChan <-chan str
 		Blocks:        chainSnapshot.Height,
 		Headers:       chainSnapshot.Height,
 		BestBlockHash: chainSnapshot.Hash.String(),
-		Difficulty:    getDifficultyRatio(chainSnapshot.Bits, params),
+		//Difficulty:    getDifficultyRatio(chainSnapshot.Bits, params),
 		MedianTime:    chainSnapshot.MedianTime.Unix(),
 		Pruned:        false,
 		Bip9SoftForks: make(map[string]*btcjson.Bip9SoftForkDescription),
@@ -1562,22 +1562,22 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// Choose a payment address at random if the caller requests a
 		// full coinbase as opposed to only the pertinent details needed
 		// to create their own coinbase.
-		var payAddr drcutil.Address
-		if !useCoinbaseValue {
-			payAddr = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
-		}
+		//var payAddr drcutil.Address
+		//if !useCoinbaseValue {
+		//	payAddr = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+		//}
 
 		// Create a new block template that has a coinbase which anyone
 		// can redeem.  This is only acceptable because the returned
 		// block template doesn't include the coinbase, so the caller
 		// will ultimately create their own coinbase which pays to the
 		// appropriate address(es).
-		blkTemplate, err := generator.NewBlockTemplate(payAddr)
-		if err != nil {
-			return internalRPCError("Failed to create new block "+
-				"template: "+err.Error(), "")
-		}
-		template = blkTemplate
+		//blkTemplate, err := generator.NewBlockTemplate(payAddr)
+		//if err != nil {
+		//	return internalRPCError("Failed to create new block "+
+		//		"template: "+err.Error(), "")
+		//}
+		//template = blkTemplate
 		msgBlock = template.Block
 		wire.ChangeCode()
 		//targetDifficulty = fmt.Sprintf("%064x",
@@ -1586,8 +1586,8 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// Get the minimum allowed timestamp for the block based on the
 		// median timestamp of the last several blocks per the chain
 		// consensus rules.
-		best := s.cfg.Chain.BestSnapshot()
-		minTimestamp := mining.MinimumMedianTime(best)
+		//best := s.cfg.Chain.BestSnapshot()
+		//minTimestamp := mining.MinimumMedianTime(best)
 
 		// Update work state to ensure another block template isn't
 		// generated until needed.
@@ -1595,7 +1595,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		state.lastGenerated = time.Now()
 		state.lastTxUpdate = lastTxUpdate
 		state.prevHash = latestHash
-		state.minTimestamp = minTimestamp
+		//state.minTimestamp = minTimestamp
 
 		rpcsLog.Debugf("Generated block template (timestamp %v, "+
 			"target %s, merkle root %s)",
@@ -1647,7 +1647,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// Update the time of the block template to the current time
 		// while accounting for the median time of the past several
 		// blocks per the chain consensus rules.
-		generator.UpdateBlockTime(msgBlock)
+		//generator.UpdateBlockTime(msgBlock)
 		//msgBlock.Header.Nonce = 0
 
 		rpcsLog.Debugf("Updated block template (timestamp %v, "+
@@ -2132,19 +2132,19 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *btcjson.TemplateReque
 		return "bad-prevblk", nil
 	}
 
-	if err := s.cfg.Chain.CheckConnectBlockTemplate(block); err != nil {
-		if _, ok := err.(blockchain.RuleError); !ok {
-			errStr := fmt.Sprintf("Failed to process block proposal: %v", err)
-			rpcsLog.Error(errStr)
-			return nil, &btcjson.RPCError{
-				Code:    btcjson.ErrRPCVerify,
-				Message: errStr,
-			}
-		}
-
-		rpcsLog.Infof("Rejected block proposal: %v", err)
-		return chainErrToGBTErrString(err), nil
-	}
+	//if err := s.cfg.Chain.CheckConnectBlockTemplate(block); err != nil {
+	//	if _, ok := err.(blockchain.RuleError); !ok {
+	//		errStr := fmt.Sprintf("Failed to process block proposal: %v", err)
+	//		rpcsLog.Error(errStr)
+	//		return nil, &btcjson.RPCError{
+	//			Code:    btcjson.ErrRPCVerify,
+	//			Message: errStr,
+	//		}
+	//	}
+	//
+	//	rpcsLog.Infof("Rejected block proposal: %v", err)
+	//	return chainErrToGBTErrString(err), nil
+	//}
 
 	return nil, nil
 }
@@ -2247,10 +2247,10 @@ func handleGetCurrentNet(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 }
 
 // handleGetDifficulty implements the getdifficulty command.
-func handleGetDifficulty(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	best := s.cfg.Chain.BestSnapshot()
-	return getDifficultyRatio(best.Bits, s.cfg.ChainParams), nil
-}
+//func handleGetDifficulty(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+//	best := s.cfg.Chain.BestSnapshot()
+//	return getDifficultyRatio(best.Bits, s.cfg.ChainParams), nil
+//}
 
 // handleGetGenerate implements the getgenerate command.
 func handleGetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
@@ -2314,9 +2314,9 @@ func handleGetInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (in
 		TimeOffset:      int64(s.cfg.TimeSource.Offset().Seconds()),
 		Connections:     s.cfg.ConnMgr.ConnectedCount(),
 		Proxy:           cfg.Proxy,
-		Difficulty:      getDifficultyRatio(best.Bits, s.cfg.ChainParams),
-		TestNet:         cfg.TestNet3,
-		RelayFee:        cfg.minRelayTxFee.ToBTC(),
+		//Difficulty:      getDifficultyRatio(best.Bits, s.cfg.ChainParams),
+		TestNet:  cfg.TestNet3,
+		RelayFee: cfg.minRelayTxFee.ToBTC(),
 	}
 
 	return ret, nil
@@ -2364,13 +2364,13 @@ func handleGetMiningInfo(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 		CurrentBlockSize:   best.BlockSize,
 		CurrentBlockWeight: best.BlockWeight,
 		CurrentBlockTx:     best.NumTxns,
-		Difficulty:         getDifficultyRatio(best.Bits, s.cfg.ChainParams),
-		Generate:           s.cfg.CPUMiner.IsMining(),
-		GenProcLimit:       s.cfg.CPUMiner.NumWorkers(),
-		HashesPerSec:       int64(s.cfg.CPUMiner.HashesPerSecond()),
-		NetworkHashPS:      networkHashesPerSec,
-		PooledTx:           uint64(s.cfg.TxMemPool.Count()),
-		TestNet:            cfg.TestNet3,
+		//Difficulty:         getDifficultyRatio(best.Bits, s.cfg.ChainParams),
+		Generate:      s.cfg.CPUMiner.IsMining(),
+		GenProcLimit:  s.cfg.CPUMiner.NumWorkers(),
+		HashesPerSec:  int64(s.cfg.CPUMiner.HashesPerSecond()),
+		NetworkHashPS: networkHashesPerSec,
+		PooledTx:      uint64(s.cfg.TxMemPool.Count()),
+		TestNet:       cfg.TestNet3,
 	}
 	return &result, nil
 }
@@ -3490,23 +3490,23 @@ func verifyChain(s *rpcServer, level, depth int32) error {
 
 	for height := best.Height; height > finishHeight; height-- {
 		// Level 0 just looks up the block.
-		block, err := s.cfg.Chain.BlockByHeight(height)
-		if err != nil {
-			rpcsLog.Errorf("Verify is unable to fetch block at "+
-				"height %d: %v", height, err)
-			return err
-		}
+		//block, err := s.cfg.Chain.BlockByHeight(height)
+		//if err != nil {
+		//	rpcsLog.Errorf("Verify is unable to fetch block at "+
+		//		"height %d: %v", height, err)
+		//	return err
+		//}
 
 		// Level 1 does basic chain sanity checks.
 		if level > 0 {
-			err := blockchain.CheckBlockSanity(block,
-				s.cfg.ChainParams.PowLimit, s.cfg.TimeSource)
-			if err != nil {
-				rpcsLog.Errorf("Verify is unable to validate "+
-					"block at hash %v height %d: %v",
-					block.Hash(), height, err)
-				return err
-			}
+			//err := blockchain.CheckBlockSanity(block,
+			//	s.cfg.ChainParams.PowLimit, s.cfg.TimeSource)
+			//if err != nil {
+			//	rpcsLog.Errorf("Verify is unable to validate "+
+			//		"block at hash %v height %d: %v",
+			//		block.Hash(), height, err)
+			//	return err
+			//}
 		}
 	}
 	rpcsLog.Infof("Chain verify completed successfully")

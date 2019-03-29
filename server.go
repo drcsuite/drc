@@ -2432,16 +2432,16 @@ func (s *server) Start() {
 		go s.upnpUpdateThread()
 	}
 
-	if !cfg.DisableRPC {
-		s.wg.Add(1)
-
-		//启动rebroadcastHandler，它确保RPC服务器接收到的用户tx被重新广播，直到包含在一个块中。
-		// Start the rebroadcastHandler, which ensures user tx received by
-		// the RPC server are rebroadcast until being included in a block.
-		go s.rebroadcastHandler()
-
-		s.rpcServer.Start()
-	}
+	//if !cfg.DisableRPC {
+	//	s.wg.Add(1)
+	//
+	//	//启动rebroadcastHandler，它确保RPC服务器接收到的用户tx被重新广播，直到包含在一个块中。
+	//	// Start the rebroadcastHandler, which ensures user tx received by
+	//	// the RPC server are rebroadcast until being included in a block.
+	//	go s.rebroadcastHandler()
+	//
+	//	s.rpcServer.Start()
+	//}
 
 	// Start the CPU miner if generation is enabled.
 	if cfg.Generate {
