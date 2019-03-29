@@ -953,14 +953,14 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Check the checkpoints for syntax errors.
-	cfg.addCheckpoints, err = parseCheckpoints(cfg.AddCheckpoints)
-	if err != nil {
-		str := "%s: Error parsing checkpoints: %v"
-		err := fmt.Errorf(str, funcName, err)
-		fmt.Fprintln(os.Stderr, err)
-		fmt.Fprintln(os.Stderr, usageMessage)
-		return nil, nil, err
-	}
+	//cfg.addCheckpoints, err = parseCheckpoints(cfg.AddCheckpoints)
+	//if err != nil {
+	//	str := "%s: Error parsing checkpoints: %v"
+	//	err := fmt.Errorf(str, funcName, err)
+	//	fmt.Fprintln(os.Stderr, err)
+	//	fmt.Fprintln(os.Stderr, usageMessage)
+	//	return nil, nil, err
+	//}
 
 	// Tor stream isolation requires either proxy or onion proxy to be set.
 	if cfg.TorIsolation && cfg.Proxy == "" && cfg.OnionProxy == "" {

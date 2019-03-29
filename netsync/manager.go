@@ -624,12 +624,11 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	//		firstNode := firstNodeEl.Value.(*headerNode)
 	//		if blockHash.IsEqual(firstNode.hash) {
 	//			behaviorFlags |= blockchain.BFFastAdd
-	//			wire.ChangeCode()
-	//			//if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
-	//			//	isCheckpointBlock = true
-	//			//} else {
-	//			//	sm.headerList.Remove(firstNodeEl)
-	//			//}
+	//			if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
+	//				isCheckpointBlock = true
+	//			} else {
+	//				sm.headerList.Remove(firstNodeEl)
+	//			}
 	//		}
 	//	}
 	//}

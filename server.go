@@ -2103,6 +2103,7 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 }
 
 // 当建立新的入站连接时，连接管理器将调用inboundPeerConnected。
+// 它初始化一个新的入站服务器对等实例，将其与连接关联，并启动goroutine等待断开连接。
 // inboundPeerConnected is invoked by the connection manager when a new inbound
 // connection is established.  It initializes a new inbound server peer
 // instance, associates it with the connection, and starts a goroutine to wait
@@ -2781,6 +2782,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		return nil, err
 	}
 
+	// 在数据库中搜索一个FeeEstimator状态。如果找不到或无法加载，则创建一个新的。
 	// Search for a FeeEstimator state in the database. If none can be found
 	// or if it cannot be loaded, create a new one.
 	db.Update(func(tx database.Tx) error {
