@@ -1559,7 +1559,7 @@ func (sm *SyncManager) VoteHandle() {
 
 	// 根据最新块，计算10秒发块定时器启动的时间
 	// According to the latest block, calculate the start time of the 10-second block timer
-	laterTime := creationTime.Add(vote.BlockTimeInterval*time.Duration(blockHeight) + 2*time.Second)
+	laterTime := creationTime.Add(vote.BlockTimeInterval*time.Duration(blockHeight) + vote.TimeInterval*time.Second)
 	nowTime := time.Now()
 	t := time.NewTimer(laterTime.Sub(nowTime))
 	<-t.C
@@ -1573,7 +1573,7 @@ func (sm *SyncManager) VoteHandle() {
 
 	// 10秒处理一波投票结果
 	// Process one wave of voting results 10 second
-	handlingTime := time.NewTimer(100000 * time.Second)
+	handlingTime := time.NewTimer(vote.BlockTimeInterval)
 	for {
 		select {
 		case <-handlingTime.C:
