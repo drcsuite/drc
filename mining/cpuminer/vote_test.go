@@ -2,6 +2,9 @@ package cpuminer
 
 import (
 	"fmt"
+	"github.com/drcsuite/drc/btcec"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/vote"
 	"testing"
 	"time"
@@ -20,4 +23,29 @@ func TestBlockVerge(t *testing.T) {
 	fmt.Println(vote.VotesVerge(257))
 	fmt.Println(vote.BlockVerge(257))
 	fmt.Println(10*time.Second*time.Duration(6) + 20*time.Second)
+}
+
+func GenerateBTC() (string, string, error) {
+	privKey, err := btcec.NewPrivateKey(btcec.S256())
+	if err != nil {
+		return "", "", err
+	}
+
+	privKeyWif, err := drcutil.NewWIF(privKey, &chaincfg.MainNetParams, false)
+	if err != nil {
+		return "", "", err
+	}
+	pubKeySerial := privKey.PubKey().SerializeUncompressed()
+
+	pubKeyAddress, err := drcutil.NewAddressPubKey(pubKeySerial, &chaincfg.MainNetParams)
+	if err != nil {
+		return "", "", err
+	}
+
+	return privKeyWif.String(), pubKeyAddress.EncodeAddress(), nil
+}
+
+func TestDi(t *testing.T) {
+	wifKey, address, _ := GenerateBTC()
+	fmt.Println(address, wifKey)
 }
