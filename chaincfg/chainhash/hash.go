@@ -69,14 +69,14 @@ func (hash *Hash) CloneBytes() []byte {
 }
 
 func (hash *Hash64) CloneBytes() []byte {
-	newHash := make([]byte, HashSize)
+	newHash := make([]byte, Hash64Size)
 	copy(newHash, hash[:])
 
 	return newHash
 }
 
 func (hash *Hash33) CloneBytes() []byte {
-	newHash := make([]byte, HashSize)
+	newHash := make([]byte, Hash33Size)
 	copy(newHash, hash[:])
 
 	return newHash

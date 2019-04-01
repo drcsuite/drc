@@ -498,6 +498,7 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 	// the local clock to keep the network time in sync.
 	sp.server.timeSource.AddTimeSample(sp.Addr(), msg.Timestamp)
 
+	// 向同步管理器发送信号:这个对等点是一个新的同步候选对象。
 	// Signal the sync manager this peer is a new sync candidate.
 	sp.server.syncManager.NewPeer(sp.Peer)
 
@@ -2445,7 +2446,6 @@ func (s *server) Start() {
 
 	// Start the CPU miner if generation is enabled.
 	if cfg.Generate {
-		fmt.Println("开始发块")
 		s.cpuMiner.Start()
 	}
 }
