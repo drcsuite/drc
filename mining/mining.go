@@ -846,7 +846,6 @@ mempoolLoop:
 	// Calculate the required difficulty for the block.  The timestamp
 	// is potentially adjusted to ensure it comes after the median time of
 	// the last several blocks per the chain consensus rules.
-	wire.ChangeCode("NewBlockTemplete")
 	// 在header中加入publickey
 	ts := medianAdjustedTime(best, g.timeSource)
 	//reqDifficulty, err := g.chain.CalcNextRequiredDifficulty(ts)
@@ -902,8 +901,10 @@ mempoolLoop:
 	//block := drcutil.NewBlock()
 	block := drcutil.NewCandidate(&msgBlock, &msgCandidate)
 	block.SetHeight(nextBlockHeight)
+	fmt.Println("blocktemplete: ", block)
 	seed, err := chainhash.NewHash(chainhash.DoubleHashB(g.BestCandidate().Header.Signature.CloneBytes()))
 	if err := g.chain.CheckConnectBlockTemplate(block, seed, vote.BlockVerge(scale)); err != nil {
+		fmt.Println("报错6")
 		return nil, err
 	}
 

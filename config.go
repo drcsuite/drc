@@ -56,7 +56,7 @@ const (
 	blockMaxSizeMax              = blockchain.MaxBlockBaseSize - 1000
 	blockMaxWeightMin            = 4000
 	blockMaxWeightMax            = blockchain.MaxBlockWeight - 4000
-	defaultGenerate              = false
+	defaultGenerate              = true
 	defaultMaxOrphanTransactions = 100
 	defaultMaxOrphanTxSize       = 100000
 	defaultSigCacheMaxSize       = 100000
@@ -474,8 +474,6 @@ func loadConfig() (*config, []string, error) {
 	parser := newConfigParser(&cfg, &serviceOpts, flags.Default)
 	if !(preCfg.RegressionTest || preCfg.SimNet) || preCfg.ConfigFile !=
 		defaultConfigFile {
-
-		fmt.Println("config: ", preCfg)
 		if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
 			err := createDefaultConfigFile(preCfg.ConfigFile)
 			if err != nil {

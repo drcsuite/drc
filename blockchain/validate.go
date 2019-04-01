@@ -1463,6 +1463,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chain
 
 	err := checkCandidateSanity(block, seed, pi, b.timeSource)
 	if err != nil {
+		fmt.Println("报错2")
 		return err
 	}
 

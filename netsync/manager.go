@@ -6,6 +6,7 @@ package netsync
 
 import (
 	"container/list"
+	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -1527,21 +1528,30 @@ func (sm *SyncManager) VoteHandle() {
 
 	// 等待同步完成
 	// Wait for synchronization to complete
-	openTime := time.NewTimer(time.Second)
-out:
-	for {
-		select {
-		case <-openTime.C:
+	//openTime := time.NewTimer(time.Second)
+	//out:
+	//for {
+	//select {
+	//case <-openTime.C:
+	//
+	//case <-vote.Open:
+	//	openTime.Stop()
+	//	break out
+	//}
+	//}
 
-		case <-vote.Open:
-			openTime.Stop()
-			break out
-		}
-	}
+	// 初始化指向池、前项块池、当前块池
+	blockchain.CurrentCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
+	blockchain.PrevCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
+	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
 
 	// 创世时间
 	// creation time
-	creationTime := chaincfg.MainNetParams.GenesisBlock.Header.Timestamp
+	genesis := chaincfg.MainNetParams.GenesisBlock
+	creationTime := time.Now()
+	if sm.chain.BestLastCandidate() == nil {
+		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
+	}
 	// 同步的最新块时间
 	// the latest block time for synchronization
 	bestLastCandidate := sm.chain.BestLastCandidate()
@@ -1549,7 +1559,7 @@ out:
 
 	// 根据最新块，计算10秒发块定时器启动的时间
 	// According to the latest block, calculate the start time of the 10-second block timer
-	laterTime := creationTime.Add(vote.BlockTimeInterval*time.Duration(blockHeight) + 20*time.Second)
+	laterTime := creationTime.Add(vote.BlockTimeInterval*time.Duration(blockHeight) + 2*time.Second)
 	nowTime := time.Now()
 	t := time.NewTimer(laterTime.Sub(nowTime))
 	<-t.C
@@ -1557,11 +1567,13 @@ out:
 
 	// 处理当前轮的写块和投票
 	// Handles write blocks and polls for the current round
-	sm.voteProcess()
+	//sm.voteProcess()
+	// 通知开始新一轮挖块
+	vote.Work = true
 
 	// 10秒处理一波投票结果
 	// Process one wave of voting results 10 second
-	handlingTime := time.NewTimer(10 * time.Second)
+	handlingTime := time.NewTimer(100000 * time.Second)
 	for {
 		select {
 		case <-handlingTime.C:
@@ -1574,6 +1586,7 @@ out:
 // When it's time to vote, select the winner on the blockChain and process the pool of votes
 func (sm *SyncManager) voteProcess() {
 	blockHeaderHash, votes := cpuminer.GetMaxVotes()
+	fmt.Println("blockheaderhash: ", blockHeaderHash)
 
 	msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
 
@@ -1841,8 +1854,9 @@ func (sm *SyncManager) ProcessBlock(block *drcutil.Block, flags blockchain.Behav
 func (sm *SyncManager) SendBlock(block *drcutil.Block) (bool, error) {
 	reply := make(chan sendBlockResponse, 1)
 	sm.msgChan <- sendBlockMsg{block: block, reply: reply}
-	response := <-reply
-	return response.isOrphan, response.err
+	//response := <-reply
+	//return response.isOrphan, response.err
+	return true, nil
 }
 
 // 广播投票签名
