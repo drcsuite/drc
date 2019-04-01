@@ -1588,10 +1588,10 @@ func (sm *SyncManager) voteProcess() {
 	blockHeaderHash, votes := cpuminer.GetMaxVotes()
 	fmt.Println("blockheaderhash: ", blockHeaderHash)
 
-	//msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
+	msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
 
 	// 写入最佳候选块，做为下轮发块的依据
-	//sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header, votes)
+	sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header, votes)
 
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
 	hash := blockchain.GetBestPointBlockH()
@@ -1867,8 +1867,8 @@ func (sm *SyncManager) SendBlock(block *drcutil.Block) (bool, error) {
 func (sm *SyncManager) SendSign(msg *wire.MsgSign) (bool, error) {
 	reply := make(chan sendSignResponse, 1)
 	sm.msgChan <- sendSignMsg{msgSign: msg, reply: reply}
-	response := <-reply
-	return response.isOrphan, response.err
+	//response := <-reply
+	return true, nil
 }
 
 // IsCurrent返回同步管理器是否认为它已与连接的对等点同步。
