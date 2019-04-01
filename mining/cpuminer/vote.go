@@ -1,6 +1,7 @@
 package cpuminer
 
 import (
+	"fmt"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
@@ -20,7 +21,7 @@ const (
 // 区块验证投票
 // Block validation vote
 func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
-
+	fmt.Println("执行了几次+++++++++++++++++++++++++++++++++++++++++++++++++")
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 

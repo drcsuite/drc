@@ -1524,11 +1524,11 @@ out:
 
 // 处理投票结果，是个独立线程
 // Processing the poll result is a separate thread
-func (sm *SyncManager) VoteHandle() {
+func (sm *SyncManager) VoteHandler() {
 
 	// 等待同步完成
 	// Wait for synchronization to complete
-	//openTime := time.NewTimer(time.Second)
+	//openTime := time.NewTicker(time.Second)
 	//out:
 	//for {
 	//select {
@@ -1573,7 +1573,7 @@ func (sm *SyncManager) VoteHandle() {
 
 	// 10秒处理一波投票结果
 	// Process one wave of voting results 10 second
-	handlingTime := time.NewTimer(vote.BlockTimeInterval)
+	handlingTime := time.NewTicker(vote.BlockTimeInterval)
 	for {
 		select {
 		case <-handlingTime.C:
@@ -1588,18 +1588,22 @@ func (sm *SyncManager) voteProcess() {
 	blockHeaderHash, votes := cpuminer.GetMaxVotes()
 	fmt.Println("blockheaderhash: ", blockHeaderHash)
 
-	msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
+	//msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
 
 	// 写入最佳候选块，做为下轮发块的依据
-	sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header, votes)
+	//sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header, votes)
 
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
 	hash := blockchain.GetBestPointBlockH()
 	prevCandidate := blockchain.PrevCandidatePool[hash]
-	msgBlock := drcutil.MsgCandidateToBlock(prevCandidate)
-	block := drcutil.NewBlockFromBlockAndBytes(msgBlock, nil)
-	block.Votes = votes
-	sm.chain.ProcessBlock(block, blockchain.BFNone)
+	// 创世块已直接写入区块链，prevCandidate为nil
+	if prevCandidate != nil {
+		msgBlock := drcutil.MsgCandidateToBlock(prevCandidate)
+		block := drcutil.NewBlockFromBlockAndBytes(msgBlock, nil)
+		block.Votes = votes
+		sm.chain.ProcessBlock(block, blockchain.BFNone)
+
+	}
 
 	// 本轮投票结束，当前票池变成上一轮票池
 	vote.RWSyncMutex.Lock()
@@ -1814,7 +1818,7 @@ func (sm *SyncManager) Start() {
 	log.Trace("Starting sync manager")
 	sm.wg.Add(1)
 	go sm.blockHandler()
-	go sm.VoteHandle()
+	go sm.VoteHandler()
 }
 
 // Stop通过停止所有异步处理程序并等待它们完成，优雅地关闭同步管理器。
