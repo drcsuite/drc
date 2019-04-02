@@ -44,7 +44,7 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 
 		// 用自己的私钥签名区块
 		// Sign the block with your own private key
-		headerSign, err := privateKey.Sign(headerHash.CloneBytes())
+		headerSign, err := privateKey.Sign64(headerHash.CloneBytes())
 		fmt.Printf("headersign： %x\n", headerSign.GenSignBytes())
 		if err != nil {
 			log.Errorf("Signature error: %s", err)
