@@ -350,7 +350,7 @@ out:
 			time.Sleep(time.Second)
 			continue
 		}
-
+		fmt.Println("开始发块")
 		curHeight := m.g.BestCandidate().Height
 		if curHeight != 0 && !m.cfg.IsCurrent() {
 			m.submitBlockLock.Unlock()
