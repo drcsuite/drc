@@ -6,7 +6,6 @@ package netsync
 
 import (
 	"container/list"
-	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -1559,7 +1558,7 @@ func (sm *SyncManager) VoteHandler() {
 
 	// 根据最新块，计算10秒发块定时器启动的时间
 	// According to the latest block, calculate the start time of the 10-second block timer
-	laterTime := creationTime.Add(vote.BlockTimeInterval*time.Duration(blockHeight) + vote.TimeInterval*time.Second)
+	laterTime := creationTime.Add(vote.BlockTimeInterval*time.Duration(blockHeight) + vote.SyncTimeInterval)
 	nowTime := time.Now()
 	t := time.NewTimer(laterTime.Sub(nowTime))
 	<-t.C
@@ -1587,18 +1586,23 @@ func (sm *SyncManager) VoteHandler() {
 // 投票时间到，选出获胜区块上链，处理票池
 // When it's time to vote, select the winner on the blockChain and process the pool of votes
 func (sm *SyncManager) voteProcess() {
-	blockHeaderHash, votes := cpuminer.GetMaxVotes()
-	fmt.Println("blockheaderhash: ", blockHeaderHash)
 
+	// 获取票数最多的区块
+	// get the block with the most votes
+	blockHeaderHash, votes := cpuminer.GetMaxVotes()
 	msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
 
 	// 写入最佳候选块，做为下轮发块的依据
+	// write the best candidate block, as the basis for the next round of block
 	sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header, votes)
 
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
+	// write the Hash of the previous round of blocks, most of which are pointed to in this round of block pool, into the blockChain
 	hash := blockchain.GetBestPointBlockH()
 	prevCandidate := blockchain.PrevCandidatePool[hash]
+
 	// 创世块已直接写入区块链，prevCandidate为nil
+	// The creation block is written directly to the blockChain, and prevCandidate is nil
 	if prevCandidate != nil {
 		msgBlock := drcutil.MsgCandidateToBlock(prevCandidate)
 		block := drcutil.NewBlockFromBlockAndBytes(msgBlock, nil)
@@ -1608,13 +1612,16 @@ func (sm *SyncManager) voteProcess() {
 	}
 
 	// 本轮投票结束，当前票池变成上一轮票池
+	// after this round of voting, the current voting pool will become the last round of voting pool
 	vote.RWSyncMutex.Lock()
 	ticketPool := vote.GetTicketPool()
 	vote.SetPrevTicketPool(ticketPool)
 	// 清空当前票池票池
+	// empty the current ticket pool
 	vote.SetTicketPool(make(map[chainhash.Hash][]vote.SignAndKey))
 
 	// 通知开始新一轮挖块
+	// // notify the start of a new round of digging
 	vote.Work = true
 
 	vote.RWSyncMutex.Unlock()
