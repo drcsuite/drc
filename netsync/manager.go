@@ -6,7 +6,6 @@ package netsync
 
 import (
 	"container/list"
-	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -1501,7 +1500,6 @@ out:
 				sm.peerNotifier.SendSign(msg.msgSign)
 
 			case isCurrentMsg:
-				fmt.Println("isCurrent,33333333333333333333333333333333333333")
 				msg.reply <- sm.current()
 
 			case pauseMsg:

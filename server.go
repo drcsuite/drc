@@ -2711,6 +2711,8 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		banPeers:             make(chan *serverPeer, cfg.MaxPeers),
 		query:                make(chan interface{}),
 		relayInv:             make(chan relayMsg, cfg.MaxPeers),
+		sendMsg:              make(chan sendMsg, cfg.MaxPeers),
+		sendSignature:        make(chan sendSignature, cfg.MaxPeers),
 		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
 		quit:                 make(chan struct{}),
 		modifyRebroadcastInv: make(chan interface{}),

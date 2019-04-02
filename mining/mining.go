@@ -615,7 +615,6 @@ mempoolLoop:
 	//	return nil, err
 	//}
 	//segwitActive := segwitState == blockchain.ThresholdActive
-	wire.ChangeCode("Threshold,calcSequenceLock")
 	witnessIncluded := false
 
 	// Choose which transactions make it into the block.
