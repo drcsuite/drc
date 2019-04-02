@@ -1846,9 +1846,9 @@ func (s *server) handleSendBlockMsg(state *peerState, msg sendMsg) {
 		// Queue the inventory to be relayed with the next batch.
 		// It will be ignored if the peer is already known to
 		// have the inventory.
-		block := msg.data.(wire.MsgCandidate)
+		block := msg.data.(*wire.MsgCandidate)
 		var dc chan<- struct{}
-		sp.QueueMessageWithEncoding(&block, dc, wire.BaseEncoding)
+		sp.QueueMessageWithEncoding(block, dc, wire.BaseEncoding)
 	})
 }
 
@@ -1861,9 +1861,9 @@ func (s *server) handleSendSignMsg(state *peerState, msg sendSignature) {
 		// Queue the inventory to be relayed with the next batch.
 		// It will be ignored if the peer is already known to
 		// have the inventory.
-		sign := msg.data.(wire.MsgSign)
+		sign := msg.data.(*wire.MsgSign)
 		var dc chan<- struct{}
-		sp.QueueMessageWithEncoding(&sign, dc, wire.BaseEncoding)
+		sp.QueueMessageWithEncoding(sign, dc, wire.BaseEncoding)
 	})
 }
 
