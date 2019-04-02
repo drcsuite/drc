@@ -360,7 +360,7 @@ out:
 		preHeader := m.g.BestCandidate().Header
 
 		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<π
-		signature, err := m.privKey.Sign(chainhash.DoubleHashB(preHeader.Signature.CloneBytes()))
+		signature, err := m.privKey.Sign64(chainhash.DoubleHashB(preHeader.Signature.CloneBytes()))
 		fmt.Printf("cpuminer sign: %x \n", signature.GenSignBytes())
 		if err != nil {
 			m.submitBlockLock.Unlock()
