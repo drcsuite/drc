@@ -1502,6 +1502,7 @@ out:
 				sm.peerNotifier.SendSign(msg.msgSign)
 
 			case isCurrentMsg:
+				fmt.Println("isCurrent,33333333333333333333333333333333333333")
 				msg.reply <- sm.current()
 
 			case pauseMsg:
@@ -1525,7 +1526,6 @@ out:
 // 处理投票结果，是个独立线程
 // Processing the poll result is a separate thread
 func (sm *SyncManager) VoteHandler() {
-
 	// 等待同步完成
 	// Wait for synchronization to complete
 	//openTime := time.NewTicker(time.Second)
@@ -1580,6 +1580,8 @@ func (sm *SyncManager) VoteHandler() {
 			sm.voteProcess()
 		}
 	}
+	sm.wg.Done()
+	log.Trace("vote Handler done")
 }
 
 // 投票时间到，选出获胜区块上链，处理票池
@@ -1816,7 +1818,7 @@ func (sm *SyncManager) Start() {
 	}
 
 	log.Trace("Starting sync manager")
-	sm.wg.Add(1)
+	sm.wg.Add(2)
 	go sm.blockHandler()
 	go sm.VoteHandler()
 }
@@ -1868,6 +1870,7 @@ func (sm *SyncManager) SendSign(msg *wire.MsgSign) (bool, error) {
 	reply := make(chan sendSignResponse, 1)
 	sm.msgChan <- sendSignMsg{msgSign: msg, reply: reply}
 	//response := <-reply
+	//return response.isOrphan, response.err
 	return true, nil
 }
 
@@ -1878,6 +1881,7 @@ func (sm *SyncManager) IsCurrent() bool {
 	reply := make(chan bool)
 	sm.msgChan <- isCurrentMsg{reply: reply}
 	return <-reply
+	//return true
 }
 
 // Pause暂停同步管理器，直到返回的通道关闭。

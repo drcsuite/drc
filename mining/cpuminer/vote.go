@@ -1,6 +1,7 @@
 package cpuminer
 
 import (
+	"fmt"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
@@ -33,7 +34,8 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 
 	// 判断该块票数是否符合被投票的资格
 	// Determine whether the block is eligible to be voted on
-	if isAdvantage(headerHash) {
+	//if isAdvantage(headerHash) {
+	if true {
 
 		pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
 		if err != nil {
@@ -43,6 +45,7 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 		// 用自己的私钥签名区块
 		// Sign the block with your own private key
 		headerSign, err := privateKey.Sign(headerHash.CloneBytes())
+		fmt.Printf("headersign： %x\n", headerSign.GenSignBytes())
 		if err != nil {
 			log.Errorf("Signature error: %s", err)
 		}
@@ -85,7 +88,6 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 // 如果当前块的票数比别的块差太多，放弃投票转发当前块
 // If the current block is too many votes short of the other blocks, the current block is not forwarded
 func isAdvantage(headerHash chainhash.Hash) bool {
-
 	_, max := GetMaxVotes()
 	// 当前块的票数
 	// The number of votes in the current block
@@ -107,6 +109,7 @@ func GetMaxVotes() (chainhash.Hash, uint16) {
 
 	var maxVotes = 0
 	var maxBlockHash chainhash.Hash
+	fmt.Println("票池大小： ", len(vote.GetTicketPool()))
 
 	for headerHash, signAndKeys := range vote.GetTicketPool() {
 		if count := len(signAndKeys); count > maxVotes {

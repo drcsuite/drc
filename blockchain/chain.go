@@ -1345,7 +1345,8 @@ func (b *BlockChain) IsCurrent() bool {
 	b.chainLock.RLock()
 	defer b.chainLock.RUnlock()
 
-	return b.isCurrent()
+	//return b.isCurrent()
+	return true
 }
 
 // BestSnapshot返回关于当前最佳链块的信息以及当前时间点的相关状态。返回的实例必须被视为不可变的，因为它是由所有调用者共享的。

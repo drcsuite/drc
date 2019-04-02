@@ -1194,12 +1194,14 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	// an error now.
 	if node.hash.IsEqual(b.chainParams.GenesisHash) {
 		str := "the coinbase for the genesis block is not spendable"
+		fmt.Println("报错3")
 		return ruleError(ErrMissingTxOut, str)
 	}
 
 	// Ensure the view is for the node being checked.
 	parentHash := &block.MsgBlock().Header.PrevBlock
 	if !view.BestHash().IsEqual(parentHash) {
+		fmt.Println("报错4")
 		return AssertError(fmt.Sprintf("inconsistent view when "+
 			"checking block connection: best hash is %v instead "+
 			"of expected %v", view.BestHash(), parentHash))
@@ -1224,6 +1226,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	if !isBIP0030Node(node) && (node.height < b.chainParams.BIP0034Height) {
 		err := b.checkBIP0030(node, block, view)
 		if err != nil {
+			fmt.Println("报错5")
 			return err
 		}
 	}
@@ -1235,6 +1238,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	// transaction inputs, counting pay-to-script-hashes, and scripts.
 	err := view.fetchInputUtxos(b.db, block)
 	if err != nil {
+		fmt.Println("报错7")
 		return err
 	}
 
@@ -1284,6 +1288,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 			str := fmt.Sprintf("block contains too many "+
 				"signature operations - got %v, max %v",
 				totalSigOpCost, MaxBlockSigOpsCost)
+			fmt.Println("报错8")
 			return ruleError(ErrTooManySigOps, str)
 		}
 	}
@@ -1308,6 +1313,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		lastTotalFees := totalFees
 		totalFees += txFee
 		if totalFees < lastTotalFees {
+			fmt.Println("报错9")
 			return ruleError(ErrBadFees, "total fees for block "+
 				"overflows accumulator")
 		}
@@ -1318,6 +1324,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		// spent txout in the order each transaction spends them.
 		err = view.connectTransaction(tx, node.height, stxos)
 		if err != nil {
+			fmt.Println("报错10")
 			return err
 		}
 	}
@@ -1337,6 +1344,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+
 			"which is more than expected value of %v",
 			totalSatoshiOut, expectedSatoshiOut)
+		fmt.Println("报错11")
 		return ruleError(ErrBadCoinbaseValue, str)
 	}
 
@@ -1400,6 +1408,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		sequenceLock, err := b.calcSequenceLock(node, tx, view,
 			false)
 		if err != nil {
+			fmt.Println("报错12")
 			return err
 		}
 		if !SequenceLockActive(sequenceLock, node.height,
@@ -1407,6 +1416,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 			str := fmt.Sprintf("block contains " +
 				"transaction whose input sequence " +
 				"locks are not met")
+			fmt.Println("报错13")
 			return ruleError(ErrUnfinalizedTx, str)
 		}
 	}
@@ -1427,6 +1437,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		err := checkBlockScripts(block, view, scriptFlags, b.sigCache,
 			b.hashCache)
 		if err != nil {
+			fmt.Println("报错14")
 			return err
 		}
 	}
@@ -1453,11 +1464,15 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chain
 
 	// This only checks whether the block can be connected to the tip of the
 	// current chain.
-	tip := b.bestChain.Tip()
+	//tip := b.bestChain.Tip()
+	lastCandidate := b.bestCandidate
 	header := block.MsgBlock().Header
-	if tip.hash != header.PrevBlock {
+	fmt.Println("tip.hash: ", lastCandidate.Hash)
+	fmt.Println("header.PrevBlock: ", header.PrevBlock)
+	if lastCandidate.Hash != header.PrevBlock {
 		str := fmt.Sprintf("previous block must be the current chain tip %v, "+
-			"instead got %v", tip.hash, header.PrevBlock)
+			"instead got %v", lastCandidate.Hash, header.PrevBlock)
+		fmt.Println("报错1")
 		return ruleError(ErrPrevBlockNotBest, str)
 	}
 
@@ -1475,7 +1490,10 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chain
 	// Leave the spent txouts entry nil in the state since the information
 	// is not needed and thus extra work can be avoided.
 	view := NewUtxoViewpoint()
-	view.SetBestHash(&tip.hash)
-	newNode := newBlockNode(&header, tip, 0)
+	view.SetBestHash(&lastCandidate.Hash)
+
+	chainTip := b.bestChain.Tip()
+	parent := newBlockNode(&lastCandidate.Header, chainTip, 0)
+	newNode := newBlockNode(&header, parent, 0)
 	return b.checkConnectBlock(newNode, block, view, nil)
 }

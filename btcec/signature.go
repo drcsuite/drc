@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"hash"
 	"math/big"
+	"math/rand"
 )
 
 // Errors returned by canonicalPadding.
@@ -416,6 +417,13 @@ func RecoverCompact(curve *KoblitzCurve, signature,
 	}
 
 	return key, ((signature[0] - 27) & 4) == 4, nil
+}
+
+func sign(privateKey *PrivateKey, hash []byte) (*Signature, error) {
+	b := make([]byte, 32)
+	rand.Read(b)
+	r, s, err := ecdsa.Sign(bytes.NewReader(b[:]), privateKey.ToECDSA(), hash)
+	return &Signature{r, s}, err
 }
 
 // signRFC6979 generates a deterministic ECDSA signature according to RFC 6979 and BIP 62.

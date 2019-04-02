@@ -18,7 +18,7 @@ const (
 
 	// 发块时间间隔
 	// Block time interval
-	BlockTimeInterval = 10 * time.Second
+	BlockTimeInterval = 2 * time.Second
 
 	TimeInterval = 20
 )

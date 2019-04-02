@@ -345,23 +345,23 @@ out:
 		m.submitBlockLock.Lock()
 		// 等待上一轮处理完成
 		if !vote.Work {
-			//if false {
 			m.submitBlockLock.Unlock()
 			time.Sleep(time.Second)
 			continue
 		}
-		fmt.Println("开始发块")
-		curHeight := m.g.BestCandidate().Height
-		if curHeight != 0 && !m.cfg.IsCurrent() {
+		fmt.Println("开始发块1")
+		//curHeight := m.g.BestCandidate().Height
+		//if curHeight != 0 && !m.cfg.IsCurrent() {
+		if false {
 			m.submitBlockLock.Unlock()
 			time.Sleep(time.Second)
 			continue
 		}
-
 		preHeader := m.g.BestCandidate().Header
 
 		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<π
 		signature, err := m.privKey.Sign(chainhash.DoubleHashB(preHeader.Signature.CloneBytes()))
+		fmt.Printf("cpuminer sign: %x \n", signature.GenSignBytes())
 		if err != nil {
 			m.submitBlockLock.Unlock()
 			errStr := fmt.Sprintf("Failed to signature prevate seed: %v", err)
@@ -514,7 +514,7 @@ func (m *CPUMiner) Start() {
 
 	m.quit = make(chan struct{})
 	m.speedMonitorQuit = make(chan struct{})
-	m.wg.Add(2)
+	m.wg.Add(1)
 	//go m.speedMonitor()
 	go m.miningWorkerController()
 
