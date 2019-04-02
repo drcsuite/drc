@@ -360,7 +360,7 @@ out:
 
 		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<π
 		signature, err := m.privKey.Sign64(chainhash.DoubleHashB(preHeader.Signature.CloneBytes()))
-		fmt.Printf("cpuminer sign: %x \n", signature)
+		//fmt.Printf("cpuminer sign: %x \n", signature)
 		if err != nil {
 			m.submitBlockLock.Unlock()
 			errStr := fmt.Sprintf("Failed to signature prevate seed: %v", err)
@@ -373,7 +373,7 @@ out:
 		// 前10个块的票数和估算值
 		votes, scales := make([]uint16, 0), make([]uint16, 0)
 
-		// 如果前项池为空，按创世快进行挖块
+		// 如果前项池为空，按链上最后一个块进行挖矿
 		if len(blockchain.PrevCandidatePool) != 0 {
 			candidate := blockchain.PrevCandidatePool[m.g.BestCandidate().Hash]
 			scales = append(scales, candidate.Header.Scale)
@@ -397,8 +397,8 @@ out:
 		// 计算前十个块平均规模和weight
 		scale := vote.EstimateScale(votes, scales)
 		Pi := vote.BlockVerge(scale)
-		fmt.Println("scale: ", scale)
-		fmt.Println("Pi: ", Pi)
+		//fmt.Println("scale: ", scale)
+		//fmt.Println("Pi: ", Pi)
 
 		// 如果不符合规则，等待下一轮
 		if weight.Cmp(Pi) >= 0 {
@@ -447,9 +447,15 @@ out:
 		// true a solution was found, so submit the solved block.
 		if m.solveBlock(template.Candidate, quit) {
 
+			// 加入当前块池
 			block := drcutil.NewCandidate(template.Block, template.Candidate)
 			blockchain.CurrentCandidatePool[*block.Hash()] = block.MsgCandidate()
-			fmt.Println("new block: ", block.MsgCandidate())
+			fmt.Println("new block hash: ", block.MsgCandidate().BlockHash())
+			// 加入当前指向池
+			points := blockchain.CurrentPointPool[m.g.BestCandidate().Hash]
+			points = append(points, block.MsgCandidate())
+			blockchain.CurrentPointPool[m.g.BestCandidate().Hash] = points
+			fmt.Println("当前指向池大小： ", len(blockchain.CurrentPointPool))
 			// 将块信息提交给对等点
 			bo := m.submitBlock(block)
 			if bo {

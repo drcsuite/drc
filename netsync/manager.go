@@ -6,6 +6,7 @@ package netsync
 
 import (
 	"container/list"
+	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -1551,7 +1552,7 @@ func (sm *SyncManager) VoteHandler() {
 	}
 	// 同步的最新块时间
 	// the latest block time for synchronization
-	bestLastCandidate := sm.chain.BestLastCandidate()
+	bestLastCandidate := sm.chain.BestSnapshot()
 	blockHeight := bestLastCandidate.Height
 
 	// 根据最新块，计算10秒发块定时器启动的时间
@@ -1597,7 +1598,12 @@ func (sm *SyncManager) voteProcess() {
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
 	// write the Hash of the previous round of blocks, most of which are pointed to in this round of block pool, into the blockChain
 	hash := blockchain.GetBestPointBlockH()
+	fmt.Println("当前指向池的hash: ", hash)
+
 	prevCandidate := blockchain.PrevCandidatePool[hash]
+	fmt.Println("prevCandidate: ", prevCandidate)
+	// 清空当前指向池
+	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
 
 	// 创世块已直接写入区块链，prevCandidate为nil
 	// The creation block is written directly to the blockChain, and prevCandidate is nil
@@ -1605,6 +1611,7 @@ func (sm *SyncManager) voteProcess() {
 		msgBlock := drcutil.MsgCandidateToBlock(prevCandidate)
 		block := drcutil.NewBlockFromBlockAndBytes(msgBlock, nil)
 		block.Votes = votes
+		fmt.Println("开始执行上链")
 		sm.chain.ProcessBlock(block, blockchain.BFNone)
 
 	}
@@ -1617,6 +1624,10 @@ func (sm *SyncManager) voteProcess() {
 	// 清空当前票池票池
 	// empty the current ticket pool
 	vote.SetTicketPool(make(map[chainhash.Hash][]vote.SignAndKey))
+
+	// 本轮投票结束,当前块池变成上一轮块池
+	blockchain.PrevCandidatePool = blockchain.CurrentCandidatePool
+	blockchain.CurrentCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
 
 	// 通知开始新一轮挖块
 	// // notify the start of a new round of digging

@@ -900,10 +900,8 @@ mempoolLoop:
 	//block := drcutil.NewBlock()
 	block := drcutil.NewCandidate(&msgBlock, &msgCandidate)
 	block.SetHeight(nextBlockHeight)
-	fmt.Println("blocktemplete: ", block)
 	seed, err := chainhash.NewHash(chainhash.DoubleHashB(g.BestCandidate().Header.Signature.CloneBytes()))
 	if err := g.chain.CheckConnectBlockTemplate(block, seed, vote.BlockVerge(scale)); err != nil {
-		fmt.Println("报错6")
 		return nil, err
 	}
 

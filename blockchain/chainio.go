@@ -1050,7 +1050,6 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState) error {
 		reserved:  snapshot.Reserved,
 		votes:     snapshot.Votes,
 	})
-
 	// Store the current best chain state into the database.
 	return dbTx.Metadata().Put(chainStateKeyName, serializedData)
 }
@@ -1079,10 +1078,10 @@ func (b *BlockChain) createChainState() error {
 
 	wire.ChangeCode("createChainState")
 	// 为创世块添加pk和sign
-	sign := genesisBlock.MsgBlock().Header.Signature
-	pubKey := genesisBlock.MsgBlock().Header.PublicKey
-	scale := genesisBlock.MsgBlock().Header.Scale
-	reserved := genesisBlock.MsgBlock().Header.Reserved
+	sign := header.Signature
+	pubKey := header.PublicKey
+	scale := header.Scale
+	reserved := header.Reserved
 
 	b.stateSnapshot = newBestState(node, blockSize, blockWeight, numTxns,
 		numTxns, sign, pubKey, scale, reserved, time.Unix(node.timestamp, 0), 1)
