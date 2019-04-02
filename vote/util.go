@@ -20,7 +20,9 @@ const (
 	// Block time interval
 	BlockTimeInterval = 10 * time.Second
 
-	TimeInterval = 20
+	// 为同步到最新的发块时间所需的时间间隔
+	// the time interval required to synchronize to the latest block time
+	SyncTimeInterval = 20 * time.Second
 )
 
 var (
