@@ -361,7 +361,7 @@ out:
 
 		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<π
 		signature, err := m.privKey.Sign64(chainhash.DoubleHashB(preHeader.Signature.CloneBytes()))
-		fmt.Printf("cpuminer sign: %x \n", signature.GenSignBytes())
+		fmt.Printf("cpuminer sign: %x \n", signature)
 		if err != nil {
 			m.submitBlockLock.Unlock()
 			errStr := fmt.Sprintf("Failed to signature prevate seed: %v", err)
@@ -369,7 +369,7 @@ out:
 			vote.Work = false
 			continue
 		}
-		weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signature.GenSignBytes()))
+		weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signature))
 
 		// 前10个块的票数和估算值
 		votes, scales := make([]uint16, 0), make([]uint16, 0)
@@ -425,7 +425,7 @@ out:
 			vote.Work = false
 			continue
 		}
-		signHash, err := chainhash.NewHash64(signature.GenSignBytes())
+		signHash, err := chainhash.NewHash64(signature)
 		if err != nil {
 			errStr := fmt.Sprintf("Hash64 Faild: %v", err)
 			log.Errorf(errStr)

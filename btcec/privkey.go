@@ -62,7 +62,7 @@ func (p *PrivateKey) Sign(hash []byte) (*Signature, error) {
 	return signRFC6979(p, hash)
 }
 
-func (p *PrivateKey) Sign64(hash []byte) (*Signature, error) {
+func (p *PrivateKey) Sign64(hash []byte) ([]byte, error) {
 	return sign(p, hash)
 }
 
