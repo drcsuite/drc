@@ -34,8 +34,7 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 
 	// 判断该块票数是否符合被投票的资格
 	// Determine whether the block is eligible to be voted on
-	//if isAdvantage(headerHash) {
-	if true {
+	if isAdvantage(headerHash) {
 
 		pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
 		if err != nil {
