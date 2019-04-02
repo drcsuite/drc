@@ -6,6 +6,7 @@ package netsync
 
 import (
 	"container/list"
+	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -23,7 +24,6 @@ import (
 	"github.com/drcsuite/drc/mempool"
 	peerpkg "github.com/drcsuite/drc/peer"
 	"github.com/drcsuite/drc/wire"
-	//"github.com/drcsuite/drc/mining/cpuminer"
 )
 
 const (

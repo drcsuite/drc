@@ -45,13 +45,13 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 		// 用自己的私钥签名区块
 		// Sign the block with your own private key
 		headerSign, err := privateKey.Sign64(headerHash.CloneBytes())
-		fmt.Printf("headersign： %x\n", headerSign.GenSignBytes())
+		fmt.Printf("headersign： %x\n", headerSign)
 		if err != nil {
 			log.Errorf("Signature error: %s", err)
 		}
 		// 计算本节点的投票weight
 		//The voting weight of this node is calculated
-		weight := chainhash.DoubleHashB(headerSign.GenSignBytes())
+		weight := chainhash.DoubleHashB(headerSign)
 		bigWeight := new(big.Int).SetBytes(weight)
 
 		voteVerge := vote.VotesVerge(msg.Header.Scale)
@@ -59,7 +59,7 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 		// Weight is less than the voteVerge, has the right to vote, does the voting signature
 		if bigWeight.Cmp(voteVerge) <= 0 {
 
-			sign, err := chainhash.NewHash64(headerSign.GenSignBytes())
+			sign, err := chainhash.NewHash64(headerSign)
 			if err != nil {
 				log.Errorf("Format conversion error: %s", err)
 			}
