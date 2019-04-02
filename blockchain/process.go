@@ -248,6 +248,7 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 		return false, false, err
 	}
 
+	fmt.Println("开始执行 processblock")
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
 	isMainChain, err := b.maybeAcceptBlock(block, flags)
@@ -340,8 +341,12 @@ func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags)
 
 	// 加入指向池 和 当前块池
 	CurrentCandidatePool[*blockHash] = block.MsgCandidate()
-	points := CurrentPointPool[*blockHash]
+	points := CurrentPointPool[b.BestLastCandidate().Hash]
 	points = append(points, block.MsgCandidate())
+	CurrentPointPool[b.BestLastCandidate().Hash] = points
+	//points := CurrentPointPool[*blockHash]
+	//points = append(points, block.MsgCandidate())
+	//CurrentPointPool[*blockHash] = points
 	log.Debugf("Accepted block %v", blockHash)
 
 	return true, nil

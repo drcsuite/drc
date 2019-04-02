@@ -33,6 +33,7 @@ const (
 	// MaxCoinbaseScriptLen is the maximum length a coinbase script can be.
 	MaxCoinbaseScriptLen = 100
 
+	// medianTimeBlocks是应该用来计算验证块时间戳所用的中值时间的先前块的数量。
 	// medianTimeBlocks is the number of previous blocks which should be
 	// used to calculate the median time used to validate block timestamps.
 	medianTimeBlocks = 11
@@ -847,15 +848,19 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	// 验证发块权
 	weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signB))
 	// 前10个块的票数和估算值
+	// 添加每个节点实际收到的票数和当时估算值
+	var blockNode *blockNode
 	votes, scales := make([]uint16, 0), make([]uint16, 0)
-	for i := 0; i < 10; i++ {
-		// 添加每个节点实际收到的票数和当时估算值
-		scales = append(scales, prevNode.Header().Scale)
-		votes = append(votes, prevNode.Votes)
-		prevNode = prevNode.Ancestor(1)
-		if prevNode == nil {
+	scales = append(scales, prevNode.Header().Scale)
+	votes = append(votes, prevNode.Votes)
+	blockNode = prevNode.Ancestor(1)
+	for i := 0; i < 9; i++ {
+		if blockNode == nil {
 			break
 		}
+		scales = append(scales, blockNode.Header().Scale)
+		votes = append(votes, blockNode.Votes)
+		blockNode = blockNode.Ancestor(1)
 	}
 	// 计算前十个块平均规模和weight
 	scale := vote.EstimateScale(votes, scales)
@@ -1393,6 +1398,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	// validated during the script checks bleow.
 	scriptFlags |= txscript.ScriptVerifyCheckSequenceVerify
 
+	// 我们获取了前一个*块的MTP，以确定当前块中的事务是否为final。
 	// We obtain the MTP of the *previous* block in order to
 	// determine if transactions in the current block are final.
 	medianTime := node.parent.CalcPastMedianTime()
@@ -1467,8 +1473,6 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chain
 	//tip := b.bestChain.Tip()
 	lastCandidate := b.bestCandidate
 	header := block.MsgBlock().Header
-	fmt.Println("tip.hash: ", lastCandidate.Hash)
-	fmt.Println("header.PrevBlock: ", header.PrevBlock)
 	if lastCandidate.Hash != header.PrevBlock {
 		str := fmt.Sprintf("previous block must be the current chain tip %v, "+
 			"instead got %v", lastCandidate.Hash, header.PrevBlock)
@@ -1487,13 +1491,15 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chain
 	//	return err
 	//}
 
+	// 将已使用的txouts条目nil保留在状态，因为不需要该信息，因此可以避免额外的工作。
 	// Leave the spent txouts entry nil in the state since the information
 	// is not needed and thus extra work can be avoided.
 	view := NewUtxoViewpoint()
 	view.SetBestHash(&lastCandidate.Hash)
 
-	chainTip := b.bestChain.Tip()
-	parent := newBlockNode(&lastCandidate.Header, chainTip, 0)
+	parent := newBlockNode(&lastCandidate.Header, b.index.LookupNode(&lastCandidate.Header.PrevBlock), 0)
+	fmt.Println("parentNode: ", parent)
 	newNode := newBlockNode(&header, parent, 0)
+	fmt.Println("currentNode: ", newNode)
 	return b.checkConnectBlock(newNode, block, view, nil)
 }

@@ -5,6 +5,7 @@
 package blockchain
 
 import (
+	"fmt"
 	"math/big"
 	"sort"
 	"sync"
@@ -212,13 +213,19 @@ func (node *blockNode) CalcPastMedianTime() time.Time {
 	timestamps := make([]int64, medianTimeBlocks)
 	numNodes := 0
 	iterNode := node
+	if iterNode != nil {
+		fmt.Println("iterNode: ", iterNode.hash)
+		if iterNode.parent != nil {
+			fmt.Println("iterNodeParent: ", iterNode.parent.hash)
+		}
+	}
 	for i := 0; i < medianTimeBlocks && iterNode != nil; i++ {
 		timestamps[i] = iterNode.timestamp
 		numNodes++
-
 		iterNode = iterNode.parent
 	}
 
+	fmt.Println("numNodes: ", numNodes)
 	// Prune the slice to the actual number of available timestamps which
 	// will be fewer than desired near the beginning of the block chain
 	// and sort them.
