@@ -1630,7 +1630,7 @@ func (sm *SyncManager) voteProcess() {
 	blockchain.CurrentCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
 
 	// 通知开始新一轮挖块
-	// // notify the start of a new round of digging
+	// notify the start of a new round of digging
 	vote.Work = true
 
 	vote.RWSyncMutex.Unlock()

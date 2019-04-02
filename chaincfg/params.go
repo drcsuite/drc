@@ -229,10 +229,12 @@ type Params struct {
 // MainNetParams定义了主要比特币网络的网络参数。6个种子节点的域名。
 // MainNetParams defines the network parameters for the main Bitcoin network.
 var MainNetParams = Params{
-	Name:        "mainnet",
-	Net:         wire.MainNet,
-	DefaultPort: "8333",
-	DNSSeeds:    []DNSSeed{
+	Name: "mainnet",
+	Net:  wire.MainNet,
+	//DefaultPort: "8333",
+	DefaultPort: "8336",
+	DNSSeeds: []DNSSeed{
+		{"192.168.10.203", true},
 		//{"seed.bitcoin.sipa.be", true},
 		//{"dnsseed.bluematt.me", true},
 		//{"dnsseed.bitcoin.dashjr.org", false},
