@@ -1619,7 +1619,7 @@ func (sm *SyncManager) voteProcess() {
 	vote.SetTicketPool(make(map[chainhash.Hash][]vote.SignAndKey))
 
 	// 通知开始新一轮挖块
-	// // notify the start of a new round of digging
+	// notify the start of a new round of digging
 	vote.Work = true
 
 	vote.RWSyncMutex.Unlock()
