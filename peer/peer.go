@@ -1354,6 +1354,8 @@ out:
 		// is done.  The timer is reset below for the next iteration if
 		// needed.
 		rmsg, buf, err := p.readMessage(p.wireEncoding) // 获取msg
+
+		fmt.Println(rmsg, "------------------------------------------------------------------")
 		idleTimer.Stop()
 		if err != nil {
 			// In order to allow regression tests with malformed messages, don't
