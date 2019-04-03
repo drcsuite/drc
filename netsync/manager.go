@@ -1575,7 +1575,7 @@ func (sm *SyncManager) VoteHandler() {
 		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
 	}
 
-	vote.Work = false
+	vote.Work = true
 
 	// 10秒处理一波投票结果
 	// Process one wave of voting results 10 second
@@ -1639,7 +1639,7 @@ func (sm *SyncManager) voteProcess() {
 
 	// 通知开始新一轮挖块
 	// notify the start of a new round of digging
-	vote.Work = false
+	vote.Work = true
 
 	vote.RWSyncMutex.Unlock()
 }
