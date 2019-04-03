@@ -1567,7 +1567,7 @@ func (sm *SyncManager) VoteHandler() {
 	// Handles write blocks and polls for the current round
 	//sm.voteProcess()
 	// 通知开始新一轮挖块
-	vote.Work = true
+	vote.Work = false
 
 	// 10秒处理一波投票结果
 	// Process one wave of voting results 10 second
@@ -1631,7 +1631,7 @@ func (sm *SyncManager) voteProcess() {
 
 	// 通知开始新一轮挖块
 	// notify the start of a new round of digging
-	vote.Work = true
+	vote.Work = false
 
 	vote.RWSyncMutex.Unlock()
 }
