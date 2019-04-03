@@ -633,8 +633,8 @@ func (sp *serverPeer) OnCandidate(_ *peer.Peer, msg *wire.MsgCandidate, buf []by
 
 	// 将块添加到对等节点的已知目录中。
 	// Add the block to the known inventory for the peer.
-	iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
-	sp.AddKnownInventory(iv)
+	//iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
+	//sp.AddKnownInventory(iv)
 
 	// 将块排队等待块管理器处理，并故意进一步接收块，直到比特币块被完全处理并知道是好是坏。
 	// 这有助于防止恶意的对等程序在断开连接(或断开连接)和浪费内存之前排队等待一堆坏块。
