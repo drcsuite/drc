@@ -127,6 +127,11 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32,
 	return drcutil.NewTx(tx), nil
 }
 
+// CreateBlock从前面的块创建一个新的块构建
+//指定块版本和时间戳。如果传递的时间戳为零(不是)
+//初始化)，然后使用前一个块的时间戳加1
+//使用second。为前一个块传递nil将导致一个这样的块
+//构建于指定链的genesis块之上。
 // CreateBlock creates a new block building from the previous block with a
 // specified blockversion and timestamp. If the timestamp passed is zero (not
 // initialized), then the timestamp of the previous block will be used plus 1

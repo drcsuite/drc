@@ -1,9 +1,14 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"github.com/drcsuite/drc/btcec"
+	"github.com/drcsuite/drc/chaincfg"
+	"github.com/drcsuite/drc/drcutil"
 )
 
 //func main() {
@@ -15,6 +20,43 @@ import (
 //	Array()
 //	fmt.Println(" Hello, DRC!")
 //}
+
+func GenerateBTC() (string, string, error) {
+	privKey, err := btcec.NewPrivateKey(btcec.S256())
+	if err != nil {
+		return "", "", err
+	}
+
+	privKeyWif, err := drcutil.NewWIF(privKey, &chaincfg.MainNetParams, false)
+	if err != nil {
+		return "", "", err
+	}
+	pubKeySerial := privKey.PubKey().SerializeUncompressed()
+
+	pubKeyAddress, err := drcutil.NewAddressPubKey(pubKeySerial, &chaincfg.MainNetParams)
+	if err != nil {
+		return "", "", err
+	}
+
+	return privKeyWif.String(), pubKeyAddress.EncodeAddress(), nil
+}
+
+//func main() {
+//	//wifKey, address, _ := GenerateBTCTest() // 测试地址
+//	wifKey, address, _ := GenerateBTC() // 正式地址
+//	fmt.Println(address, wifKey)
+//}
+
+// github.com/btcsuite/btcd/btcec/privkey.go
+// NewPrivateKey is a wrapper for ecdsa.GenerateKey that returns a PrivateKey
+// instead of the normal ecdsa.PrivateKey.
+func NewPrivateKey(curve elliptic.Curve) (*btcec.PrivateKey, error) {
+	key, err := ecdsa.GenerateKey(curve, rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	return (*btcec.PrivateKey)(key), nil
+}
 
 func testCipherAndSign() {
 	// cipher
@@ -31,10 +73,9 @@ func testCipherAndSign() {
 
 	// signature
 	hash := []byte{0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9}
-	signature, _ := privateKey.Sign(hash)
+	bytes, _ := privateKey.Sign64(hash)
 
 	// plan 1
-	bytes := signature.GenSignBytes()
 	fmt.Println("长度： ", len(bytes), "签名bytes： ", bytes)
 	derSignature := btcec.GetSignature(bytes)
 

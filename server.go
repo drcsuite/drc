@@ -498,6 +498,7 @@ func (sp *serverPeer) OnVersion(_ *peer.Peer, msg *wire.MsgVersion) *wire.MsgRej
 	// the local clock to keep the network time in sync.
 	sp.server.timeSource.AddTimeSample(sp.Addr(), msg.Timestamp)
 
+	// 向同步管理器发送信号:这个对等点是一个新的同步候选对象。
 	// Signal the sync manager this peer is a new sync candidate.
 	sp.server.syncManager.NewPeer(sp.Peer)
 
@@ -1845,9 +1846,9 @@ func (s *server) handleSendBlockMsg(state *peerState, msg sendMsg) {
 		// Queue the inventory to be relayed with the next batch.
 		// It will be ignored if the peer is already known to
 		// have the inventory.
-		block := msg.data.(wire.MsgCandidate)
+		block := msg.data.(*wire.MsgCandidate)
 		var dc chan<- struct{}
-		sp.QueueMessageWithEncoding(&block, dc, wire.BaseEncoding)
+		sp.QueueMessageWithEncoding(block, dc, wire.BaseEncoding)
 	})
 }
 
@@ -1860,9 +1861,9 @@ func (s *server) handleSendSignMsg(state *peerState, msg sendSignature) {
 		// Queue the inventory to be relayed with the next batch.
 		// It will be ignored if the peer is already known to
 		// have the inventory.
-		sign := msg.data.(wire.MsgSign)
+		sign := msg.data.(*wire.MsgSign)
 		var dc chan<- struct{}
-		sp.QueueMessageWithEncoding(&sign, dc, wire.BaseEncoding)
+		sp.QueueMessageWithEncoding(sign, dc, wire.BaseEncoding)
 	})
 }
 
@@ -2445,7 +2446,6 @@ func (s *server) Start() {
 
 	// Start the CPU miner if generation is enabled.
 	if cfg.Generate {
-		fmt.Println("开始发块")
 		s.cpuMiner.Start()
 	}
 }
@@ -2711,6 +2711,8 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		banPeers:             make(chan *serverPeer, cfg.MaxPeers),
 		query:                make(chan interface{}),
 		relayInv:             make(chan relayMsg, cfg.MaxPeers),
+		sendMsg:              make(chan sendMsg, cfg.MaxPeers),
+		sendSignature:        make(chan sendSignature, cfg.MaxPeers),
 		broadcast:            make(chan broadcastMsg, cfg.MaxPeers),
 		quit:                 make(chan struct{}),
 		modifyRebroadcastInv: make(chan interface{}),

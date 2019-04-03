@@ -62,6 +62,10 @@ func (p *PrivateKey) Sign(hash []byte) (*Signature, error) {
 	return signRFC6979(p, hash)
 }
 
+func (p *PrivateKey) Sign64(hash []byte) ([]byte, error) {
+	return sign(p, hash)
+}
+
 // PrivKeyBytesLen defines the length in bytes of a serialized private key.
 const PrivKeyBytesLen = 32
 

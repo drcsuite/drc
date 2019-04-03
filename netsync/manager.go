@@ -6,6 +6,7 @@ package netsync
 
 import (
 	"container/list"
+	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -23,7 +24,6 @@ import (
 	"github.com/drcsuite/drc/mempool"
 	peerpkg "github.com/drcsuite/drc/peer"
 	"github.com/drcsuite/drc/wire"
-	//"github.com/drcsuite/drc/mining/cpuminer"
 )
 
 const (
@@ -1523,33 +1523,41 @@ out:
 
 // 处理投票结果，是个独立线程
 // Processing the poll result is a separate thread
-func (sm *SyncManager) VoteHandle() {
-
+func (sm *SyncManager) VoteHandler() {
 	// 等待同步完成
 	// Wait for synchronization to complete
-	openTime := time.NewTimer(time.Second)
-out:
-	for {
-		select {
-		case <-openTime.C:
+	//openTime := time.NewTicker(time.Second)
+	//out:
+	//for {
+	//select {
+	//case <-openTime.C:
+	//
+	//case <-vote.Open:
+	//	openTime.Stop()
+	//	break out
+	//}
+	//}
 
-		case <-vote.Open:
-			openTime.Stop()
-			break out
-		}
-	}
+	// 初始化指向池、前项块池、当前块池
+	blockchain.CurrentCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
+	blockchain.PrevCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
+	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
 
 	// 创世时间
 	// creation time
-	creationTime := chaincfg.MainNetParams.GenesisBlock.Header.Timestamp
+	genesis := chaincfg.MainNetParams.GenesisBlock
+	creationTime := time.Now()
+	if sm.chain.BestLastCandidate() == nil {
+		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
+	}
 	// 同步的最新块时间
 	// the latest block time for synchronization
-	bestLastCandidate := sm.chain.BestLastCandidate()
+	bestLastCandidate := sm.chain.BestSnapshot()
 	blockHeight := bestLastCandidate.Height
 
 	// 根据最新块，计算10秒发块定时器启动的时间
 	// According to the latest block, calculate the start time of the 10-second block timer
-	laterTime := creationTime.Add(vote.BlockTimeInterval*time.Duration(blockHeight) + 20*time.Second)
+	laterTime := creationTime.Add(vote.BlockTimeInterval*time.Duration(blockHeight) + vote.SyncTimeInterval)
 	nowTime := time.Now()
 	t := time.NewTimer(laterTime.Sub(nowTime))
 	<-t.C
@@ -1557,45 +1565,72 @@ out:
 
 	// 处理当前轮的写块和投票
 	// Handles write blocks and polls for the current round
-	sm.voteProcess()
+	//sm.voteProcess()
+	// 通知开始新一轮挖块
+	vote.Work = true
 
 	// 10秒处理一波投票结果
 	// Process one wave of voting results 10 second
-	handlingTime := time.NewTimer(10 * time.Second)
+	handlingTime := time.NewTicker(vote.BlockTimeInterval)
 	for {
 		select {
 		case <-handlingTime.C:
 			sm.voteProcess()
 		}
 	}
+	sm.wg.Done()
+	log.Trace("vote Handler done")
 }
 
 // 投票时间到，选出获胜区块上链，处理票池
 // When it's time to vote, select the winner on the blockChain and process the pool of votes
 func (sm *SyncManager) voteProcess() {
-	blockHeaderHash, votes := cpuminer.GetMaxVotes()
 
+	// 获取票数最多的区块
+	// get the block with the most votes
+	blockHeaderHash, votes := cpuminer.GetMaxVotes()
 	msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
 
 	// 写入最佳候选块，做为下轮发块的依据
+	// write the best candidate block, as the basis for the next round of block
 	sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header, votes)
 
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
+	// write the Hash of the previous round of blocks, most of which are pointed to in this round of block pool, into the blockChain
 	hash := blockchain.GetBestPointBlockH()
+	fmt.Println("当前指向池的hash: ", hash)
+
 	prevCandidate := blockchain.PrevCandidatePool[hash]
-	msgBlock := drcutil.MsgCandidateToBlock(prevCandidate)
-	block := drcutil.NewBlockFromBlockAndBytes(msgBlock, nil)
-	block.Votes = votes
-	sm.chain.ProcessBlock(block, blockchain.BFNone)
+	fmt.Println("prevCandidate: ", prevCandidate)
+	// 清空当前指向池
+	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
+
+	// 创世块已直接写入区块链，prevCandidate为nil
+	// The creation block is written directly to the blockChain, and prevCandidate is nil
+	if prevCandidate != nil {
+		msgBlock := drcutil.MsgCandidateToBlock(prevCandidate)
+		block := drcutil.NewBlockFromBlockAndBytes(msgBlock, nil)
+		block.Votes = votes
+		fmt.Println("开始执行上链")
+		sm.chain.ProcessBlock(block, blockchain.BFNone)
+
+	}
 
 	// 本轮投票结束，当前票池变成上一轮票池
+	// after this round of voting, the current voting pool will become the last round of voting pool
 	vote.RWSyncMutex.Lock()
 	ticketPool := vote.GetTicketPool()
 	vote.SetPrevTicketPool(ticketPool)
 	// 清空当前票池票池
+	// empty the current ticket pool
 	vote.SetTicketPool(make(map[chainhash.Hash][]vote.SignAndKey))
 
+	// 本轮投票结束,当前块池变成上一轮块池
+	blockchain.PrevCandidatePool = blockchain.CurrentCandidatePool
+	blockchain.CurrentCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
+
 	// 通知开始新一轮挖块
+	// notify the start of a new round of digging
 	vote.Work = true
 
 	vote.RWSyncMutex.Unlock()
@@ -1799,9 +1834,9 @@ func (sm *SyncManager) Start() {
 	}
 
 	log.Trace("Starting sync manager")
-	sm.wg.Add(1)
+	sm.wg.Add(2)
 	go sm.blockHandler()
-	go sm.VoteHandle()
+	go sm.VoteHandler()
 }
 
 // Stop通过停止所有异步处理程序并等待它们完成，优雅地关闭同步管理器。
@@ -1841,16 +1876,18 @@ func (sm *SyncManager) ProcessBlock(block *drcutil.Block, flags blockchain.Behav
 func (sm *SyncManager) SendBlock(block *drcutil.Block) (bool, error) {
 	reply := make(chan sendBlockResponse, 1)
 	sm.msgChan <- sendBlockMsg{block: block, reply: reply}
-	response := <-reply
-	return response.isOrphan, response.err
+	//response := <-reply
+	//return response.isOrphan, response.err
+	return true, nil
 }
 
 // 广播投票签名
 func (sm *SyncManager) SendSign(msg *wire.MsgSign) (bool, error) {
 	reply := make(chan sendSignResponse, 1)
 	sm.msgChan <- sendSignMsg{msgSign: msg, reply: reply}
-	response := <-reply
-	return response.isOrphan, response.err
+	//response := <-reply
+	//return response.isOrphan, response.err
+	return true, nil
 }
 
 // IsCurrent返回同步管理器是否认为它已与连接的对等点同步。
@@ -1860,6 +1897,7 @@ func (sm *SyncManager) IsCurrent() bool {
 	reply := make(chan bool)
 	sm.msgChan <- isCurrentMsg{reply: reply}
 	return <-reply
+	//return true
 }
 
 // Pause暂停同步管理器，直到返回的通道关闭。

@@ -1,6 +1,7 @@
 package cpuminer
 
 import (
+	"fmt"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
@@ -20,7 +21,6 @@ const (
 // 区块验证投票
 // Block validation vote
 func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
-
 	m.Mutex.Lock()
 	defer m.Mutex.Unlock()
 
@@ -43,13 +43,14 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 
 		// 用自己的私钥签名区块
 		// Sign the block with your own private key
-		headerSign, err := privateKey.Sign(headerHash.CloneBytes())
+		headerSign, err := privateKey.Sign64(headerHash.CloneBytes())
+		fmt.Printf("headersign： %x\n", headerSign)
 		if err != nil {
 			log.Errorf("Signature error: %s", err)
 		}
 		// 计算本节点的投票weight
 		//The voting weight of this node is calculated
-		weight := chainhash.DoubleHashB(headerSign.Serialize())
+		weight := chainhash.DoubleHashB(headerSign)
 		bigWeight := new(big.Int).SetBytes(weight)
 
 		voteVerge := vote.VotesVerge(msg.Header.Scale)
@@ -57,7 +58,7 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 		// Weight is less than the voteVerge, has the right to vote, does the voting signature
 		if bigWeight.Cmp(voteVerge) <= 0 {
 
-			sign, err := chainhash.NewHash64(headerSign.Serialize())
+			sign, err := chainhash.NewHash64(headerSign)
 			if err != nil {
 				log.Errorf("Format conversion error: %s", err)
 			}
@@ -86,7 +87,6 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 // 如果当前块的票数比别的块差太多，放弃投票转发当前块
 // If the current block is too many votes short of the other blocks, the current block is not forwarded
 func isAdvantage(headerHash chainhash.Hash) bool {
-
 	_, max := GetMaxVotes()
 	// 当前块的票数
 	// The number of votes in the current block
@@ -108,6 +108,7 @@ func GetMaxVotes() (chainhash.Hash, uint16) {
 
 	var maxVotes = 0
 	var maxBlockHash chainhash.Hash
+	fmt.Println("票池大小： ", len(vote.GetTicketPool()))
 
 	for headerHash, signAndKeys := range vote.GetTicketPool() {
 		if count := len(signAndKeys); count > maxVotes {

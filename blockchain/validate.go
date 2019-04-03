@@ -33,6 +33,7 @@ const (
 	// MaxCoinbaseScriptLen is the maximum length a coinbase script can be.
 	MaxCoinbaseScriptLen = 100
 
+	// medianTimeBlocks是应该用来计算验证块时间戳所用的中值时间的先前块的数量。
 	// medianTimeBlocks is the number of previous blocks which should be
 	// used to calculate the median time used to validate block timestamps.
 	medianTimeBlocks = 11
@@ -847,15 +848,19 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	// 验证发块权
 	weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signB))
 	// 前10个块的票数和估算值
+	// 添加每个节点实际收到的票数和当时估算值
+	var blockNode *blockNode
 	votes, scales := make([]uint16, 0), make([]uint16, 0)
-	for i := 0; i < 10; i++ {
-		// 添加每个节点实际收到的票数和当时估算值
-		scales = append(scales, prevNode.Header().Scale)
-		votes = append(votes, prevNode.Votes)
-		prevNode = prevNode.Ancestor(1)
-		if prevNode == nil {
+	scales = append(scales, prevNode.Header().Scale)
+	votes = append(votes, prevNode.Votes)
+	blockNode = prevNode.Ancestor(1)
+	for i := 0; i < 9; i++ {
+		if blockNode == nil {
 			break
 		}
+		scales = append(scales, blockNode.Header().Scale)
+		votes = append(votes, blockNode.Votes)
+		blockNode = blockNode.Ancestor(1)
 	}
 	// 计算前十个块平均规模和weight
 	scale := vote.EstimateScale(votes, scales)
@@ -1194,12 +1199,14 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	// an error now.
 	if node.hash.IsEqual(b.chainParams.GenesisHash) {
 		str := "the coinbase for the genesis block is not spendable"
+		fmt.Println("报错3")
 		return ruleError(ErrMissingTxOut, str)
 	}
 
 	// Ensure the view is for the node being checked.
 	parentHash := &block.MsgBlock().Header.PrevBlock
 	if !view.BestHash().IsEqual(parentHash) {
+		fmt.Println("报错4")
 		return AssertError(fmt.Sprintf("inconsistent view when "+
 			"checking block connection: best hash is %v instead "+
 			"of expected %v", view.BestHash(), parentHash))
@@ -1224,6 +1231,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	if !isBIP0030Node(node) && (node.height < b.chainParams.BIP0034Height) {
 		err := b.checkBIP0030(node, block, view)
 		if err != nil {
+			fmt.Println("报错5")
 			return err
 		}
 	}
@@ -1235,6 +1243,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	// transaction inputs, counting pay-to-script-hashes, and scripts.
 	err := view.fetchInputUtxos(b.db, block)
 	if err != nil {
+		fmt.Println("报错7")
 		return err
 	}
 
@@ -1284,6 +1293,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 			str := fmt.Sprintf("block contains too many "+
 				"signature operations - got %v, max %v",
 				totalSigOpCost, MaxBlockSigOpsCost)
+			fmt.Println("报错8")
 			return ruleError(ErrTooManySigOps, str)
 		}
 	}
@@ -1308,6 +1318,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		lastTotalFees := totalFees
 		totalFees += txFee
 		if totalFees < lastTotalFees {
+			fmt.Println("报错9")
 			return ruleError(ErrBadFees, "total fees for block "+
 				"overflows accumulator")
 		}
@@ -1318,6 +1329,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		// spent txout in the order each transaction spends them.
 		err = view.connectTransaction(tx, node.height, stxos)
 		if err != nil {
+			fmt.Println("报错10")
 			return err
 		}
 	}
@@ -1337,6 +1349,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+
 			"which is more than expected value of %v",
 			totalSatoshiOut, expectedSatoshiOut)
+		fmt.Println("报错11")
 		return ruleError(ErrBadCoinbaseValue, str)
 	}
 
@@ -1385,6 +1398,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	// validated during the script checks bleow.
 	scriptFlags |= txscript.ScriptVerifyCheckSequenceVerify
 
+	// 我们获取了前一个*块的MTP，以确定当前块中的事务是否为final。
 	// We obtain the MTP of the *previous* block in order to
 	// determine if transactions in the current block are final.
 	medianTime := node.parent.CalcPastMedianTime()
@@ -1400,6 +1414,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		sequenceLock, err := b.calcSequenceLock(node, tx, view,
 			false)
 		if err != nil {
+			fmt.Println("报错12")
 			return err
 		}
 		if !SequenceLockActive(sequenceLock, node.height,
@@ -1407,6 +1422,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 			str := fmt.Sprintf("block contains " +
 				"transaction whose input sequence " +
 				"locks are not met")
+			fmt.Println("报错13")
 			return ruleError(ErrUnfinalizedTx, str)
 		}
 	}
@@ -1427,6 +1443,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		err := checkBlockScripts(block, view, scriptFlags, b.sigCache,
 			b.hashCache)
 		if err != nil {
+			fmt.Println("报错14")
 			return err
 		}
 	}
@@ -1453,16 +1470,19 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chain
 
 	// This only checks whether the block can be connected to the tip of the
 	// current chain.
-	tip := b.bestChain.Tip()
+	//tip := b.bestChain.Tip()
+	lastCandidate := b.bestCandidate
 	header := block.MsgBlock().Header
-	if tip.hash != header.PrevBlock {
+	if lastCandidate.Hash != header.PrevBlock {
 		str := fmt.Sprintf("previous block must be the current chain tip %v, "+
-			"instead got %v", tip.hash, header.PrevBlock)
+			"instead got %v", lastCandidate.Hash, header.PrevBlock)
+		fmt.Println("报错1")
 		return ruleError(ErrPrevBlockNotBest, str)
 	}
 
 	err := checkCandidateSanity(block, seed, pi, b.timeSource)
 	if err != nil {
+		fmt.Println("报错2")
 		return err
 	}
 
@@ -1471,10 +1491,15 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chain
 	//	return err
 	//}
 
+	// 将已使用的txouts条目nil保留在状态，因为不需要该信息，因此可以避免额外的工作。
 	// Leave the spent txouts entry nil in the state since the information
 	// is not needed and thus extra work can be avoided.
 	view := NewUtxoViewpoint()
-	view.SetBestHash(&tip.hash)
-	newNode := newBlockNode(&header, tip, 0)
+	view.SetBestHash(&lastCandidate.Hash)
+
+	parent := newBlockNode(&lastCandidate.Header, b.index.LookupNode(&lastCandidate.Header.PrevBlock), 0)
+	fmt.Println("parentNode: ", parent)
+	newNode := newBlockNode(&header, parent, 0)
+	fmt.Println("currentNode: ", newNode)
 	return b.checkConnectBlock(newNode, block, view, nil)
 }
