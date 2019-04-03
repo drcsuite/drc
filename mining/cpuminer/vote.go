@@ -1,7 +1,6 @@
 package cpuminer
 
 import (
-	"fmt"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
@@ -44,7 +43,7 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 		// 用自己的私钥签名区块
 		// Sign the block with your own private key
 		headerSign, err := privateKey.Sign64(headerHash.CloneBytes())
-		fmt.Printf("headersign： %x\n", headerSign)
+		//fmt.Printf("headersign： %x\n", headerSign)
 		if err != nil {
 			log.Errorf("Signature error: %s", err)
 		}
@@ -108,7 +107,7 @@ func GetMaxVotes() (chainhash.Hash, uint16) {
 
 	var maxVotes = 0
 	var maxBlockHash chainhash.Hash
-	fmt.Println("票池大小： ", len(vote.GetTicketPool()))
+	//fmt.Println("票池大小： ", len(vote.GetTicketPool()))
 
 	for headerHash, signAndKeys := range vote.GetTicketPool() {
 		if count := len(signAndKeys); count > maxVotes {

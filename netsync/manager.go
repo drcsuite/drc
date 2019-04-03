@@ -6,7 +6,6 @@ package netsync
 
 import (
 	"container/list"
-	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -816,6 +815,7 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 
 	// If we didn't ask for this block then the peer is misbehaving.
 	blockHash := bmsg.block.CandidateHash()
+	log.Info("收到新块,hash: ", blockHash)
 
 	//在heades -first模式下，如果块匹配正在获取的头列表中第一个头的哈希值，则可以减少验证，
 	// 因为头已经被验证为链接在一起，并且直到下一个检查点为止都是有效的。
@@ -834,7 +834,7 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 	// 通过验证将该块放入块池和指向池
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
+	vote, b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
 	if err != nil || !b {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -871,6 +871,7 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 		return
 	}
 
+	log.Info("转发块信息")
 	// 转发块信息
 	bo, err := sm.SendBlock(bmsg.block)
 	if err != nil || !bo {
@@ -878,7 +879,10 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 	}
 
 	// 对收到的块做投票处理
-	bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
+	if vote {
+		log.Info("对 ", bmsg.block.Hash(), " 进行投票")
+		bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
+	}
 }
 
 // 处理签名队列里的签名
@@ -1545,11 +1549,9 @@ func (sm *SyncManager) VoteHandler() {
 
 	// 创世时间
 	// creation time
-	genesis := chaincfg.MainNetParams.GenesisBlock
+	//best := sm.chain.BestSnapshot()
 	creationTime := time.Now()
-	if sm.chain.BestLastCandidate() == nil {
-		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
-	}
+
 	// 同步的最新块时间
 	// the latest block time for synchronization
 	bestLastCandidate := sm.chain.BestSnapshot()
@@ -1567,6 +1569,11 @@ func (sm *SyncManager) VoteHandler() {
 	// Handles write blocks and polls for the current round
 	//sm.voteProcess()
 	// 通知开始新一轮挖块
+	// 必须把bestlastcandidate同步过来，如果同步结束BestLastCandidate依然为空，则按照创世块发块
+	genesis := chaincfg.MainNetParams.GenesisBlock
+	if sm.chain.BestLastCandidate() == nil {
+		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
+	}
 	vote.Work = true
 
 	// 10秒处理一波投票结果
@@ -1598,10 +1605,10 @@ func (sm *SyncManager) voteProcess() {
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
 	// write the Hash of the previous round of blocks, most of which are pointed to in this round of block pool, into the blockChain
 	hash := blockchain.GetBestPointBlockH()
-	fmt.Println("当前指向池的hash: ", hash)
+	//fmt.Println("当前指向池的hash: ", hash)
 
 	prevCandidate := blockchain.PrevCandidatePool[hash]
-	fmt.Println("prevCandidate: ", prevCandidate)
+	//fmt.Println("prevCandidate: ", prevCandidate)
 	// 清空当前指向池
 	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
 
@@ -1611,7 +1618,7 @@ func (sm *SyncManager) voteProcess() {
 		msgBlock := drcutil.MsgCandidateToBlock(prevCandidate)
 		block := drcutil.NewBlockFromBlockAndBytes(msgBlock, nil)
 		block.Votes = votes
-		fmt.Println("开始执行上链")
+		//fmt.Println("开始执行上链")
 		sm.chain.ProcessBlock(block, blockchain.BFNone)
 
 	}
