@@ -85,14 +85,19 @@ func (b *BlockChain) maybeAcceptBlock(block *drcutil.Block, flags BehaviorFlags)
 	if err != nil {
 		return false, err
 	}
-	fmt.Println("开始执行accept")
-	fmt.Println("newNode: ", newNode)
+	log.Info("开始写入区块链")
 	// 将通过的模块连接到链条上，同时要根据链条的正确选择，并提供最多的工作证明。这还处理事务脚本的验证。
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
 	isMainChain, err := b.connectBestChain(newNode, block, flags)
-	fmt.Println("已上链的区块： ", block)
+	log.Info("区块上链成功")
+	log.Info("高度: ", block.Height())
+	log.Info("version: ", block.MsgBlock().Header.Version)
+	log.Info("scale: ", block.MsgBlock().Header.Scale)
+	log.Info("timestamp: ", block.MsgBlock().Header.Timestamp)
+	log.Info("blockhash: ", block.MsgBlock().BlockHash())
+
 	if err != nil {
 		return false, err
 	}
