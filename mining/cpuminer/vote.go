@@ -1,6 +1,7 @@
 package cpuminer
 
 import (
+	"fmt"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
@@ -78,6 +79,7 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 				PublicKey:       *pubKey,
 			}
 
+			fmt.Println("传播对块的签名+++++++++++++++++++++++++", pubKey)
 			m.cfg.SendSign(msgSign)
 		}
 	}

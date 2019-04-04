@@ -380,10 +380,13 @@ out:
 			if prevNode == nil {
 				break
 			}
+			fmt.Println("第", i, "次节点为： ", prevNode.Header())
 			scales = append(scales, prevNode.Header().Scale)
 			votes = append(votes, prevNode.Votes)
 			prevNode = prevNode.Ancestor(1)
 		}
+		log.Info("前十个块票数： ", votes)
+		log.Info("前十个块scale： ", scales)
 		scale := vote.EstimateScale(votes, scales)
 		Pi := vote.BlockVerge(scale)
 		// 如果不符合规则，等待下一轮

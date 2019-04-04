@@ -6,6 +6,7 @@ package netsync
 
 import (
 	"container/list"
+	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -833,7 +834,7 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 	// 通过验证将该块放入块池和指向池
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	/*behaviorFlags := blockchain.BFNone
+	behaviorFlags := blockchain.BFNone
 	vote, b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
 	if err != nil || !b {
 		// When the error is a rule error, it means the block was simply
@@ -853,7 +854,7 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 		}
 
 		return
-	}*/
+	}
 
 	//向发送孤儿块的对等方请求父方。当块不是孤立块时，记录有关它的信息并更新链状态。
 	// Request the parents for the orphan block from the peer that sent it.
@@ -873,10 +874,10 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 	}
 
 	// 对收到的块做投票处理
-	//if vote {
-	log.Info("对 ", bmsg.block.Hash(), " 进行投票")
-	bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
-	//}
+	if vote {
+		log.Info("对 ", bmsg.block.Hash(), " 进行投票")
+		bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
+	}
 }
 
 // 处理签名队列里的签名
@@ -942,7 +943,8 @@ func (sm *SyncManager) CollectVotes(sign *wire.MsgSign, candidate *wire.MsgCandi
 				// 收到的投票的前置块hash值跟本节点的前置hash值一样，传播该投票信息
 				// The leading block hash value for the poll received is the same as the leading hash value for the node, and the poll is propagated
 				lastCandidate := sm.chain.BestLastCandidate()
-
+				fmt.Println("传播收到的的签名+++++++++++++++++++++++++", sign.PublicKey)
+				fmt.Println(candidate.Header.PrevBlock == lastCandidate.Hash)
 				if candidate.Header.PrevBlock == lastCandidate.Hash {
 
 					bo, err := sm.SendSign(sign)
