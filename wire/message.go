@@ -37,6 +37,7 @@ const (
 	CmdGetData      = "getdata"
 	CmdNotFound     = "notfound"
 	CmdBlock        = "block"
+	CmdCandidate    = "candidate"
 	CmdTx           = "tx"
 	CmdGetHeaders   = "getheaders"
 	CmdHeaders      = "headers"
@@ -114,6 +115,9 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdBlock:
 		msg = &MsgBlock{}
+
+	case CmdCandidate:
+		msg = &MsgCandidate{}
 
 	case CmdInv:
 		msg = &MsgInv{}
@@ -371,6 +375,7 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet BitcoinNet,
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
 	}
 
+	// 根据命令创建适当消息类型的结构。
 	// Create struct of appropriate message type based on the command.
 	msg, err := makeEmptyMessage(command)
 	if err != nil {

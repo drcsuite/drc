@@ -1023,10 +1023,13 @@ func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte,
 	n, msg, buf, err := wire.ReadMessageWithEncodingN(p.conn,
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
 	atomic.AddUint64(&p.bytesReceived, uint64(n))
+	fmt.Println("++++++++++++++++readMessage: ", msg)
 	if p.cfg.Listeners.OnRead != nil {
+		fmt.Println("+++++++++++++++++++++++onread")
 		p.cfg.Listeners.OnRead(p, n, msg, err)
 	}
 	if err != nil {
+		fmt.Println("+++++++++++++++++++++err1")
 		return nil, nil, err
 	}
 
@@ -1216,6 +1219,7 @@ out:
 		case msg := <-p.stallControl:
 			switch msg.command {
 			case sccSendMessage:
+				// 如果需要，为预期的响应消息添加一个截止日期。
 				// Add a deadline for the expected response
 				// message if needed.
 				p.maybeAddDeadline(pendingResponses,
@@ -1459,6 +1463,7 @@ out:
 			}
 
 		case *wire.MsgCandidate:
+			fmt.Println("****************************************MsgCandidate")
 			if p.cfg.Listeners.OnCandidate != nil {
 				p.cfg.Listeners.OnCandidate(p, msg, buf)
 			}

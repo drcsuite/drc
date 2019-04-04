@@ -48,6 +48,7 @@ func (code RejectCode) String() string {
 	return fmt.Sprintf("Unknown RejectCode (%d)", uint8(code))
 }
 
+// MsgReject实现消息接口并表示比特币拒绝消息。
 // MsgReject implements the Message interface and represents a bitcoin reject
 // message.
 //
