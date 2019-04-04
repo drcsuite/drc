@@ -827,13 +827,13 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 	// Also, remove the list entry for all blocks except the checkpoint
 	// since it is needed to verify the next round of headers links
 	// properly.
-	behaviorFlags := blockchain.BFNone
 
 	// 处理该块
 	// 包括：验证签名，验证交易，验证weight，验证coinbase，
 	// 通过验证将该块放入块池和指向池
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
+	/*behaviorFlags := blockchain.BFNone
 	vote, b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
 	if err != nil || !b {
 		// When the error is a rule error, it means the block was simply
@@ -853,7 +853,7 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 		}
 
 		return
-	}
+	}*/
 
 	//向发送孤儿块的对等方请求父方。当块不是孤立块时，记录有关它的信息并更新链状态。
 	// Request the parents for the orphan block from the peer that sent it.
@@ -865,12 +865,6 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 	// Clear the rejected transactions.
 	sm.rejectedTxns = make(map[chainhash.Hash]struct{})
 
-	//如果我们不采取“头先上”的模式，就没什么可做的了。
-	// Nothing more to do if we aren't in headers-first mode.
-	if !sm.headersFirstMode {
-		return
-	}
-
 	log.Info("转发块信息")
 	// 转发块信息
 	bo, err := sm.SendBlock(bmsg.block)
@@ -879,10 +873,10 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 	}
 
 	// 对收到的块做投票处理
-	if vote {
-		log.Info("对 ", bmsg.block.Hash(), " 进行投票")
-		bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
-	}
+	//if vote {
+	log.Info("对 ", bmsg.block.Hash(), " 进行投票")
+	bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
+	//}
 }
 
 // 处理签名队列里的签名

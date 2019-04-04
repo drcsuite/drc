@@ -1023,9 +1023,10 @@ func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte,
 	n, msg, buf, err := wire.ReadMessageWithEncodingN(p.conn,
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
 	atomic.AddUint64(&p.bytesReceived, uint64(n))
-	fmt.Println("++++++++++++++++readMessage: ", msg)
+	if msg != nil {
+		fmt.Println("++++++++++++++++readMessage: ", msg.Command(), "| ", msg)
+	}
 	if p.cfg.Listeners.OnRead != nil {
-		fmt.Println("+++++++++++++++++++++++onread")
 		p.cfg.Listeners.OnRead(p, n, msg, err)
 	}
 	if err != nil {
@@ -1458,14 +1459,11 @@ out:
 			}
 
 		case *wire.MsgBlock:
-			fmt.Println("++++++++++++++++++++++++++++++", rmsg)
 			if p.cfg.Listeners.OnBlock != nil {
 				p.cfg.Listeners.OnBlock(p, msg, buf)
 			}
 
 		case *wire.MsgCandidate:
-			fmt.Println("------------------------------", rmsg)
-			fmt.Println("****************************************MsgCandidate")
 			if p.cfg.Listeners.OnCandidate != nil {
 				p.cfg.Listeners.OnCandidate(p, msg, buf)
 			}
