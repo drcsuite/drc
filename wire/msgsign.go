@@ -36,5 +36,5 @@ func (msg *MsgSign) Command() string {
 }
 
 func (msg *MsgSign) MaxPayloadLength(pver uint32) uint32 {
-	return MaxBlockPayload
+	return MaxVotePayload
 }

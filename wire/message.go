@@ -184,6 +184,9 @@ func makeEmptyMessage(command string) (Message, error) {
 	case CmdCFCheckpt:
 		msg = &MsgCFCheckpt{}
 
+	case CmdSign:
+		msg = &MsgSign{}
+
 	default:
 		return nil, fmt.Errorf("unhandled command [%s]", command)
 	}

@@ -1355,7 +1355,6 @@ out:
 		// needed.
 		rmsg, buf, err := p.readMessage(p.wireEncoding) // 获取msg
 
-		fmt.Println(rmsg, "------------------------------------------------------------------")
 		idleTimer.Stop()
 		if err != nil {
 			// In order to allow regression tests with malformed messages, don't
@@ -1456,11 +1455,13 @@ out:
 			}
 
 		case *wire.MsgBlock:
+			fmt.Println("++++++++++++++++++++++++++++++", rmsg)
 			if p.cfg.Listeners.OnBlock != nil {
 				p.cfg.Listeners.OnBlock(p, msg, buf)
 			}
 
 		case *wire.MsgCandidate:
+			fmt.Println("------------------------------", rmsg)
 			if p.cfg.Listeners.OnCandidate != nil {
 				p.cfg.Listeners.OnCandidate(p, msg, buf)
 			}

@@ -50,7 +50,8 @@ const (
 	defaultRequiredServices = wire.SFNodeNetwork
 
 	// defaultTargetOutbound is the default number of outbound peers to target.
-	defaultTargetOutbound = 8
+	//defaultTargetOutbound = 8
+	defaultTargetOutbound = 1
 
 	// connectionRetryInterval is the base amount of time to wait in between
 	// retries when connecting to persistent peers.  It is adjusted by the
@@ -1838,6 +1839,8 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 }
 
 func (s *server) handleSendBlockMsg(state *peerState, msg sendMsg) {
+
+	fmt.Println("可广播的可信节点数", state.Count())
 	state.forAllPeers(func(sp *serverPeer) {
 		if !sp.Connected() {
 			return
