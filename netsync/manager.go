@@ -806,7 +806,7 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 }
 
 // 处理发块阶段收到的块
-func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
+func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 	peer := bmsg.peer
 	_, exists := sm.peerStates[peer]
 	if !exists {
@@ -1458,7 +1458,7 @@ out:
 				msg.reply <- struct{}{}
 
 			case *candidateMsg:
-				sm.handleCadidateMsg(msg)
+				sm.handleCandidateMsg(msg)
 				msg.reply <- struct{}{}
 
 			case *signMsg:
@@ -1838,7 +1838,7 @@ func (sm *SyncManager) Start() {
 	log.Trace("Starting sync manager")
 	sm.wg.Add(2)
 	go sm.blockHandler()
-	//go sm.VoteHandler()
+	go sm.VoteHandler()
 }
 
 // Stop通过停止所有异步处理程序并等待它们完成，优雅地关闭同步管理器。

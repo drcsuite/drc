@@ -337,6 +337,10 @@ func (bi *blockIndex) NodeStatus(node *blockNode) blockStatus {
 	return status
 }
 
+func (bi *blockIndex) NodeNum() int {
+	return len(bi.index)
+}
+
 // SetStatusFlags将block节点上提供的状态标志翻转为on，
 //不管他们之前是开着还是关着。这不会取消任何设置
 //当前打开标志。

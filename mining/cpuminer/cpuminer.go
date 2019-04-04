@@ -378,16 +378,17 @@ out:
 		if prevNode != nil {
 			for i := 0; i < 9; i++ {
 				// 添加每个节点实际收到的票数和当时估算值
-				scales = append(scales, prevNode.Header().Scale)
-				votes = append(votes, prevNode.Votes)
-				prevNode = prevNode.Ancestor(1)
 				if prevNode == nil {
 					break
 				}
+				//prevNode = prevNode.Ancestor(1)
+				scales = append(scales, prevNode.Header().Scale)
+				votes = append(votes, prevNode.Votes)
 				hashes := prevNode.Header().PrevBlock
 				prevNode = m.chain.GetBlockIndex().LookupNode(&hashes)
 			}
 		}
+		fmt.Println("前10块投票数为: ", votes)
 		scale := vote.EstimateScale(votes, scales)
 		Pi := vote.BlockVerge(scale)
 		// 如果不符合规则，等待下一轮
