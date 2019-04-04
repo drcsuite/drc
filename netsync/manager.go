@@ -1844,7 +1844,7 @@ func (sm *SyncManager) Start() {
 	log.Trace("Starting sync manager")
 	sm.wg.Add(2)
 	go sm.blockHandler()
-	//go sm.VoteHandler()
+	go sm.VoteHandler()
 }
 
 // Stop通过停止所有异步处理程序并等待它们完成，优雅地关闭同步管理器。
