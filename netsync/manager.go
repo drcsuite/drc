@@ -917,16 +917,15 @@ func (sm *SyncManager) CollectVotes(sign *wire.MsgSign, candidate *wire.MsgCandi
 
 		// 验证签名
 		// Verify the signature
-		signature, err := btcec.ParseSignature(sign.Signature.CloneBytes(), btcec.S256())
-		if err != nil {
-			log.Errorf("Parse error: %s", err)
-		}
+		signBytes := sign.Signature.CloneBytes()
+
 		pubKey, err := btcec.ParsePubKey(sign.PublicKey.CloneBytes(), btcec.S256())
 		if err != nil {
 			log.Errorf("Parse error: %s", err)
 		}
 		hash := sign.BlockHeaderHash.CloneBytes()
-		if signature.Verify(hash, pubKey) {
+
+		if btcec.GetSignature(signBytes).Verify(hash, pubKey) {
 
 			// 查看weight是否符合
 			// Check whether weight is consistent
@@ -1844,7 +1843,7 @@ func (sm *SyncManager) Start() {
 	log.Trace("Starting sync manager")
 	sm.wg.Add(2)
 	go sm.blockHandler()
-	//go sm.VoteHandler()
+	go sm.VoteHandler()
 }
 
 // Stop通过停止所有异步处理程序并等待它们完成，优雅地关闭同步管理器。
