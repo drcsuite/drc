@@ -375,18 +375,19 @@ out:
 		scales = append(scales, preHeader.Scale)
 		votes = append(votes, best.Votes)
 		prevNode := m.chain.GetBlockIndex().LookupNode(&preHeader.PrevBlock)
-		for i := 0; i < 9; i++ {
-			// 添加每个节点实际收到的票数和当时估算值
-			if prevNode == nil {
-				break
+		if prevNode != nil {
+			for i := 0; i < 9; i++ {
+				// 添加每个节点实际收到的票数和当时估算值
+				scales = append(scales, prevNode.Header().Scale)
+				votes = append(votes, prevNode.Votes)
+				prevNode = prevNode.Ancestor(1)
+				if prevNode == nil {
+					break
+				}
+				hashes := prevNode.Header().PrevBlock
+				prevNode = m.chain.GetBlockIndex().LookupNode(&hashes)
 			}
-			fmt.Println("第", i, "次节点为： ", prevNode.Header())
-			scales = append(scales, prevNode.Header().Scale)
-			votes = append(votes, prevNode.Votes)
-			prevNode = prevNode.Ancestor(1)
 		}
-		log.Info("前十个块票数： ", votes)
-		log.Info("前十个块scale： ", scales)
 		scale := vote.EstimateScale(votes, scales)
 		Pi := vote.BlockVerge(scale)
 		// 如果不符合规则，等待下一轮

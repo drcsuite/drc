@@ -328,14 +328,18 @@ func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags)
 	scales = append(scales, best.Header.Scale)
 	votes = append(votes, best.Votes)
 	node := b.GetBlockIndex().LookupNode(&best.Header.PrevBlock)
-	for i := 0; i < 9; i++ {
-		// 添加每个节点实际收到的票数和当时估算值
-		if node == nil {
-			break
+	if node != nil {
+		for i := 0; i < 9; i++ {
+			// 添加每个节点实际收到的票数和当时估算值
+			scales = append(scales, node.Header().Scale)
+			votes = append(votes, node.Votes)
+			node = node.Ancestor(1)
+			if node == nil {
+				break
+			}
+			hashes := node.Header().PrevBlock
+			node = b.GetBlockIndex().LookupNode(&hashes)
 		}
-		scales = append(scales, node.Header().Scale)
-		votes = append(votes, node.Votes)
-		node = node.Ancestor(1)
 	}
 	scale := vote.EstimateScale(votes, scales)
 	Pi := vote.BlockVerge(scale)
