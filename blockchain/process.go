@@ -322,6 +322,7 @@ func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags)
 	//对块及其事务执行初步的完整性检查。
 	// Perform preliminary sanity checks on the block and its transactions.
 	// 计算Pi,阈值规模
+
 	seed := chainhash.DoubleHashH(best.Header.Signature.CloneBytes())
 	votes, scales := make([]uint16, 0), make([]uint16, 0)
 	scales = append(scales, best.Header.Scale)
