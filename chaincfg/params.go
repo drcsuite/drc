@@ -233,8 +233,8 @@ var MainNetParams = Params{
 	Net:         wire.MainNet,
 	DefaultPort: "8333",
 	DNSSeeds: []DNSSeed{
-		{"192.168.10.153", true},
-		//{"192.168.1.206", true},
+		{"192.168.1.136", true},
+		{"192.168.1.206", true},
 		//{"seed.bitcoin.sipa.be", true},
 		//{"dnsseed.bluematt.me", true},
 		//{"dnsseed.bitcoin.dashjr.org", false},

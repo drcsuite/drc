@@ -76,7 +76,7 @@ func (msg *MsgCandidate) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding
 }
 
 func (msg *MsgCandidate) Command() string {
-	return CmdBlock
+	return CmdCandidate
 }
 
 func (msg *MsgCandidate) MaxPayloadLength(pver uint32) uint32 {
