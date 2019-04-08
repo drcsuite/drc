@@ -397,7 +397,6 @@ out:
 			time.Sleep(time.Second)
 			continue
 		}
-
 		// 当weight符合规则，发块
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
