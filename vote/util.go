@@ -2,6 +2,7 @@ package vote
 
 import (
 	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -126,7 +127,7 @@ func mean(values []uint16) (meanValue uint16) {
 	for _, value := range values {
 		totalValue = totalValue + value
 	}
-	meanValue = totalValue / uint16(len(values))
+	meanValue = uint16(math.Ceil(float64(totalValue) / float64(len(values))))
 	return
 }
 
