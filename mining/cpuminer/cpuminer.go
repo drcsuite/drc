@@ -388,6 +388,7 @@ out:
 				prevNode = m.chain.GetBlockIndex().LookupNode(&hashes)
 			}
 		}
+		fmt.Println("投票數為： ", votes)
 		scale := vote.EstimateScale(votes, scales)
 		Pi := vote.BlockVerge(scale)
 		// 如果不符合规则，等待下一轮
