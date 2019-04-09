@@ -313,7 +313,7 @@ func (sm *SyncManager) startSync() {
 		// to passing their latest known block.  NOTE: The < is
 		// intentional as opposed to <=.  While technically the peer
 		// doesn't have a later block when it's equal, it will likely
-		// have one soon so it is a reasonable choice.  It also allows
+		// have one soon so it is a reasonable choice.  It als o allows
 		// the case where both are at 0 such as during regression test.
 		if peer.LastBlock() < best.Height {
 			state.syncCandidate = false
