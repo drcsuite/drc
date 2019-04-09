@@ -834,7 +834,7 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 	// 通过验证将该块放入块池和指向池
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-	/*behaviorFlags := blockchain.BFNone
+	behaviorFlags := blockchain.BFNone
 	vote, b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
 	if err != nil || !b {
 		// When the error is a rule error, it means the block was simply
@@ -854,7 +854,7 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 		}
 
 		return
-	}*/
+	}
 
 	//向发送孤儿块的对等方请求父方。当块不是孤立块时，记录有关它的信息并更新链状态。
 	// Request the parents for the orphan block from the peer that sent it.
@@ -874,10 +874,10 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 	}
 
 	// 对收到的块做投票处理
-	//if vote {
-	log.Info("对 ", bmsg.block.Hash(), " 进行投票")
-	bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
-	//}
+	if vote {
+		log.Info("对 ", bmsg.block.Hash(), " 进行投票")
+		bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
+	}
 }
 
 // 处理签名队列里的签名
@@ -1522,6 +1522,7 @@ out:
 // 处理投票结果，是个独立线程
 // Processing the poll result is a separate thread
 func (sm *SyncManager) VoteHandler() {
+
 	// 等待同步完成
 	// Wait for synchronization to complete
 	//openTime := time.NewTicker(time.Second)
@@ -1529,10 +1530,13 @@ func (sm *SyncManager) VoteHandler() {
 	//for {
 	//select {
 	//case <-openTime.C:
-	//
+	//	fmt.Println(sm.chain.IsCurrent())
+	//	if sm.chain.IsCurrent(){
+	//		break out
+	//	}
 	//case <-vote.Open:
 	//	openTime.Stop()
-	//	break out
+	////
 	//}
 	//}
 
@@ -1595,7 +1599,9 @@ func (sm *SyncManager) voteProcess() {
 
 	// 写入最佳候选块，做为下轮发块的依据
 	// write the best candidate block, as the basis for the next round of block
-	sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header, votes)
+	h := sm.chain.BestLastCandidate().Height + 1
+	head := msgCandidate.Header
+	sm.chain.SetBestCandidate(blockHeaderHash, h, head, votes)
 
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
 	// write the Hash of the previous round of blocks, most of which are pointed to in this round of block pool, into the blockChain
@@ -1837,7 +1843,7 @@ func (sm *SyncManager) Start() {
 	log.Trace("Starting sync manager")
 	sm.wg.Add(2)
 	go sm.blockHandler()
-	//go sm.VoteHandler()
+	go sm.VoteHandler()
 }
 
 // Stop通过停止所有异步处理程序并等待它们完成，优雅地关闭同步管理器。
