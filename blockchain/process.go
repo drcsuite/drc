@@ -329,7 +329,7 @@ func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags)
 	votes = append(votes, best.Votes)
 	node := b.GetBlockIndex().LookupNode(&best.Header.PrevBlock)
 	if node != nil {
-		for i := 0; i < 9; i++ {
+		for i := 0; i < vote.PrevScaleNum; i++ {
 			// 添加每个节点实际收到的票数和当时估算值
 			if node == nil {
 				break

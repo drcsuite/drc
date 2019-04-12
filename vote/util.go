@@ -24,6 +24,10 @@ const (
 	// 为同步到最新的发块时间所需的时间间隔
 	// the time interval required to synchronize to the latest block time
 	SyncTimeInterval = 20 * time.Second
+
+	// The number of items in the preceding paragraph that scale looks for
+	// 计算scale时寻找的前项数量=1+PrevScaleNum
+	PrevScaleNum = 9
 )
 
 var (
