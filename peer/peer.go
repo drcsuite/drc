@@ -130,6 +130,14 @@ type MessageListeners struct {
 	// OnSign is invoked when a peer receives a signed message.
 	OnSign func(p *Peer, msg *wire.MsgSign)
 
+	// 当对等方接收到getBlock消息时调用它。
+	// OnSign is invoked when a peer receives a signed message.
+	OnGetBlock func(p *Peer, msg *wire.MsgGetBlock)
+
+	// 当对等方接收到syncBlock消息时调用它。
+	// OnSign is invoked when a peer receives a signed message.
+	OnSyncBlock func(p *Peer, msg *wire.MsgSyncBlock)
+
 	// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
 	OnCFilter func(p *Peer, msg *wire.MsgCFilter)
 
@@ -1472,6 +1480,16 @@ out:
 		case *wire.MsgSign:
 			if p.cfg.Listeners.OnSign != nil {
 				p.cfg.Listeners.OnSign(p, msg)
+			}
+
+		case *wire.MsgGetBlock:
+			if p.cfg.Listeners.OnGetBlock != nil {
+				p.cfg.Listeners.OnGetBlock(p, msg)
+			}
+
+		case *wire.MsgSyncBlock:
+			if p.cfg.Listeners.OnSyncBlock != nil {
+				p.cfg.Listeners.OnSyncBlock(p, msg)
 			}
 
 		case *wire.MsgInv:

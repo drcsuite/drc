@@ -59,6 +59,8 @@ const (
 	CmdCFHeaders    = "cfheaders"
 	CmdCFCheckpt    = "cfcheckpt"
 	CmdSign         = "sign"
+	CmdGetBlock     = "getblock"
+	CmdMsgGetBlock  = "msggetblock"
 )
 
 // MessageEncoding 表示要使用的有线消息编码格式。
@@ -190,6 +192,12 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdSign:
 		msg = &MsgSign{}
+
+	case CmdGetBlock:
+		msg = &MsgGetBlock{}
+
+	case CmdMsgGetBlock:
+		msg = &MsgGetBlock{}
 
 	default:
 		return nil, fmt.Errorf("unhandled command [%s]", command)
