@@ -1523,8 +1523,8 @@ out:
 // Processing the poll result is a separate thread
 func (sm *SyncManager) VoteHandler() {
 
-	// 等待同步完成
-	// Wait for synchronization to complete
+	//等待同步完成
+	//Wait for synchronization to complete
 	//openTime := time.NewTicker(time.Second)
 	//out:
 	//for {
