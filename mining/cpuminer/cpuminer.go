@@ -376,7 +376,7 @@ out:
 		votes = append(votes, best.Votes)
 		prevNode := m.chain.GetBlockIndex().LookupNode(&preHeader.PrevBlock)
 		if prevNode != nil {
-			for i := 0; i < 9; i++ {
+			for i := 0; i < vote.PrevScaleNum; i++ {
 				// 添加每个节点实际收到的票数和当时估算值
 				if prevNode == nil {
 					break
@@ -421,7 +421,7 @@ out:
 			vote.Work = false
 			continue
 		}
-		template, err := m.g.NewBlockTemplate(payToAddr, pubKey, signHash, scale, 0)
+		template, err := m.g.NewBlockTemplate(payToAddr, pubKey, signHash, scale, 0, best.Height+1)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -440,17 +440,19 @@ out:
 			// 加入当前块池
 			block := drcutil.NewCandidate(template.Block, template.Candidate)
 			log.Info("发现新块")
-			log.Info("高度: ", best.Height+1)
+			log.Info("高度: ", block.MsgCandidate().Sigwit.Height)
 			log.Info("version: ", block.MsgCandidate().Header.Version)
 			log.Info("scale: ", block.MsgCandidate().Header.Scale)
 			log.Info("timestamp: ", block.MsgCandidate().Header.Timestamp)
 			log.Info("blockhash: ", block.MsgCandidate().BlockHash())
 
 			// 加入当前指向池
-			blockchain.CurrentCandidatePool[*block.Hash()] = block.MsgCandidate()
+			blockchain.CurrentCandidatePool[*block.CandidateHash()] = block.MsgCandidate()
 			points := blockchain.CurrentPointPool[best.Hash]
 			points = append(points, block.MsgCandidate())
 			blockchain.CurrentPointPool[best.Hash] = points
+			log.Info("块池大小为: ", len(blockchain.CurrentCandidatePool))
+			log.Info("指向池大小为: ", len(blockchain.CurrentPointPool[best.Hash]))
 
 			// 将块信息提交给对等点
 			bo := m.submitBlock(block)

@@ -443,7 +443,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //  |  <= policy.BlockMinSize)          |   |
 //   -----------------------------------  --
 func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress drcutil.Address, pubkey *chainhash.Hash33, signature *chainhash.Hash64,
-	scale uint16, reserved uint16) (*BlockTemplate, error) {
+	scale uint16, reserved uint16, height int32) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestLastCandidate()
 	nextBlockHeight := best.Height + 1
@@ -891,6 +891,7 @@ mempoolLoop:
 			return nil, err
 		}
 	}
+	msgCandidate.Sigwit.Height = height
 
 	// 最后，根据chain consensus规则对创建的块进行全面检查，确保它正确地连接到当前最佳
 	// 链条没有问题。

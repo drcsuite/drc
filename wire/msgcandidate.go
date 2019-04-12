@@ -12,7 +12,7 @@ import (
 type MsgCandidate struct {
 	Header       BlockHeader
 	Transactions []*MsgTx
-	Votes        []*MsgVote
+	Sigwit       *MsgSigwit
 }
 
 func (msg *MsgCandidate) AddTransaction(tx *MsgTx) error {
@@ -51,6 +51,11 @@ func (msg *MsgCandidate) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding
 		msg.Transactions = append(msg.Transactions, &tx)
 	}
 
+	err = msg.Sigwit.BtcDecode(r, pver, enc)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -70,6 +75,11 @@ func (msg *MsgCandidate) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding
 		if err != nil {
 			return err
 		}
+	}
+
+	err = msg.Sigwit.BtcEncode(w, pver, enc)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -98,32 +108,28 @@ func (msg *MsgCandidate) SerializeSizeStripped() int {
 	return n
 }
 
+type MsgSigwit struct {
+	Height int32
+	Votes  []*MsgVote
+}
+
+func (msg *MsgSigwit) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
+	return readElements(r, msg.Height)
+}
+
+func (msg *MsgSigwit) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
+	return writeElements(w, &msg.Height)
+}
+
 type MsgVote struct {
 	Sign   *chainhash.Hash64
 	PubKey *chainhash.Hash33
 }
 
 func (msg *MsgVote) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	return readMsg(r, pver, msg)
-}
-
-func readMsg(r io.Reader, pver uint32, msg *MsgVote) error {
 	return readElements(r, &msg.Sign, &msg.PubKey)
 }
 
 func (msg *MsgVote) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
-	return writeMsg(w, pver, msg)
-}
-
-func writeMsg(w io.Writer, pver uint32, msg *MsgVote) error {
-
 	return writeElements(w, &msg.Sign, &msg.PubKey)
-}
-
-func (msg *MsgVote) Command() string {
-	return CmdSign
-}
-
-func (msg *MsgVote) MaxPayloadLength(pver uint32) uint32 {
-	return MaxBlockPayload
 }

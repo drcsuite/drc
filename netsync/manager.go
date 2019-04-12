@@ -227,6 +227,8 @@ type SyncManager struct {
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
+
+	currentHeight int32 // 当前轮次高度
 }
 
 // resetHeaderState将headers-first模式状态设置为适合从新对等点同步的值。
@@ -814,27 +816,34 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 		return
 	}
 
-	// If we didn't ask for this block then the peer is misbehaving.
+	bestState := sm.chain.BestSnapshot()
+	// 参与验证
+	if bmsg.block.MsgCandidate().Sigwit.Height-bestState.Height == 2 {
+		// 当前轮不收增量块
+		if sm.currentHeight == bmsg.block.MsgCandidate().Sigwit.Height {
+			log.Infof("The current wheel does not accept fast increments")
+			return
+		}
+		// 请求增量块
+
+		// 请求软状态
+
+		// 当前轮高度-链上最后一个块高度>2,请求增量块，并写入map，同步软状态，并记录当前轮块
+	} else if bmsg.block.MsgCandidate().Sigwit.Height-bestState.Height > 2 {
+
+		// 不符合规则
+	} else {
+
+	}
+
+	// handling, etc.
+	// Process the block to include validation, best chain selection, orphan
+	// 处理该块
+	// 通过验证将该块放入块池和指向池
+	// 包括：验证签名，验证交易，验证weight，验证coinbase，
 	blockHash := bmsg.block.CandidateHash()
 	log.Info("收到新块,hash: ", blockHash)
-
-	//在heades -first模式下，如果块匹配正在获取的头列表中第一个头的哈希值，则可以减少验证，
-	// 因为头已经被验证为链接在一起，并且直到下一个检查点为止都是有效的。
-	// 此外，删除除检查点之外的所有块的列表条目，因为它需要正确地验证下一轮头文件链接。
-	// When in headers-first mode, if the block matches the hash of the
-	// first header in the list of headers that are being fetched, it's
-	// eligible for less validation since the headers have already been
-	// verified to link together and are valid up to the next checkpoint.
-	// Also, remove the list entry for all blocks except the checkpoint
-	// since it is needed to verify the next round of headers links
-	// properly.
-
-	// 处理该块
-	// 包括：验证签名，验证交易，验证weight，验证coinbase，
-	// 通过验证将该块放入块池和指向池
-	// Process the block to include validation, best chain selection, orphan
-	// handling, etc.
-	/*behaviorFlags := blockchain.BFNone
+	behaviorFlags := blockchain.BFNone
 	vote, b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
 	if err != nil || !b {
 		// When the error is a rule error, it means the block was simply
@@ -854,7 +863,7 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 		}
 
 		return
-	}*/
+	}
 
 	//向发送孤儿块的对等方请求父方。当块不是孤立块时，记录有关它的信息并更新链状态。
 	// Request the parents for the orphan block from the peer that sent it.
@@ -874,10 +883,10 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 	}
 
 	// 对收到的块做投票处理
-	//if vote {
-	log.Info("对 ", bmsg.block.Hash(), " 进行投票")
-	bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
-	//}
+	if vote {
+		log.Info("对 ", bmsg.block.Hash(), " 进行投票")
+		bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
+	}
 }
 
 // 处理签名队列里的签名
@@ -1563,9 +1572,12 @@ func (sm *SyncManager) VoteHandler() {
 	// Handles write blocks and polls for the current round
 	//sm.voteProcess()
 	// 通知开始新一轮挖块
-	// 必须把bestlastcandidate同步过来，如果同步结束BestLastCandidate依然为空，则按照创世块发块
-	genesis := chaincfg.MainNetParams.GenesisBlock
-	if sm.chain.BestLastCandidate() == nil {
+	// 必须把bestlastcandidate同步过来
+	node := sm.chain.GetBlockIndex().LookupNode(&bestLastCandidate.Hash)
+	if node != nil {
+		sm.chain.SetBestCandidate(bestLastCandidate.Hash, bestLastCandidate.Height, node.Header(), node.Votes)
+	} else {
+		genesis := chaincfg.MainNetParams.GenesisBlock
 		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
 	}
 
