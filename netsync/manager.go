@@ -734,7 +734,7 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 		blockHash := bmsg.block.CandidateHash()
 		log.Info("收到新块,hash: ", blockHash)
 		behaviorFlags := blockchain.BFNone
-		vote, b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
+		v, b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
 		if err != nil || !b {
 			// When the error is a rule error, it means the block was simply
 			// rejected as opposed to something actually going wrong, so log
@@ -768,7 +768,7 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 		}
 
 		// 对收到的块做投票处理
-		if vote {
+		if v || vote.VoteBool {
 			log.Info("对 ", bmsg.block.Hash(), " 进行投票")
 			bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
 		}

@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/drcsuite/drc/vote"
 	"math"
 	"net"
 	"runtime"
@@ -2444,6 +2445,11 @@ func (s *server) Start() {
 
 	// Server startup time. Used for the uptime command for uptime calculation.
 	s.startupTime = time.Now().Unix()
+	if vote.FirstBLockTime != 0 {
+		vote.StartHeight = int32(s.startupTime-vote.FirstBLockTime)/10000 + 1
+	} else {
+		vote.StartHeight = 1
+	}
 
 	// Start the peer handler which in turn starts the address and block
 	// managers.
