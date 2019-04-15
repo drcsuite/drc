@@ -38,6 +38,9 @@ func newBlockProgressLogger(progressMessage string, logger btclog.Logger) *block
 	}
 }
 
+// LogBlockHeight记录一个新的块高度，作为要显示的信息消息
+//用户的进展。为了防止垃圾邮件，它将日志记录限制为一个
+//每10秒发送一次信息，包括持续时间和总数。
 // LogBlockHeight logs a new block height as an information message to show
 // progress to the user. In order to prevent spam, it limits logging to one
 // message every 10 seconds with duration and totals included.

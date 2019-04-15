@@ -214,7 +214,6 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
-	//fastAdd := flags&BFFastAdd == BFFastAdd
 
 	blockHash := block.Hash()
 	log.Tracef("Processing block %v", blockHash)
@@ -267,7 +266,6 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 		return false, false, err
 	}
 
-	//fmt.Println("开始执行 processblock")
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
 	isMainChain, err := b.maybeAcceptBlock(block, flags)
@@ -281,10 +279,10 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 	// Accept any orphan blocks that depend on this block (they are
 	// no longer orphans) and repeat for those accepted blocks until
 	// there are no more.
-	//err = b.processOrphans(blockHash, flags)
-	//if err != nil {
-	//	return false, false, err
-	//}
+	err = b.processOrphans(blockHash, flags)
+	if err != nil {
+		return false, false, err
+	}
 
 	log.Debugf("Accepted block %v", blockHash)
 

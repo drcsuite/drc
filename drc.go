@@ -11,15 +11,16 @@ import (
 	"github.com/drcsuite/drc/drcutil"
 )
 
-//func main() {
-//	//testCipherAndSign()
-//	//ptr()
-//	//ptrint()
-//	//GenesisBlock()
-//
-//	Array()
-//	fmt.Println(" Hello, DRC!")
-//}
+func main() {
+	//testCipherAndSign()
+	//ptr()
+	//ptrint()
+	//GenesisBlock()
+
+	//Array()
+	MapStruct()
+	fmt.Println(" Hello, DRC!")
+}
 
 func GenerateBTC() (string, string, error) {
 	privKey, err := btcec.NewPrivateKey(btcec.S256())
@@ -144,4 +145,16 @@ func Array() {
 	bytes := make([]byte, 0)
 	i := append(bytes, 1, 2, 3)
 	fmt.Println(len(i))
+}
+
+func MapStruct() {
+	var incrementBlock map[int32]struct{}
+	incrementBlock = make(map[int32]struct{})
+	incrementBlock[1] = struct{}{}
+	incrementBlock[2] = struct{}{}
+	incrementBlock[3] = struct{}{}
+	_, i := incrementBlock[1]
+	_, i2 := incrementBlock[4]
+	fmt.Println(i)
+	fmt.Println(i2)
 }
