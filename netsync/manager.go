@@ -6,6 +6,7 @@ package netsync
 
 import (
 	"container/list"
+	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -1497,19 +1498,19 @@ func (sm *SyncManager) VoteHandler() {
 
 	//等待同步完成
 	//Wait for synchronization to complete
-	//openTime := time.NewTicker(time.Second)
-	//out:
-	//for {
-	//select {
-	//case <-openTime.C:
-	//	fmt.Println(sm.chain.IsCurrent())
-	//	if sm.chain.IsCurrent(){
-	//		break out
-	//	}
-	//case <-vote.Open:
-	//	openTime.Stop()
-	//}
-	//}
+	openTime := time.NewTicker(time.Second)
+out:
+	for {
+		select {
+		case <-openTime.C:
+			fmt.Println(sm.chain.IsCurrent())
+			if sm.chain.IsCurrent() {
+				break out
+			}
+
+			openTime.Stop()
+		}
+	}
 
 	// 初始化指向池、前项块池、当前块池
 	blockchain.CurrentCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
