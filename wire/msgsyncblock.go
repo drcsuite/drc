@@ -44,7 +44,7 @@ func (msg *MsgSyncBlock) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding
 }
 
 func (msg *MsgSyncBlock) Command() string {
-	return CmdMsgGetBlock
+	return CmdSyncBlock
 }
 
 func (msg *MsgSyncBlock) MaxPayloadLength(pver uint32) uint32 {
