@@ -1503,7 +1503,6 @@ func (sm *SyncManager) VoteHandler() {
 	// the latest block time for synchronization
 	bestLastCandidate := sm.chain.BestSnapshot()
 	blockHeight := bestLastCandidate.Height
-
 out:
 	for {
 		select {
@@ -1522,8 +1521,8 @@ out:
 	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
 
 	// 第一个块生成时间
-
-	creationTime := vote.FirstBLockTime
+	// First block generation time
+	creationTime := time.Unix(vote.FirstBLockTime, 0)
 
 	// 根据最新块，计算10秒发块定时器启动的时间
 	laterTime := creationTime.Add(vote.BlockTimeInterval * time.Duration(blockHeight))
@@ -1534,7 +1533,9 @@ out:
 
 	// 处理当前轮的写块和投票
 	// Handles write blocks and polls for the current round
-	//sm.voteProcess()
+	sm.voteProcess()
+	vote.VoteBool = true
+
 	// 通知开始新一轮挖块
 	// 必须把bestlastcandidate同步过来
 	node := sm.chain.GetBlockIndex().LookupNode(&bestLastCandidate.Hash)
