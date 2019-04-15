@@ -1494,60 +1494,58 @@ out:
 // 处理投票结果，是个独立线程
 // Processing the poll result is a separate thread
 func (sm *SyncManager) VoteHandler() {
-
-	//等待同步完成
-	//Wait for synchronization to complete
-
-	openTime := time.NewTicker(time.Second)
-	// 同步的最新块
-	// the latest block time for synchronization
-	bestLastCandidate := sm.chain.BestSnapshot()
-	blockHeight := bestLastCandidate.Height
-out:
-	for {
-		select {
-		case <-openTime.C:
-
-			if blockHeight-vote.CurrentHeight == 2 {
-				break out
-			}
-		}
-	}
-	openTime.Stop()
-
 	// 初始化指向池、前项块池、当前块池
 	blockchain.CurrentCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
 	blockchain.PrevCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
 	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
 
-	// 第一个块生成时间
-	// First block generation time
-	creationTime := time.Unix(vote.FirstBLockTime, 0)
+	if vote.FirstBLockTime != 0 {
 
-	// 根据最新块，计算10秒发块定时器启动的时间
-	laterTime := creationTime.Add(vote.BlockTimeInterval * time.Duration(blockHeight))
-	nowTime := time.Now()
-	t := time.NewTimer(laterTime.Sub(nowTime))
-	<-t.C
-	t.Stop()
+		//等待同步完成
+		//Wait for synchronization to complete
 
-	// 处理当前轮的写块和投票
-	// Handles write blocks and polls for the current round
-	sm.voteProcess()
-	vote.VoteBool = true
+		openTime := time.NewTicker(time.Second)
+		// 同步的最新块
+		// the latest block time for synchronization
+		bestLastCandidate := sm.chain.BestSnapshot()
+		blockHeight := bestLastCandidate.Height
+	out:
+		for {
+			select {
+			case <-openTime.C:
 
-	// 通知开始新一轮挖块
-	// 必须把bestlastcandidate同步过来
-	node := sm.chain.GetBlockIndex().LookupNode(&bestLastCandidate.Hash)
-	if node != nil {
-		sm.chain.SetBestCandidate(bestLastCandidate.Hash, bestLastCandidate.Height, node.Header(), node.Votes)
-	} else {
-		genesis := chaincfg.MainNetParams.GenesisBlock
-		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
+				if vote.CurrentHeight-blockHeight == 2 {
+					break out
+				}
+			}
+		}
+		openTime.Stop()
+
+		// 第一个块生成时间
+		// First block generation time
+		creationTime := time.Unix(vote.FirstBLockTime, 0)
+		// 根据最新块，计算10秒发块定时器启动的时间
+		laterTime := creationTime.Add(vote.BlockTimeInterval * time.Duration(vote.CurrentHeight))
+		nowTime := time.Now()
+		t := time.NewTimer(laterTime.Sub(nowTime))
+		<-t.C
+		t.Stop()
+
+		// 处理当前轮的写块和投票
+		// Handles write blocks and polls for the current round
+		sm.voteProcess()
+
+		// 通知开始新一轮挖块
+		// 必须把bestlastcandidate同步过来
+		//node := sm.chain.GetBlockIndex().LookupNode(&bestLastCandidate.Hash)
+		//if node != nil {
+		//	sm.chain.SetBestCandidate(bestLastCandidate.Hash, bestLastCandidate.Height, node.Header(), node.Votes)
+		//} else {
+		//	genesis := chaincfg.MainNetParams.GenesisBlock
+		//	sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
+		//}
 	}
-
-	vote.Work = true
-
+	vote.VoteBool = true
 	// 10秒处理一波投票结果
 	// Process one wave of voting results 10 second
 	handlingTime := time.NewTicker(vote.BlockTimeInterval)
