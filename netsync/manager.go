@@ -677,6 +677,95 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	}
 }
 
+// handleBlockMsg处理来自所有对等点的块消息。
+// handleBlockMsg handles block messages from all peers.
+func (sm *SyncManager) handleSyncBLock(bmsg *blockMsg) {
+	peer := bmsg.peer
+	state, exists := sm.peerStates[peer]
+	if !exists {
+		log.Warnf("Received block message from unknown peer %s", peer)
+		return
+	}
+
+	blockHash := bmsg.block.Hash()
+	behaviorFlags := blockchain.BFNone
+	// Remove block from request maps. Either chain will know about it and
+	// so we shouldn't have any more instances of trying to fetch it, or we
+	// will fail the insert and thus we'll retry next time we get an inv.
+	delete(state.requestedBlocks, *blockHash)
+	delete(sm.requestedBlocks, *blockHash)
+
+	// 处理该块以包括验证、最佳链选择、孤儿处理等。
+	// Process the block to include validation, best chain selection, orphan
+	// handling, etc.
+	// 处理发块环节收到的块，
+	// 包括：验证签名，验证交易，验证weight，验证coinbase，
+	// 通过验证将块放入块池
+	_, isOrphan, err := sm.chain.ProcessBlock(bmsg.block, behaviorFlags)
+	if err != nil {
+		// When the error is a rule error, it means the block was simply
+		// rejected as opposed to something actually going wrong, so log
+		// it as such.  Otherwise, something really did go wrong, so log
+		// it as an actual error.
+		if _, ok := err.(blockchain.RuleError); ok {
+			log.Infof("Rejected block %v from %s: %v", blockHash,
+				peer, err)
+		} else {
+			log.Errorf("Failed to process block %v: %v",
+				blockHash, err)
+		}
+		if dbErr, ok := err.(database.Error); ok && dbErr.ErrorCode ==
+			database.ErrCorruption {
+			panic(dbErr)
+		}
+		return
+	}
+
+	// Meta-data about the new block this peer is reporting. We use this
+	// below to update this peer's latest block height and the heights of
+	// other peers based on their last announced block hash. This allows us
+	// to dynamically update the block heights of peers, avoiding stale
+	// heights when looking for a new sync peer. Upon acceptance of a block
+	// or recognition of an orphan, we also use this information to update
+	// the block heights over other peers who's invs may have been ignored
+	// if we are actively syncing while the chain is not yet current or
+	// who may have lost the lock announcement race.
+	var heightUpdate int32
+	var blkHashUpdate *chainhash.Hash
+
+	if !isOrphan {
+		// 当块不是孤立块时，记录有关它的信息并更新链状态。
+		// When the block is not an orphan, log information about it and
+		// update the chain state.
+		sm.progressLogger.LogBlockHeight(bmsg.block)
+
+		// Update this peer's latest block height, for future
+		// potential sync node candidacy.
+		best := sm.chain.BestSnapshot()
+		heightUpdate = best.Height
+		blkHashUpdate = &best.Hash
+
+		// Clear the rejected transactions.
+		sm.rejectedTxns = make(map[chainhash.Hash]struct{})
+	}
+
+	// 更新此对等点的块高度。
+	// 但是，只有当这是孤立的或我们的链是“当前的”时，才向服务器发送消息更新对等高度。如果我们从头开始同步链，这将避免发送垃圾数量的消息。
+	// Update the block height for this peer. But only send a message to
+	// the server for updating peer heights if this is an orphan or our
+	// chain is "current". This avoids sending a spammy amount of messages
+	// if we're syncing the chain from scratch.
+	if blkHashUpdate != nil && heightUpdate != 0 {
+		peer.UpdateLastBlockHeight(heightUpdate)
+		//if isOrphan || sm.current() {
+		if sm.current() {
+			// 更新所有已知对等点的高度
+			go sm.peerNotifier.UpdatePeerHeights(blkHashUpdate, heightUpdate,
+				peer)
+		}
+	}
+}
+
 // 处理发块阶段收到的块
 func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 	peer := bmsg.peer
