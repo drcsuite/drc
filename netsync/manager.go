@@ -934,7 +934,6 @@ func (sm *SyncManager) handleSyncBlockMsg(msg *syncBlockMsg) {
 	if msg.syncBlockMsg.TypeParameter == 1 {
 		// TypeParameter为1，保存增量同步块
 		sm.handleSyncBLock(drcutil.NewCandidate(drcutil.MsgCandidateToBlock(&candidate), &candidate))
-		//sm.ProcessBlock().
 
 	} else if msg.syncBlockMsg.TypeParameter == 2 {
 		// TypeParameter为2，保存软状态块
