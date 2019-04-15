@@ -891,7 +891,9 @@ mempoolLoop:
 			return nil, err
 		}
 	}
-	msgCandidate.Sigwit.Height = height
+	msgCandidate.Sigwit = &wire.MsgSigwit{
+		Height: height,
+	}
 
 	// 最后，根据chain consensus规则对创建的块进行全面检查，确保它正确地连接到当前最佳
 	// 链条没有问题。
