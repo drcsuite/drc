@@ -782,11 +782,11 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 			return
 		}
 		if _, ok := incrementBlock[height]; !ok {
-
 			// 请求增量块
-			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-2, 1), nil)
+			var zero chainhash.Hash
+			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-2, 1, zero), nil)
 			// 请求软状态
-			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-1, 2), nil)
+			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-1, 2, bmsg.block.MsgCandidate().Header.PrevBlock), nil)
 			// 加入增量请求状态
 			incrementBlock[height] = struct{}{}
 		}
