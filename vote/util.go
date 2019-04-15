@@ -49,7 +49,10 @@ var (
 
 	// 第一个块生成时间
 	// （当前时间-第一个块时间）/10 +1 = 当前轮高度
-	FirstBLockTime = time.Unix(time.Now().Unix(), 0)
+	// 第一个节点设置为0
+	FirstBLockTime int64 = 0
+
+	VoteBool = false
 )
 
 // 具有投票权的节点对区块的签名值和验证时用的公钥
