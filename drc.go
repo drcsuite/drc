@@ -11,16 +11,16 @@ import (
 	"github.com/drcsuite/drc/drcutil"
 )
 
-func main() {
-	//testCipherAndSign()
-	//ptr()
-	//ptrint()
-	//GenesisBlock()
-
-	//Array()
-	MapStruct()
-	fmt.Println(" Hello, DRC!")
-}
+//func main() {
+//	//testCipherAndSign()
+//	//ptr()
+//	//ptrint()
+//	//GenesisBlock()
+//
+//	//Array()
+//	MapStruct()
+//	fmt.Println(" Hello, DRC!")
+//}
 
 func GenerateBTC() (string, string, error) {
 	privKey, err := btcec.NewPrivateKey(btcec.S256())

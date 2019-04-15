@@ -1570,9 +1570,12 @@ func (sm *SyncManager) voteProcess() {
 
 	// 写入最佳候选块，做为下轮发块的依据
 	// write the best candidate block, as the basis for the next round of block
-	h := sm.chain.BestLastCandidate().Height + 1
-	head := msgCandidate.Header
-	sm.chain.SetBestCandidate(blockHeaderHash, h, head, votes)
+	if len(blockchain.CurrentCandidatePool) == 0 {
+		genesis := chaincfg.MainNetParams.GenesisBlock
+		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
+	} else {
+		sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header, votes)
+	}
 
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
 	// write the Hash of the previous round of blocks, most of which are pointed to in this round of block pool, into the blockChain
