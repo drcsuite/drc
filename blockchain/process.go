@@ -236,12 +236,6 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 		return false, false, ruleError(ErrDuplicateBlock, str)
 	}
 
-	// Find the previous checkpoint and perform some additional checks based
-	// on the checkpoint.  This provides a few nice properties such as
-	// preventing old side chain blocks before the last checkpoint,
-	// rejecting easy to mine, but otherwise bogus, blocks that could be
-	// used to eat memory, and ensuring expected (versus claimed) proof of
-	// work requirements since the previous checkpoint are met.
 	blockHeader := &block.MsgBlock().Header
 	// Handle orphan blocks.
 	prevHash := &blockHeader.PrevBlock
@@ -287,6 +281,39 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 	log.Debugf("Accepted block %v", blockHash)
 
 	return isMainChain, false, nil
+}
+
+func (b *BlockChain) ProcessSyncBlock(block *drcutil.Block) (bool, error) {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	blockHash := block.Hash()
+	log.Tracef("Processing block %v", blockHash)
+
+	// 该块不能已经存在于主链或侧链中。
+	// The block must not already exist in the main chain or side chains.
+	exists, err := b.blockExists(blockHash)
+	if err != nil {
+		return false, err
+	}
+	if exists {
+		str := fmt.Sprintf("already have block %v", blockHash)
+		return false, ruleError(ErrDuplicateBlock, str)
+	}
+
+	//该块不能作为孤儿存在。
+	// The block must not already exist as an orphan.
+	if _, exists := b.orphans[*blockHash]; exists {
+		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
+		return false, ruleError(ErrDuplicateBlock, str)
+	}
+
+	// 添加入孤块池
+	b.addOrphanBlock(block)
+
+	log.Debugf("Accepted sync block %v", blockHash)
+
+	return true, nil
 }
 
 // 处理发块阶段收到的块，并将该块放入块池和指向池

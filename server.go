@@ -630,7 +630,7 @@ func (sp *serverPeer) OnCandidate(_ *peer.Peer, msg *wire.MsgCandidate, buf []by
 	// 将原始MsgBlock转换为btcutil块，该块提供了一些方便的方法和诸如散列缓存之类的东西。
 	// Convert the raw MsgBlock to a drcutil.Block which provides some
 	// convenience methods and things such as hash caching.
-	block := drcutil.NewCandidateFromBlockAndBytes(msg, buf)
+	block := drcutil.NewBlockFromCandidateAndBytes(msg, buf)
 
 	// 将块添加到对等节点的已知目录中。
 	// Add the block to the known inventory for the peer.

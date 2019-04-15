@@ -298,7 +298,7 @@ func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock, serializedBlock []byte) 
 	}
 }
 
-func NewCandidateFromBlockAndBytes(msgCandidate *wire.MsgCandidate, serializedBlock []byte) *Block {
+func NewBlockFromCandidateAndBytes(msgCandidate *wire.MsgCandidate, serializedBlock []byte) *Block {
 	return &Block{
 		msgCandidate:    msgCandidate,
 		serializedBlock: serializedBlock,
