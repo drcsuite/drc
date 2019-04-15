@@ -353,33 +353,42 @@ func (b *BlockChain) removeOrphanBlock(orphan *orphanBlock) {
 // blocks and will remove the oldest received orphan block if the limit is
 // exceeded.
 func (b *BlockChain) addOrphanBlock(block *drcutil.Block) {
+	//删除过期的孤立块。
 	// Remove expired orphan blocks.
-	for _, oBlock := range b.orphans {
-		if time.Now().After(oBlock.expiration) {
-			b.removeOrphanBlock(oBlock)
-			continue
-		}
+	//for _, oBlock := range b.orphans {
+	//	if time.Now().After(oBlock.expiration) {
+	//		b.removeOrphanBlock(oBlock)
+	//		continue
+	//	}
+	//
+	//	//更新最老的孤立块指针，以便可以丢弃它
+	//	//以防孤儿池被填满。
+	//	// Update the oldest orphan block pointer so it can be discarded
+	//	// in case the orphan pool fills up.
+	//	if b.oldestOrphan == nil || oBlock.expiration.Before(b.oldestOrphan.expiration) {
+	//		b.oldestOrphan = oBlock
+	//	}
+	//}
 
-		// Update the oldest orphan block pointer so it can be discarded
-		// in case the orphan pool fills up.
-		if b.oldestOrphan == nil || oBlock.expiration.Before(b.oldestOrphan.expiration) {
-			b.oldestOrphan = oBlock
-		}
-	}
-
+	// 限制孤立块以防止内存耗尽。
 	// Limit orphan blocks to prevent memory exhaustion.
-	if len(b.orphans)+1 > maxOrphanBlocks {
-		// Remove the oldest orphan to make room for the new one.
-		b.removeOrphanBlock(b.oldestOrphan)
-		b.oldestOrphan = nil
-	}
+	//if len(b.orphans)+1 > maxOrphanBlocks {
+	//	// Remove the oldest orphan to make room for the new one.
+	//	b.removeOrphanBlock(b.oldestOrphan)
+	//	b.oldestOrphan = nil
+	//}
 
+	//保护并发访问。这里是故意这样做的
+	//接近顶部，因为remove孤儿院块做自己的锁定和
+	//范围迭代器不会因为删除映射项而失效。
 	// Protect concurrent access.  This is intentionally done here instead
 	// of near the top since removeOrphanBlock does its own locking and
 	// the range iterator is not invalidated by removing map entries.
 	b.orphanLock.Lock()
 	defer b.orphanLock.Unlock()
 
+	//在孤儿映射中插入块并设置过期时间
+	//一小时后。
 	// Insert the block into the orphan map with an expiration time
 	// 1 hour from now.
 	expiration := time.Now().Add(time.Hour)

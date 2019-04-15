@@ -44,6 +44,10 @@ var (
 	// 前一区块的签名票池
 	// The signature ticket pool for the previous block
 	prevTicketPool = make(map[chainhash.Hash][]SignAndKey)
+
+	// 第一个块生成时间
+	// （当前时间-第一个块时间）/10 +1 = 当前轮高度
+	FirstBLockTime = time.Unix(time.Now().Unix(), 0)
 )
 
 // 具有投票权的节点对区块的签名值和验证时用的公钥

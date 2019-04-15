@@ -308,6 +308,7 @@ func (b *BlockChain) ProcessSyncBlock(block *drcutil.Block) (bool, error) {
 		return false, ruleError(ErrDuplicateBlock, str)
 	}
 
+	// 添加入孤块池
 	b.addOrphanBlock(block)
 
 	log.Debugf("Accepted sync block %v", blockHash)

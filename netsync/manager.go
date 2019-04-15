@@ -688,22 +688,10 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	}
 }
 
-// handleBlockMsg处理来自所有对等点的块消息。
+// handleBlockMsg处理同步块的信息
 // handleBlockMsg handles block messages from all peers.
-func (sm *SyncManager) handleSyncBLock(bmsg *blockMsg) {
-	peer := bmsg.peer
-	state, exists := sm.peerStates[peer]
-	if !exists {
-		log.Warnf("Received block message from unknown peer %s", peer)
-		return
-	}
-
-	blockHash := bmsg.block.Hash()
-	// Remove block from request maps. Either chain will know about it and
-	// so we shouldn't have any more instances of trying to fetch it, or we
-	// will fail the insert and thus we'll retry next time we get an inv.
-	delete(state.requestedBlocks, *blockHash)
-	delete(sm.requestedBlocks, *blockHash)
+func (sm *SyncManager) handleSyncBLock(bmsg *drcutil.Block) {
+	blockHash := bmsg.Hash()
 
 	// 处理该块以包括验证、最佳链选择、孤儿处理等。
 	// Process the block to include validation, best chain selection, orphan
@@ -713,11 +701,10 @@ func (sm *SyncManager) handleSyncBLock(bmsg *blockMsg) {
 	// 通过验证将块放入块池
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
-	bo, err := sm.chain.ProcessSyncBlock(bmsg.block)
+	bo, err := sm.chain.ProcessSyncBlock(bmsg)
 	if err != nil || !bo {
 		if _, ok := err.(blockchain.RuleError); ok {
-			log.Infof("Rejected block %v from %s: %v", blockHash,
-				peer, err)
+			log.Infof("Rejected block %v: %v", blockHash, err)
 		} else {
 			log.Warnf("Failed to add incremental block %v", blockHash, err)
 		}
@@ -795,10 +782,11 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 			return
 		}
 		if _, ok := incrementBlock[height]; !ok {
+
 			// 请求增量块
-
+			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-2, 1), nil)
 			// 请求软状态
-
+			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-1, 2), nil)
 			// 加入增量请求状态
 			incrementBlock[height] = struct{}{}
 		}
@@ -937,13 +925,15 @@ func (sm *SyncManager) handleSyncBlockMsg(msg *syncBlockMsg) {
 	// 根据syncBlockMsg的type，处理接收到的数据
 	//msgCandidate := msg.syncBlockMsg.MsgCandidate
 
+	candidate := msg.syncBlockMsg.MsgCandidate
 	if msg.syncBlockMsg.TypeParameter == 1 {
 		// TypeParameter为1，保存增量同步块
-
+		sm.handleSyncBLock(drcutil.NewCandidate(drcutil.MsgCandidateToBlock(&candidate), &candidate))
 		//sm.ProcessBlock().
 
 	} else if msg.syncBlockMsg.TypeParameter == 2 {
 		// TypeParameter为2，保存软状态块
+		blockchain.PrevCandidatePool[candidate.BlockHash()] = &candidate
 	}
 }
 
