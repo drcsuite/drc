@@ -961,16 +961,21 @@ func (sm *SyncManager) handleGetBlockMsg(msg *getBlockMsg) {
 		return
 	}
 
+	getBlock := msg.getBlock
 	// 根据getBlock的type，处理发送的结果
-
-	if msg.getBlock.TypeParameter == 1 {
+	if getBlock.TypeParameter == 1 {
 		// TypeParameter为1，请求增量同步块
+		block, _ := sm.chain.BlockByHeight(getBlock.Height)
+		candidate := wire.MsgCandidate{
+			Header:       block.MsgBlock().Header,
+			Transactions: block.MsgBlock().Transactions,
+		}
 
-		peer.QueueMessage(wire.NewMsgSyncBlock(1, wire.MsgCandidate{}), nil)
-	} else if msg.getBlock.TypeParameter == 2 {
+		peer.QueueMessage(wire.NewMsgSyncBlock(1, candidate), nil)
+	} else if getBlock.TypeParameter == 2 {
 		// TypeParameter为2，请求软状态块
-
-		peer.QueueMessage(wire.NewMsgSyncBlock(2, wire.MsgCandidate{}), nil)
+		candidate := blockchain.PrevCandidatePool[getBlock.BlockHash]
+		peer.QueueMessage(wire.NewMsgSyncBlock(2, *candidate), nil)
 	}
 }
 

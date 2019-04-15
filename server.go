@@ -675,7 +675,7 @@ func (sp *serverPeer) onGetBlock(_ *peer.Peer, msg *wire.MsgGetBlock) {
 // The handler that is called when SyncBlock information is received
 func (sp *serverPeer) onSyncBlock(_ *peer.Peer, msg *wire.MsgSyncBlock) {
 
-	sp.server.syncManager.QueueGetBlock(msg, sp.Peer, sp.blockProcessed)
+	sp.server.syncManager.QueueSyncBlock(msg, sp.Peer, sp.blockProcessed)
 	<-sp.blockProcessed
 }
 

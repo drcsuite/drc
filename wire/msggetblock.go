@@ -5,6 +5,7 @@
 package wire
 
 import (
+	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"io"
 )
 
@@ -13,16 +14,19 @@ import (
 type MsgGetBlock struct {
 	TypeParameter int8
 	Height        int32
+	BlockHash     chainhash.Hash
 }
+
+const MaxMsgGetBlock = 5 + chainhash.HashSize
 
 func (msg *MsgGetBlock) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
 
-	return readElements(r, &msg.TypeParameter, &msg.Height)
+	return readElements(r, &msg.TypeParameter, &msg.Height, &msg.BlockHash)
 }
 
 func (msg *MsgGetBlock) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {
 
-	return writeElements(w, &msg.TypeParameter, &msg.Height)
+	return writeElements(w, &msg.TypeParameter, &msg.Height, &msg.BlockHash)
 }
 
 func (msg *MsgGetBlock) Command() string {
@@ -31,12 +35,13 @@ func (msg *MsgGetBlock) Command() string {
 
 func (msg *MsgGetBlock) MaxPayloadLength(pver uint32) uint32 {
 
-	return 5
+	return MaxMsgGetBlock
 }
 
-func NewMsgGetBlock(height int32, typePara int8) *MsgGetBlock {
+func NewMsgGetBlock(height int32, typePara int8, blockHash chainhash.Hash) *MsgGetBlock {
 	return &MsgGetBlock{
 		TypeParameter: typePara,
 		Height:        height,
+		BlockHash:     blockHash,
 	}
 }
