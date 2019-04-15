@@ -6,7 +6,6 @@ package netsync
 
 import (
 	"container/list"
-	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -1498,38 +1497,36 @@ func (sm *SyncManager) VoteHandler() {
 
 	//等待同步完成
 	//Wait for synchronization to complete
+
 	openTime := time.NewTicker(time.Second)
+	// 同步的最新块
+	// the latest block time for synchronization
+	bestLastCandidate := sm.chain.BestSnapshot()
+	blockHeight := bestLastCandidate.Height
+
 out:
 	for {
 		select {
 		case <-openTime.C:
-			fmt.Println(sm.chain.IsCurrent())
-			if sm.chain.IsCurrent() {
+
+			if blockHeight-vote.CurrentHeight == 2 {
 				break out
 			}
-
-			openTime.Stop()
 		}
 	}
+	openTime.Stop()
 
 	// 初始化指向池、前项块池、当前块池
 	blockchain.CurrentCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
 	blockchain.PrevCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
 	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
 
-	// 创世时间
-	// creation time
-	//best := sm.chain.BestSnapshot()
-	creationTime := time.Now()
+	// 第一个块生成时间
 
-	// 同步的最新块时间
-	// the latest block time for synchronization
-	bestLastCandidate := sm.chain.BestSnapshot()
-	blockHeight := bestLastCandidate.Height
+	creationTime := vote.FirstBLockTime
 
 	// 根据最新块，计算10秒发块定时器启动的时间
-	// According to the latest block, calculate the start time of the 10-second block timer
-	laterTime := creationTime.Add(vote.BlockTimeInterval*time.Duration(blockHeight) + vote.SyncTimeInterval)
+	laterTime := creationTime.Add(vote.BlockTimeInterval * time.Duration(blockHeight))
 	nowTime := time.Now()
 	t := time.NewTimer(laterTime.Sub(nowTime))
 	<-t.C

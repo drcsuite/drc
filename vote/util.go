@@ -19,7 +19,7 @@ const (
 
 	// 发块时间间隔
 	// Block time interval
-	BlockTimeInterval = 2 * time.Second
+	BlockTimeInterval = 10 * time.Second
 
 	// 为同步到最新的发块时间所需的时间间隔
 	// the time interval required to synchronize to the latest block time

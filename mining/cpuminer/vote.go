@@ -8,10 +8,6 @@ import (
 )
 
 const (
-	// The number of leading reference blocks required to evaluate a scale
-	// 求scale值需要的前置参考块的数量
-	BlockCount = 10
-
 	// 成为优势区块所需的票数差
 	// The number of votes needed to become the dominant block
 	AdvantageVoteNum = 100
