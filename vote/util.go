@@ -43,6 +43,10 @@ var (
 	// The signature ticket pool for the previous block
 	prevTicketPool = make(map[chainhash.Hash][]SignAndKey)
 
+	CurrentHeight int32 // 当前轮高度
+
+	StartHeight int32 // 项目启动时高度
+
 	// 第一个块生成时间
 	// （当前时间-第一个块时间）/10 +1 = 当前轮高度
 	FirstBLockTime = time.Unix(time.Now().Unix(), 0)
