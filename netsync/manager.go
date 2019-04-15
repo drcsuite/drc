@@ -240,8 +240,6 @@ type SyncManager struct {
 
 	// An optional fee estimator.
 	feeEstimator *mempool.FeeEstimator
-
-	currentHeight int32 // 当前轮次高度
 }
 
 // resetHeaderState将headers-first模式状态设置为适合从新对等点同步的值。
@@ -726,6 +724,7 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 
 	bestState := sm.chain.BestSnapshot()
 	height := bmsg.block.MsgCandidate().Sigwit.Height
+	vote.CurrentHeight = height
 	if height-bestState.Height == 2 { // 参与验证
 		// handling, etc.
 		// Process the block to include validation, best chain selection, orphan
@@ -777,7 +776,7 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 		// 当前轮高度-链上最后一个块高度>2,请求增量块，并写入map，同步软状态，并记录当前轮块
 	} else if height-bestState.Height > 2 {
 		// 当前轮不收增量块
-		if sm.currentHeight == height {
+		if vote.StartHeight == height {
 			log.Infof("The current wheel does not accept fast increments")
 			return
 		}
@@ -787,7 +786,8 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-2, 1, zero), nil)
 			// 请求软状态
 			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-1, 2, bmsg.block.MsgCandidate().Header.PrevBlock), nil)
-			// 加入增量请求状态
+
+			// 防止重复请求
 			incrementBlock[height] = struct{}{}
 		}
 		// 不符合规则
