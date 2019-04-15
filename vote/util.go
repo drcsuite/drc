@@ -32,8 +32,6 @@ const (
 
 var (
 	Work bool
-	Open = make(chan bool)
-
 	// 读写锁
 	// Read-write lock
 	RWSyncMutex = new(sync.RWMutex)
