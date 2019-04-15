@@ -663,6 +663,22 @@ func (sp *serverPeer) OnSign(_ *peer.Peer, msg *wire.MsgSign) {
 	<-sp.blockProcessed
 }
 
+// 接收到GetBlock信息时调用的处理函数
+// The handler that is called when GetBlock information is received
+func (sp *serverPeer) onGetBlock(_ *peer.Peer, msg *wire.MsgGetBlock) {
+
+	sp.server.syncManager.QueueGetBlock(msg, sp.Peer, sp.blockProcessed)
+	<-sp.blockProcessed
+}
+
+// 接收到SyncBlock信息时调用的处理函数
+// The handler that is called when SyncBlock information is received
+func (sp *serverPeer) onSyncBlock(_ *peer.Peer, msg *wire.MsgSyncBlock) {
+
+	sp.server.syncManager.QueueGetBlock(msg, sp.Peer, sp.blockProcessed)
+	<-sp.blockProcessed
+}
+
 // OnInv在对等方接收到inv比特币消息时被调用，用于检查远程对等方公布的库存并作出相应的响应。
 // 我们将消息传递给blockmanager，它将调用QueueMessage并提供适当的响应。
 // OnInv is invoked when a peer receives an inv bitcoin message and is
@@ -2086,6 +2102,8 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnRead:         sp.OnRead,
 			OnWrite:        sp.OnWrite,
 			OnSign:         sp.OnSign,
+			OnGetBlock:     sp.onGetBlock,
+			OnSyncBlock:    sp.onSyncBlock,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but

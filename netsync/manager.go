@@ -6,7 +6,6 @@ package netsync
 
 import (
 	"container/list"
-	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -81,6 +80,18 @@ type signMsg struct {
 	sign  *wire.MsgSign
 	peer  *peerpkg.Peer
 	reply chan struct{}
+}
+
+type getBlockMsg struct {
+	getBlock *wire.MsgGetBlock
+	peer     *peerpkg.Peer
+	reply    chan struct{}
+}
+
+type syncBlockMsg struct {
+	syncBlockMsg *wire.MsgSyncBlock
+	peer         *peerpkg.Peer
+	reply        chan struct{}
 }
 
 // invMsg将比特币inv消息及其来自的对等方打包在一起，以便块处理程序能够访问该信息。
@@ -860,10 +871,7 @@ func (sm *SyncManager) CollectVotes(sign *wire.MsgSign, candidate *wire.MsgCandi
 				// 收到的投票的前置块hash值跟本节点的前置hash值一样，传播该投票信息
 				// The leading block hash value for the poll received is the same as the leading hash value for the node, and the poll is propagated
 				lastCandidate := sm.chain.BestLastCandidate()
-				fmt.Println("传播收到的的签名+++++++++++++++++++++++++", sign.PublicKey)
-				fmt.Println(candidate.Header.PrevBlock == lastCandidate.Hash)
 				if candidate.Header.PrevBlock == lastCandidate.Hash {
-
 					bo, err := sm.SendSign(sign)
 					if err != nil || !bo {
 						log.Errorf("Failed to send sign message: %v", err)
@@ -893,6 +901,50 @@ func preventRepeatSign(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash3
 		}
 	}
 	return true
+}
+
+// 处理GetBlock信息，发送增量同步块或者软状态块
+func (sm *SyncManager) handleGetBlockMsg(msg *getBlockMsg) {
+	peer := msg.peer
+	_, exists := sm.peerStates[peer]
+	if !exists {
+		log.Warnf("Received block message from unknown peer %s", peer)
+		return
+	}
+
+	// 根据getBlock的type，处理发送的结果
+
+	if msg.getBlock.TypeParameter == 1 {
+		// TypeParameter为1，请求增量同步块
+
+		peer.QueueMessage(wire.NewMsgSyncBlock(1, wire.MsgCandidate{}), nil)
+	} else if msg.getBlock.TypeParameter == 2 {
+		// TypeParameter为2，请求软状态块
+
+		peer.QueueMessage(wire.NewMsgSyncBlock(2, wire.MsgCandidate{}), nil)
+	}
+}
+
+// 处理syncBlockMsg信息，保存增量同步块或者软状态块
+func (sm *SyncManager) handleSyncBlockMsg(msg *syncBlockMsg) {
+	peer := msg.peer
+	_, exists := sm.peerStates[peer]
+	if !exists {
+		log.Warnf("Received block message from unknown peer %s", peer)
+		return
+	}
+
+	// 根据syncBlockMsg的type，处理接收到的数据
+	//msgCandidate := msg.syncBlockMsg.MsgCandidate
+
+	if msg.syncBlockMsg.TypeParameter == 1 {
+		// TypeParameter为1，保存增量同步块
+
+		//sm.ProcessBlock().
+
+	} else if msg.syncBlockMsg.TypeParameter == 2 {
+		// TypeParameter为2，保存软状态块
+	}
 }
 
 // fetchHeaderBlocks创建一个请求，并向syncPeer发送一个请求，根据当前头列表下载下一个块列表。
@@ -1382,6 +1434,14 @@ out:
 				sm.handleSignMsg(msg)
 				msg.reply <- struct{}{}
 
+			case *getBlockMsg:
+				sm.handleGetBlockMsg(msg)
+				msg.reply <- struct{}{}
+
+			case *syncBlockMsg:
+				sm.handleSyncBlockMsg(msg)
+				msg.reply <- struct{}{}
+
 			case *invMsg:
 				sm.handleInvMsg(msg)
 
@@ -1712,6 +1772,26 @@ func (sm *SyncManager) QueueSign(msg *wire.MsgSign, peer *peerpkg.Peer, done cha
 	}
 
 	sm.msgChan <- &signMsg{sign: msg, peer: peer, reply: done}
+}
+
+func (sm *SyncManager) QueueGetBlock(msg *wire.MsgGetBlock, peer *peerpkg.Peer, done chan struct{}) {
+	// Don't accept more blocks if we're shutting down.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		done <- struct{}{}
+		return
+	}
+
+	sm.msgChan <- &getBlockMsg{getBlock: msg, peer: peer, reply: done}
+}
+
+func (sm *SyncManager) QueueSyncBlock(msg *wire.MsgSyncBlock, peer *peerpkg.Peer, done chan struct{}) {
+	// Don't accept more blocks if we're shutting down.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		done <- struct{}{}
+		return
+	}
+
+	sm.msgChan <- &syncBlockMsg{syncBlockMsg: msg, peer: peer, reply: done}
 }
 
 // QueueInv将传递的inv消息和对等点添加到块处理队列中。
