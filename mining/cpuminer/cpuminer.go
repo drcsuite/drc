@@ -443,7 +443,7 @@ out:
 			log.Info("高度: ", block.MsgCandidate().Sigwit.Height)
 			log.Info("version: ", block.MsgCandidate().Header.Version)
 			log.Info("scale: ", block.MsgCandidate().Header.Scale)
-			log.Info("timestamp: ", block.MsgCandidate().Header.Timestamp)
+			log.Info("timestamp: ", block.MsgCandidate().Header.Timestamp.Unix())
 			log.Info("blockhash: ", block.MsgCandidate().BlockHash())
 
 			// 加入当前指向池

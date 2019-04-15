@@ -909,6 +909,9 @@ func (sm *SyncManager) handleGetBlockMsg(msg *getBlockMsg) {
 			Header:       block.MsgBlock().Header,
 			Transactions: block.MsgBlock().Transactions,
 		}
+		candidate.Sigwit = &wire.MsgSigwit{
+			Height: getBlock.Height,
+		}
 
 		peer.QueueMessage(wire.NewMsgSyncBlock(1, candidate), nil)
 	} else if getBlock.TypeParameter == 2 {
