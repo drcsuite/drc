@@ -1,6 +1,7 @@
 package cpuminer
 
 import (
+	"fmt"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
@@ -102,7 +103,7 @@ func GetMaxVotes() (chainhash.Hash, uint16) {
 
 	var maxVotes = 0
 	var maxBlockHash chainhash.Hash
-	//fmt.Println("票池大小： ", len(vote.GetTicketPool()))
+	fmt.Println("票池： ", vote.GetTicketPool())
 
 	for headerHash, signAndKeys := range vote.GetTicketPool() {
 		if count := len(signAndKeys); count > maxVotes {
