@@ -935,8 +935,6 @@ func (sm *SyncManager) handleSyncBlockMsg(msg *syncBlockMsg) {
 	}
 
 	// 根据syncBlockMsg的type，处理接收到的数据
-	//msgCandidate := msg.syncBlockMsg.MsgCandidate
-
 	candidate := msg.syncBlockMsg.MsgCandidate
 	if msg.syncBlockMsg.TypeParameter == 1 {
 		// TypeParameter为1，保存增量同步块

@@ -52,9 +52,9 @@ func (msg *MsgSyncBlock) MaxPayloadLength(pver uint32) uint32 {
 	return MaxBlockPayload
 }
 
-func NewMsgSyncBlock(TypeParameter int8, msgCandidate MsgCandidate) *MsgSyncBlock {
+func NewMsgSyncBlock(typeParameter int8, msgCandidate MsgCandidate) *MsgSyncBlock {
 	return &MsgSyncBlock{
-		TypeParameter: TypeParameter,
+		TypeParameter: typeParameter,
 		MsgCandidate:  msgCandidate,
 	}
 }
