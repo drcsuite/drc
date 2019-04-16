@@ -172,6 +172,7 @@ func (b *Block) Transactions() []*Tx {
 		return b.transactions
 	}
 
+	//如果需要，生成一个切片来保存所有包装好的事务。
 	// Generate slice to hold all of the wrapped transactions if needed.
 	if len(b.transactions) == 0 {
 		b.transactions = make([]*Tx, len(b.msgBlock.Transactions))
