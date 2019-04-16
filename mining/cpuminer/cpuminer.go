@@ -440,6 +440,7 @@ out:
 			// 加入当前块池
 			block := drcutil.NewCandidate(template.Block, template.Candidate)
 			log.Info("发现新块")
+			log.Info("前项块: ", block.MsgCandidate().Header.PrevBlock)
 			log.Info("高度: ", block.MsgCandidate().Sigwit.Height)
 			log.Info("version: ", block.MsgCandidate().Header.Version)
 			log.Info("scale: ", block.MsgCandidate().Header.Scale)

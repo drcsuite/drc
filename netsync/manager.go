@@ -1524,9 +1524,6 @@ func (sm *SyncManager) VoteHandler() {
 
 				bestLastCandidate := sm.chain.BestSnapshot()
 				blockHeight := bestLastCandidate.Height
-				fmt.Println("本地节点当前高度为： ", vote.CurrentHeight)
-				fmt.Println("当前链上高度为： ", blockHeight)
-				fmt.Println("高度差值为： ", vote.CurrentHeight-blockHeight)
 				if vote.CurrentHeight-blockHeight == 2 {
 					fmt.Println("+——+——+——+——+——+——+——+——+——+——+——")
 					break out
