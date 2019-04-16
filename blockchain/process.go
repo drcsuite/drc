@@ -346,7 +346,7 @@ func (b *BlockChain) ProcessSyncBlock(block *drcutil.Block) (bool, error) {
 }
 
 // 处理发块阶段收到的块，并将该块放入块池和指向池
-// 																			是否投票，块是否符合规则，错误信息
+// 是否投票，块是否符合规则，错误信息
 func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
