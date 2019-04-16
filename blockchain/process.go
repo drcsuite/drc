@@ -351,6 +351,12 @@ func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags)
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
+	// 复制msgcandidate
+	block.MsgBlock() = &wire.MsgBlock{
+		Header:       block.MsgCandidate().Header,
+		Transactions: block.MsgCandidate().Transactions,
+	}
+
 	//fastAdd := flags&BFFastAdd == BFFastAdd
 	blockHash := block.CandidateHash()
 	log.Tracef("Processing block %v", blockHash)
