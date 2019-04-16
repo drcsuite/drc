@@ -1031,9 +1031,9 @@ func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte,
 	n, msg, buf, err := wire.ReadMessageWithEncodingN(p.conn,
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
 	atomic.AddUint64(&p.bytesReceived, uint64(n))
-	if msg != nil {
-		fmt.Println("++++++++++++++++readMessage: ", msg.Command(), msg)
-	}
+	//if msg != nil {
+	//	fmt.Println("++++++++++++++++readMessage: ", msg.Command(), msg)
+	//}
 
 	if p.cfg.Listeners.OnRead != nil {
 		p.cfg.Listeners.OnRead(p, n, msg, err)

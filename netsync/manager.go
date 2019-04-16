@@ -787,9 +787,13 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 		if _, ok := incrementBlock[height]; !ok {
 			// 请求增量块
 			var zero chainhash.Hash
+			blockHash := bmsg.block.MsgCandidate().BlockHash()
 			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-2, 1, zero), nil)
 			// 请求软状态
 			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-1, 2, bmsg.block.MsgCandidate().Header.PrevBlock), nil)
+
+			// 加入当前块池
+			blockchain.CurrentCandidatePool[blockHash] = bmsg.block.MsgCandidate()
 
 			// 防止重复请求
 			incrementBlock[height] = struct{}{}
@@ -863,7 +867,7 @@ func (sm *SyncManager) CollectVotes(sign *wire.MsgSign, candidate *wire.MsgCandi
 				// 收到的投票的前置块hash值跟本节点的前置hash值一样，传播该投票信息
 				// The leading block hash value for the poll received is the same as the leading hash value for the node, and the poll is propagated
 				lastCandidate := sm.chain.BestLastCandidate()
-				if candidate.Header.PrevBlock == lastCandidate.Hash {
+				if lastCandidate != nil && candidate.Header.PrevBlock == lastCandidate.Hash {
 					bo, err := sm.SendSign(sign)
 					if err != nil || !bo {
 						log.Errorf("Failed to send sign message: %v", err)
@@ -1584,7 +1588,7 @@ func (sm *SyncManager) voteProcess() {
 		genesis := chaincfg.MainNetParams.GenesisBlock
 		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
 	} else {
-		sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header, votes)
+		sm.chain.SetBestCandidate(blockHeaderHash, msgCandidate.Sigwit.Height, msgCandidate.Header, votes)
 	}
 
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
