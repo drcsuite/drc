@@ -1511,16 +1511,20 @@ func (sm *SyncManager) VoteHandler() {
 		//Wait for synchronization to complete
 
 		openTime := time.NewTicker(time.Second)
-		// 同步的最新块
-		// the latest block time for synchronization
-		bestLastCandidate := sm.chain.BestSnapshot()
-		blockHeight := bestLastCandidate.Height
 	out:
 		for {
 			select {
+			// 同步的最新块
+			// the latest block time for synchronization
 			case <-openTime.C:
 
+				bestLastCandidate := sm.chain.BestSnapshot()
+				blockHeight := bestLastCandidate.Height
+				fmt.Println("本地节点当前高度为： ", vote.CurrentHeight)
+				fmt.Println("当前链上高度为： ", blockHeight)
+				fmt.Println("高度差值为： ", vote.CurrentHeight-blockHeight)
 				if vote.CurrentHeight-blockHeight == 2 {
+					fmt.Println("+——+——+——+——+——+——+——+——+——+——+——")
 					break out
 				}
 			}
