@@ -503,11 +503,11 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, seed *chainhash.Hash, pi *
 
 	// 时间验证，确保区块时间不会太长。
 	// Ensure the block time is not too far in the future.
-	maxTimestamp := timeSource.AdjustedTime()
-	if header.Timestamp.After(maxTimestamp) {
-		str := fmt.Sprintf("block timestamp of %v is too far in the current time: ", header.Timestamp)
-		return false, ruleError(ErrTimeTooNew, str)
-	}
+	//maxTimestamp := timeSource.AdjustedTime()
+	//if header.Timestamp.After(maxTimestamp) {
+	//	str := fmt.Sprintf("block timestamp of %v is too far in the current time: ", header.Timestamp)
+	//	return false, ruleError(ErrTimeTooNew, str)
+	//}
 
 	return vb, nil
 }

@@ -726,9 +726,9 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 	bestState := sm.chain.BestSnapshot()
 	height := bmsg.block.MsgCandidate().Sigwit.Height
 	vote.CurrentHeight = height
-	fmt.Println("收到的msgCandidate高度为： ", height)
-	fmt.Println("当前链上高度为： ", bestState.Height)
-	fmt.Println("高度差值为： ", height-bestState.Height)
+	//fmt.Println("收到的msgCandidate高度为： ", height)
+	//fmt.Println("当前链上高度为： ", bestState.Height)
+	//fmt.Println("高度差值为： ", height-bestState.Height)
 	if height-bestState.Height == 2 { // 参与验证
 		// handling, etc.
 		// Process the block to include validation, best chain selection, orphan
@@ -1594,10 +1594,10 @@ func (sm *SyncManager) voteProcess() {
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
 	// write the Hash of the previous round of blocks, most of which are pointed to in this round of block pool, into the blockChain
 	hash := blockchain.GetBestPointBlockH()
-	fmt.Println("当前指向池的hash: ", hash)
+	//fmt.Println("当前指向池的hash: ", hash)
 
 	prevCandidate := blockchain.PrevCandidatePool[hash]
-	fmt.Println("prevCandidate: ", prevCandidate)
+	//fmt.Println("prevCandidate: ", prevCandidate)
 	// 清空当前指向池
 	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
 
