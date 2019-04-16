@@ -299,6 +299,7 @@ func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock, serializedBlock []byte) 
 	}
 }
 
+// 根据candidate创建block
 func NewBlockFromCandidateAndBytes(msgCandidate *wire.MsgCandidate, serializedBlock []byte) *Block {
 	return &Block{
 		msgCandidate:    msgCandidate,
@@ -313,4 +314,8 @@ func MsgCandidateToBlock(msgCandidate *wire.MsgCandidate) *wire.MsgBlock {
 		Header:       msgCandidate.Header,
 		Transactions: msgCandidate.Transactions,
 	}
+}
+
+func (b *Block) SetMsgBlock(msgBlock *wire.MsgBlock) {
+	b.msgBlock = msgBlock
 }
