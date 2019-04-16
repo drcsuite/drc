@@ -772,7 +772,7 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 		}
 
 		// 对收到的块做投票处理
-		if v || vote.VoteBool {
+		if v && vote.VoteBool {
 			log.Info("对 ", bmsg.block.Hash(), " 进行投票")
 			bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
 		}
@@ -787,13 +787,16 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 		if _, ok := incrementBlock[height]; !ok {
 			// 请求增量块
 			var zero chainhash.Hash
-			blockHash := bmsg.block.MsgCandidate().BlockHash()
+			candidate := bmsg.block.MsgCandidate()
 			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-2, 1, zero), nil)
 			// 请求软状态
-			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-1, 2, bmsg.block.MsgCandidate().Header.PrevBlock), nil)
+			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-1, 2, candidate.Header.PrevBlock), nil)
 
-			// 加入当前块池
-			blockchain.CurrentCandidatePool[blockHash] = bmsg.block.MsgCandidate()
+			// 加入当前块池和指向池
+			blockchain.CurrentCandidatePool[candidate.BlockHash()] = candidate
+			points := blockchain.CurrentPointPool[candidate.Header.PrevBlock]
+			points = append(points, candidate)
+			blockchain.CurrentPointPool[candidate.Header.PrevBlock] = points
 
 			// 防止重复请求
 			incrementBlock[height] = struct{}{}
@@ -1591,10 +1594,10 @@ func (sm *SyncManager) voteProcess() {
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
 	// write the Hash of the previous round of blocks, most of which are pointed to in this round of block pool, into the blockChain
 	hash := blockchain.GetBestPointBlockH()
-	//fmt.Println("当前指向池的hash: ", hash)
+	fmt.Println("当前指向池的hash: ", hash)
 
 	prevCandidate := blockchain.PrevCandidatePool[hash]
-	//fmt.Println("prevCandidate: ", prevCandidate)
+	fmt.Println("prevCandidate: ", prevCandidate)
 	// 清空当前指向池
 	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
 

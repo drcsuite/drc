@@ -2,6 +2,7 @@ package cpuminer
 
 import (
 	"fmt"
+	"github.com/drcsuite/drc/blockchain"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
@@ -104,12 +105,28 @@ func GetMaxVotes() (chainhash.Hash, uint16) {
 	var maxVotes = 0
 	var maxBlockHash chainhash.Hash
 	fmt.Println("票池： ", vote.GetTicketPool())
+	for a, b := range vote.GetTicketPool() {
+		fmt.Println(a, len(b))
+	}
 
 	for headerHash, signAndKeys := range vote.GetTicketPool() {
-		if count := len(signAndKeys); count > maxVotes {
+		count := len(signAndKeys)
+		if count > maxVotes {
 			maxVotes = count
 			maxBlockHash = headerHash
+		} else if count == maxVotes {
+
+			msgCandidate := blockchain.CurrentCandidatePool[headerHash]
+			weight := new(big.Int).SetBytes(chainhash.DoubleHashB(msgCandidate.Header.Signature.CloneBytes()))
+
+			maxCandidate := blockchain.CurrentCandidatePool[maxBlockHash]
+			maxWeight := new(big.Int).SetBytes(chainhash.DoubleHashB(maxCandidate.Header.Signature.CloneBytes()))
+
+			if weight.Cmp(maxWeight) < 0 {
+				maxBlockHash = headerHash
+			}
 		}
+
 	}
 	return maxBlockHash, uint16(maxVotes)
 }

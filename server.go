@@ -1856,8 +1856,6 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 }
 
 func (s *server) handleSendBlockMsg(state *peerState, msg sendMsg) {
-
-	fmt.Println("可广播的可信节点数", state.Count())
 	state.forAllPeers(func(sp *serverPeer) {
 		if !sp.Connected() {
 			return
@@ -1873,7 +1871,6 @@ func (s *server) handleSendBlockMsg(state *peerState, msg sendMsg) {
 }
 
 func (s *server) handleSendSignMsg(state *peerState, msg sendSignature) {
-	fmt.Println("可广播投票的可信节点数", state.Count())
 	state.forAllPeers(func(sp *serverPeer) {
 		if !sp.Connected() {
 			return
