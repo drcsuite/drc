@@ -891,7 +891,7 @@ mempoolLoop:
 			return nil, err
 		}
 	}
-	msgCandidate.Sigwit = &wire.MsgSigwit{
+	msgCandidate.Sigwit = wire.MsgSigwit{
 		Height: height,
 	}
 

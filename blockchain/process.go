@@ -283,6 +283,7 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 	return isMainChain, false, nil
 }
 
+// 处理同步增量块
 func (b *BlockChain) ProcessSyncBlock(block *drcutil.Block) (bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
@@ -308,8 +309,36 @@ func (b *BlockChain) ProcessSyncBlock(block *drcutil.Block) (bool, error) {
 		return false, ruleError(ErrDuplicateBlock, str)
 	}
 
-	// 添加入孤块池
-	b.addOrphanBlock(block)
+	prevHash := &block.MsgBlock().Header.PrevBlock
+	prevHashExists, err := b.blockExists(prevHash)
+	if err != nil {
+		return false, nil
+	}
+	if !prevHashExists {
+		log.Infof("Adding orphan block %v with parent %v", blockHash, prevHash)
+		// 添加入孤块池
+		b.addOrphanBlock(block)
+
+		return true, nil
+	}
+
+	// The block has passed all context independent checks and appears sane
+	// enough to potentially accept it into the block chain.
+	_, err = b.maybeAcceptBlock(block, BFNone)
+	if err != nil {
+		return false, err
+	}
+
+	// 接受任何依赖于此块的孤立块(它们确实如此)
+	// 不再是孤儿)，并重复这些接受街区，直到
+	// 没有了。
+	// Accept any orphan blocks that depend on this block (they are
+	// no longer orphans) and repeat for those accepted blocks until
+	// there are no more.
+	err = b.processOrphans(blockHash, BFNone)
+	if err != nil {
+		return false, err
+	}
 
 	log.Debugf("Accepted sync block %v", blockHash)
 

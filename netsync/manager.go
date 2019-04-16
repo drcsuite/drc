@@ -6,6 +6,7 @@ package netsync
 
 import (
 	"container/list"
+	"fmt"
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
@@ -725,6 +726,9 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 	bestState := sm.chain.BestSnapshot()
 	height := bmsg.block.MsgCandidate().Sigwit.Height
 	vote.CurrentHeight = height
+	fmt.Println("收到的msgCandidate高度为： ", height)
+	fmt.Println("当前链上高度为： ", bestState.Height)
+	fmt.Println("高度差值为： ", height-bestState.Height)
 	if height-bestState.Height == 2 { // 参与验证
 		// handling, etc.
 		// Process the block to include validation, best chain selection, orphan
@@ -909,7 +913,7 @@ func (sm *SyncManager) handleGetBlockMsg(msg *getBlockMsg) {
 			Header:       block.MsgBlock().Header,
 			Transactions: block.MsgBlock().Transactions,
 		}
-		candidate.Sigwit = &wire.MsgSigwit{
+		candidate.Sigwit = wire.MsgSigwit{
 			Height: getBlock.Height,
 		}
 
@@ -1501,6 +1505,7 @@ func (sm *SyncManager) VoteHandler() {
 	blockchain.CurrentCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
 	blockchain.PrevCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
 	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
+	incrementBlock = make(map[int32]struct{})
 
 	if vote.FirstBLockTime != 0 {
 

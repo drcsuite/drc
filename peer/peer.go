@@ -1039,7 +1039,6 @@ func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte,
 		p.cfg.Listeners.OnRead(p, n, msg, err)
 	}
 	if err != nil {
-		fmt.Println("+++++++++++++++++++++err1", err)
 		return nil, nil, err
 	}
 

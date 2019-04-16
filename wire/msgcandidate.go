@@ -12,7 +12,7 @@ import (
 type MsgCandidate struct {
 	Header       BlockHeader
 	Transactions []*MsgTx
-	Sigwit       *MsgSigwit
+	Sigwit       MsgSigwit
 }
 
 func (msg *MsgCandidate) AddTransaction(tx *MsgTx) error {
@@ -110,11 +110,11 @@ func (msg *MsgCandidate) SerializeSizeStripped() int {
 
 type MsgSigwit struct {
 	Height int32
-	Votes  []*MsgVote
+	//Votes  []*MsgVote
 }
 
 func (msg *MsgSigwit) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {
-	return readElements(r, msg.Height)
+	return readElements(r, &msg.Height)
 }
 
 func (msg *MsgSigwit) BtcEncode(w io.Writer, pver uint32, enc MessageEncoding) error {

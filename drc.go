@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -9,18 +10,8 @@ import (
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/drcutil"
+	"github.com/drcsuite/drc/wire"
 )
-
-//func main() {
-//	//testCipherAndSign()
-//	//ptr()
-//	//ptrint()
-//	//GenesisBlock()
-//
-//	//Array()
-//	MapStruct()
-//	fmt.Println(" Hello, DRC!")
-//}
 
 func GenerateBTC() (string, string, error) {
 	privKey, err := btcec.NewPrivateKey(btcec.S256())
@@ -158,3 +149,25 @@ func MapStruct() {
 	fmt.Println(i)
 	fmt.Println(i2)
 }
+
+func IOREADER() {
+	a := []byte{17, 0, 0, 0}
+	sigwit := wire.MsgSigwit{}
+	err := sigwit.BtcDecode(bytes.NewReader(a), 0, 0)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(sigwit.Height)
+}
+
+//func main() {
+//	//testCipherAndSign()
+//	//ptr()
+//	//ptrint()
+//	//GenesisBlock()
+//
+//	//Array()
+//	//MapStruct()
+//	IOREADER()
+//	fmt.Println(" Hello, DRC!")
+//}
