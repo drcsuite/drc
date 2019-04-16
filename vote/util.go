@@ -28,6 +28,8 @@ const (
 	// The number of items in the preceding paragraph that scale looks for
 	// 计算scale时寻找的前项数量=1+PrevScaleNum
 	PrevScaleNum = 9
+
+	SendBlockWait = 3
 )
 
 var (
@@ -50,7 +52,7 @@ var (
 	// 第一个块生成时间
 	// （当前时间-第一个块时间）/10 +1 = 当前轮高度
 	// 第一个节点设置为0
-	FirstBLockTime int64 = 1555402508
+	FirstBLockTime int64 = 1555408863
 
 	VoteBool = false
 )
