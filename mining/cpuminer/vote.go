@@ -12,6 +12,10 @@ const (
 	// 成为优势区块所需的票数差
 	// The number of votes needed to become the dominant block
 	AdvantageVoteNum = 100
+
+	// 区块胜出所需的最小的投票比，全部投票数的三分之二
+	// The minimum number of votes needed for a block to win, two-thirds of the total votes cast
+	MinVoteRatio = float64(2) / float64(3)
 )
 
 // 区块验证投票
@@ -94,6 +98,41 @@ func isAdvantage(headerHash chainhash.Hash) bool {
 	}
 
 	return true
+
+}
+
+// 判断获胜区块获得的票数是否大于总票数的三分之二
+func IsEnough(voteNum uint16, scale uint16) bool {
+
+	// 根据scale估算符合投票的节点数
+	// scale小于等于300，scale为符合投票的节点数；scale大于300，300为符合投票的节点数；
+	if scale <= vote.IdealVoteNum {
+
+		// 修正节点数太少，突然有节点断开连接的的影响
+		if scale <= 10 {
+			if float64(voteNum) >= float64(scale)*MinVoteRatio-1 {
+				return true
+			}
+		}
+
+		// 收到的票数大于符合投票的节点数的三分之二，返回true
+		// Returns true if the number of votes received is greater than two-thirds of the number of nodes eligible to vote
+		if float64(voteNum) >= float64(scale)*MinVoteRatio {
+
+			return true
+		}
+
+	} else {
+
+		// 收到的票数大于符合投票的节点数的三分之二，返回true
+		// Returns true if the number of votes received is greater than two-thirds of the number of nodes eligible to vote
+		if float64(voteNum) >= float64(vote.IdealVoteNum)*MinVoteRatio {
+			return true
+		}
+
+	}
+
+	return false
 
 }
 

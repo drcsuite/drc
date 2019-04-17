@@ -456,6 +456,9 @@ out:
 			log.Info("指向池大小为: ", len(blockchain.CurrentPointPool[best.Hash]))
 
 			// 将块信息提交给对等点
+			t := time.NewTimer(vote.SendBlockWait * time.Second)
+			<-t.C
+			t.Stop()
 			bo := m.submitBlock(block)
 			if bo {
 				vote.Work = false
