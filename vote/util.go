@@ -52,7 +52,7 @@ var (
 	// 第一个块生成时间
 	// （当前时间-第一个块时间）/10 +1 = 当前轮高度
 	// 第一个节点设置为0
-	FirstBLockTime int64 = 1555408863
+	FirstBLockTime int64 = 1555469407
 
 	VoteBool = false
 )
