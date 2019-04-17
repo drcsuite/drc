@@ -130,6 +130,14 @@ type MessageListeners struct {
 	// OnSign is invoked when a peer receives a signed message.
 	OnSign func(p *Peer, msg *wire.MsgSign)
 
+	// 当对等方接收到getBlock消息时调用它。
+	// OnSign is invoked when a peer receives a signed message.
+	OnGetBlock func(p *Peer, msg *wire.MsgGetBlock)
+
+	// 当对等方接收到syncBlock消息时调用它。
+	// OnSign is invoked when a peer receives a signed message.
+	OnSyncBlock func(p *Peer, msg *wire.MsgSyncBlock)
+
 	// OnCFilter is invoked when a peer receives a cfilter bitcoin message.
 	OnCFilter func(p *Peer, msg *wire.MsgCFilter)
 
@@ -1023,6 +1031,10 @@ func (p *Peer) readMessage(encoding wire.MessageEncoding) (wire.Message, []byte,
 	n, msg, buf, err := wire.ReadMessageWithEncodingN(p.conn,
 		p.ProtocolVersion(), p.cfg.ChainParams.Net, encoding)
 	atomic.AddUint64(&p.bytesReceived, uint64(n))
+	//if msg != nil {
+	//	fmt.Println("++++++++++++++++readMessage: ", msg.Command(), msg)
+	//}
+
 	if p.cfg.Listeners.OnRead != nil {
 		p.cfg.Listeners.OnRead(p, n, msg, err)
 	}
@@ -1216,6 +1228,7 @@ out:
 		case msg := <-p.stallControl:
 			switch msg.command {
 			case sccSendMessage:
+				// 如果需要，为预期的响应消息添加一个截止日期。
 				// Add a deadline for the expected response
 				// message if needed.
 				p.maybeAddDeadline(pendingResponses,
@@ -1466,6 +1479,16 @@ out:
 		case *wire.MsgSign:
 			if p.cfg.Listeners.OnSign != nil {
 				p.cfg.Listeners.OnSign(p, msg)
+			}
+
+		case *wire.MsgGetBlock:
+			if p.cfg.Listeners.OnGetBlock != nil {
+				p.cfg.Listeners.OnGetBlock(p, msg)
+			}
+
+		case *wire.MsgSyncBlock:
+			if p.cfg.Listeners.OnSyncBlock != nil {
+				p.cfg.Listeners.OnSyncBlock(p, msg)
 			}
 
 		case *wire.MsgInv:

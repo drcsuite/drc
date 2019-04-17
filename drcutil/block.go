@@ -172,6 +172,7 @@ func (b *Block) Transactions() []*Tx {
 		return b.transactions
 	}
 
+	//如果需要，生成一个切片来保存所有包装好的事务。
 	// Generate slice to hold all of the wrapped transactions if needed.
 	if len(b.transactions) == 0 {
 		b.transactions = make([]*Tx, len(b.msgBlock.Transactions))
@@ -298,7 +299,8 @@ func NewBlockFromBlockAndBytes(msgBlock *wire.MsgBlock, serializedBlock []byte) 
 	}
 }
 
-func NewCandidateFromBlockAndBytes(msgCandidate *wire.MsgCandidate, serializedBlock []byte) *Block {
+// 根据candidate创建block
+func NewBlockFromCandidateAndBytes(msgCandidate *wire.MsgCandidate, serializedBlock []byte) *Block {
 	return &Block{
 		msgCandidate:    msgCandidate,
 		serializedBlock: serializedBlock,
@@ -312,4 +314,8 @@ func MsgCandidateToBlock(msgCandidate *wire.MsgCandidate) *wire.MsgBlock {
 		Header:       msgCandidate.Header,
 		Transactions: msgCandidate.Transactions,
 	}
+}
+
+func (b *Block) SetMsgBlock(msgBlock *wire.MsgBlock) {
+	b.msgBlock = msgBlock
 }

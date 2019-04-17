@@ -12,6 +12,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/drcsuite/drc/vote"
 	"math"
 	"net"
 	"runtime"
@@ -50,7 +51,8 @@ const (
 	defaultRequiredServices = wire.SFNodeNetwork
 
 	// defaultTargetOutbound is the default number of outbound peers to target.
-	defaultTargetOutbound = 8
+	defaultTargetOutbound = 1
+	//defaultTargetOutbound = 8
 
 	// connectionRetryInterval is the base amount of time to wait in between
 	// retries when connecting to persistent peers.  It is adjusted by the
@@ -629,12 +631,12 @@ func (sp *serverPeer) OnCandidate(_ *peer.Peer, msg *wire.MsgCandidate, buf []by
 	// 将原始MsgBlock转换为btcutil块，该块提供了一些方便的方法和诸如散列缓存之类的东西。
 	// Convert the raw MsgBlock to a drcutil.Block which provides some
 	// convenience methods and things such as hash caching.
-	block := drcutil.NewCandidateFromBlockAndBytes(msg, buf)
+	block := drcutil.NewBlockFromCandidateAndBytes(msg, buf)
 
 	// 将块添加到对等节点的已知目录中。
 	// Add the block to the known inventory for the peer.
-	iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
-	sp.AddKnownInventory(iv)
+	//iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
+	//sp.AddKnownInventory(iv)
 
 	// 将块排队等待块管理器处理，并故意进一步接收块，直到比特币块被完全处理并知道是好是坏。
 	// 这有助于防止恶意的对等程序在断开连接(或断开连接)和浪费内存之前排队等待一堆坏块。
@@ -659,6 +661,22 @@ func (sp *serverPeer) OnCandidate(_ *peer.Peer, msg *wire.MsgCandidate, buf []by
 func (sp *serverPeer) OnSign(_ *peer.Peer, msg *wire.MsgSign) {
 
 	sp.server.syncManager.QueueSign(msg, sp.Peer, sp.blockProcessed)
+	<-sp.blockProcessed
+}
+
+// 接收到GetBlock信息时调用的处理函数
+// The handler that is called when GetBlock information is received
+func (sp *serverPeer) onGetBlock(_ *peer.Peer, msg *wire.MsgGetBlock) {
+
+	sp.server.syncManager.QueueGetBlock(msg, sp.Peer, sp.blockProcessed)
+	<-sp.blockProcessed
+}
+
+// 接收到SyncBlock信息时调用的处理函数
+// The handler that is called when SyncBlock information is received
+func (sp *serverPeer) onSyncBlock(_ *peer.Peer, msg *wire.MsgSyncBlock) {
+
+	sp.server.syncManager.QueueSyncBlock(msg, sp.Peer, sp.blockProcessed)
 	<-sp.blockProcessed
 }
 
@@ -2082,6 +2100,8 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnRead:         sp.OnRead,
 			OnWrite:        sp.OnWrite,
 			OnSign:         sp.OnSign,
+			OnGetBlock:     sp.onGetBlock,
+			OnSyncBlock:    sp.onSyncBlock,
 
 			// Note: The reference client currently bans peers that send alerts
 			// not signed with its key.  We could verify against their key, but
@@ -2422,6 +2442,11 @@ func (s *server) Start() {
 
 	// Server startup time. Used for the uptime command for uptime calculation.
 	s.startupTime = time.Now().Unix()
+	if vote.FirstBLockTime != 0 {
+		vote.StartHeight = int32(s.startupTime-vote.FirstBLockTime)/10000 + 1
+	} else {
+		vote.StartHeight = 1
+	}
 
 	// Start the peer handler which in turn starts the address and block
 	// managers.

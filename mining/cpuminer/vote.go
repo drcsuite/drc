@@ -1,7 +1,7 @@
 package cpuminer
 
 import (
-	"fmt"
+	"github.com/drcsuite/drc/blockchain"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
@@ -9,13 +9,13 @@ import (
 )
 
 const (
-	// The number of leading reference blocks required to evaluate a scale
-	// 求scale值需要的前置参考块的数量
-	BlockCount = 10
-
 	// 成为优势区块所需的票数差
 	// The number of votes needed to become the dominant block
 	AdvantageVoteNum = 100
+
+	// 区块胜出所需的最小的投票比，全部投票数的三分之二
+	// The minimum number of votes needed for a block to win, two-thirds of the total votes cast
+	MinVoteRatio = float64(2) / float64(3)
 )
 
 // 区块验证投票
@@ -44,7 +44,7 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 		// 用自己的私钥签名区块
 		// Sign the block with your own private key
 		headerSign, err := privateKey.Sign64(headerHash.CloneBytes())
-		fmt.Printf("headersign： %x\n", headerSign)
+		//fmt.Printf("headersign： %x\n", headerSign)
 		if err != nil {
 			log.Errorf("Signature error: %s", err)
 		}
@@ -78,7 +78,6 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 				Signature:       *sign,
 				PublicKey:       *pubKey,
 			}
-
 			m.cfg.SendSign(msgSign)
 		}
 	}
@@ -102,19 +101,66 @@ func isAdvantage(headerHash chainhash.Hash) bool {
 
 }
 
+// 判断获胜区块获得的票数是否大于总票数的三分之二
+func IsEnough(voteNum uint16, scale uint16) bool {
+
+	// 根据scale估算符合投票的节点数
+	// scale小于等于300，scale为符合投票的节点数；scale大于300，300为符合投票的节点数；
+	if scale <= vote.IdealVoteNum {
+
+		// 修正节点数太少，突然有节点断开连接的的影响
+		if scale <= 10 {
+			if float64(voteNum) >= float64(scale)*MinVoteRatio-1 {
+				return true
+			}
+		}
+
+		// 收到的票数大于符合投票的节点数的三分之二，返回true
+		// Returns true if the number of votes received is greater than two-thirds of the number of nodes eligible to vote
+		if float64(voteNum) >= float64(scale)*MinVoteRatio {
+
+			return true
+		}
+
+	} else {
+
+		// 收到的票数大于符合投票的节点数的三分之二，返回true
+		// Returns true if the number of votes received is greater than two-thirds of the number of nodes eligible to vote
+		if float64(voteNum) >= float64(vote.IdealVoteNum)*MinVoteRatio {
+			return true
+		}
+
+	}
+
+	return false
+
+}
+
 // 取得当前票池中获得最多投票数的区块和票数值
 // Gets the block with the most votes in the current pool and the number of votes
 func GetMaxVotes() (chainhash.Hash, uint16) {
 
 	var maxVotes = 0
 	var maxBlockHash chainhash.Hash
-	fmt.Println("票池大小： ", len(vote.GetTicketPool()))
 
 	for headerHash, signAndKeys := range vote.GetTicketPool() {
-		if count := len(signAndKeys); count > maxVotes {
+		count := len(signAndKeys)
+		if count > maxVotes {
 			maxVotes = count
 			maxBlockHash = headerHash
+		} else if count == maxVotes {
+
+			msgCandidate := blockchain.CurrentCandidatePool[headerHash]
+			weight := new(big.Int).SetBytes(chainhash.DoubleHashB(msgCandidate.Header.Signature.CloneBytes()))
+
+			maxCandidate := blockchain.CurrentCandidatePool[maxBlockHash]
+			maxWeight := new(big.Int).SetBytes(chainhash.DoubleHashB(maxCandidate.Header.Signature.CloneBytes()))
+
+			if weight.Cmp(maxWeight) < 0 {
+				maxBlockHash = headerHash
+			}
 		}
+
 	}
 	return maxBlockHash, uint16(maxVotes)
 }

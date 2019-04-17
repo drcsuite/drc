@@ -49,6 +49,8 @@ const (
 	maxRequestedTxns = wire.MaxInvPerMsg
 )
 
+var incrementBlock map[int32]struct{}
+
 // zeroHash是零值散列(全部为零)。它被定义为一种便利。
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
 var zeroHash chainhash.Hash
@@ -79,6 +81,18 @@ type signMsg struct {
 	sign  *wire.MsgSign
 	peer  *peerpkg.Peer
 	reply chan struct{}
+}
+
+type getBlockMsg struct {
+	getBlock *wire.MsgGetBlock
+	peer     *peerpkg.Peer
+	reply    chan struct{}
+}
+
+type syncBlockMsg struct {
+	syncBlockMsg *wire.MsgSyncBlock
+	peer         *peerpkg.Peer
+	reply        chan struct{}
 }
 
 // invMsg将比特币inv消息及其来自的对等方打包在一起，以便块处理程序能够访问该信息。
@@ -313,7 +327,7 @@ func (sm *SyncManager) startSync() {
 		// to passing their latest known block.  NOTE: The < is
 		// intentional as opposed to <=.  While technically the peer
 		// doesn't have a later block when it's equal, it will likely
-		// have one soon so it is a reasonable choice.  It also allows
+		// have one soon so it is a reasonable choice.  It als o allows
 		// the case where both are at 0 such as during regression test.
 		if peer.LastBlock() < best.Height {
 			state.syncCandidate = false
@@ -594,49 +608,8 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 		return
 	}
 
-	// If we didn't ask for this block then the peer is misbehaving.
 	blockHash := bmsg.block.Hash()
-	//if _, exists = state.requestedBlocks[*blockHash]; !exists {
-	// The regression test intentionally sends some blocks twice
-	// to test duplicate block insertion fails.  Don't disconnect
-	// the peer or ignore the block when we're in regression test
-	// mode in this case so the chain code is actually fed the
-	// duplicate blocks.
-	//if sm.chainParams != &chaincfg.RegressionNetParams {
-	//	log.Warnf("Got unrequested block %v from %s -- "+
-	//		"disconnecting", blockHash, peer.Addr())
-	//	peer.Disconnect()
-	//	return
-	//}
-	//}
-
-	//在heades -first模式下，如果块匹配正在获取的头列表中第一个头的哈希值，则可以减少验证，
-	// 因为头已经被验证为链接在一起，并且直到下一个检查点为止都是有效的。
-	// 此外，删除除检查点之外的所有块的列表条目，因为它需要正确地验证下一轮头文件链接。
-	// When in headers-first mode, if the block matches the hash of the
-	// first header in the list of headers that are being fetched, it's
-	// eligible for less validation since the headers have already been
-	// verified to link together and are valid up to the next checkpoint.
-	// Also, remove the list entry for all blocks except the checkpoint
-	// since it is needed to verify the next round of headers links
-	// properly.
-	//isCheckpointBlock := false
 	behaviorFlags := blockchain.BFNone
-	//if sm.headersFirstMode {
-	//	firstNodeEl := sm.headerList.Front()
-	//	if firstNodeEl != nil {
-	//		firstNode := firstNodeEl.Value.(*headerNode)
-	//		if blockHash.IsEqual(firstNode.hash) {
-	//			behaviorFlags |= blockchain.BFFastAdd
-	//			if firstNode.hash.IsEqual(sm.nextCheckpoint.Hash) {
-	//				isCheckpointBlock = true
-	//			} else {
-	//				sm.headerList.Remove(firstNodeEl)
-	//			}
-	//		}
-	//	}
-	//}
-
 	// Remove block from request maps. Either chain will know about it and
 	// so we shouldn't have any more instances of trying to fetch it, or we
 	// will fail the insert and thus we'll retry next time we get an inv.
@@ -646,11 +619,10 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	// 处理该块以包括验证、最佳链选择、孤儿处理等。
 	// Process the block to include validation, best chain selection, orphan
 	// handling, etc.
-
 	// 处理发块环节收到的块，
 	// 包括：验证签名，验证交易，验证weight，验证coinbase，
 	// 通过验证将块放入块池
-	_, _, err := sm.chain.ProcessBlock(bmsg.block, behaviorFlags)
+	_, isOrphan, err := sm.chain.ProcessBlock(bmsg.block, behaviorFlags)
 	if err != nil {
 		// When the error is a rule error, it means the block was simply
 		// rejected as opposed to something actually going wrong, so log
@@ -667,12 +639,6 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 			database.ErrCorruption {
 			panic(dbErr)
 		}
-
-		//将错误转换为适当的拒绝消息并发送。
-		// Convert the error into an appropriate reject message and
-		// send it.
-		//code, reason := mempool.ErrToRejectErr(err)
-		//peer.PushRejectMsg(wire.CmdBlock, code, reason, blockHash, false)
 		return
 	}
 
@@ -688,52 +654,21 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 	var heightUpdate int32
 	var blkHashUpdate *chainhash.Hash
 
-	// 向发送孤儿块的对等方请求父方。
-	// Request the parents for the orphan block from the peer that sent it.
-	//if isOrphan {
-	//	// We've just received an orphan block from a peer. In order
-	//	// to update the height of the peer, we try to extract the
-	//	// block height from the scriptSig of the coinbase transaction.
-	//	// Extraction is only attempted if the block's version is
-	//	// high enough (ver 2+).
-	//	header := &bmsg.block.MsgBlock().Header
-	//	if blockchain.ShouldHaveSerializedBlockHeight(header) {
-	//		coinbaseTx := bmsg.block.Transactions()[0]
-	//		cbHeight, err := blockchain.ExtractCoinbaseHeight(coinbaseTx)
-	//		if err != nil {
-	//			log.Warnf("Unable to extract height from "+
-	//				"coinbase tx: %v", err)
-	//		} else {
-	//			log.Debugf("Extracted height of %v from "+
-	//				"orphan block", cbHeight)
-	//			heightUpdate = cbHeight
-	//			blkHashUpdate = blockHash
-	//		}
-	//	}
-	//
-	//	orphanRoot := sm.chain.GetOrphanRoot(blockHash)
-	//	locator, err := sm.chain.LatestBlockLocator()
-	//	if err != nil {
-	//		log.Warnf("Failed to get block locator for the "+
-	//			"latest block: %v", err)
-	//	} else {
-	//		peer.PushGetBlocksMsg(locator, orphanRoot)
-	//	}
-	//} else {
-	// 当块不是孤立块时，记录有关它的信息并更新链状态。
-	// When the block is not an orphan, log information about it and
-	// update the chain state.
-	sm.progressLogger.LogBlockHeight(bmsg.block)
+	if !isOrphan {
+		// 当块不是孤立块时，记录有关它的信息并更新链状态。
+		// When the block is not an orphan, log information about it and
+		// update the chain state.
+		sm.progressLogger.LogBlockHeight(bmsg.block)
 
-	// Update this peer's latest block height, for future
-	// potential sync node candidacy.
-	best := sm.chain.BestSnapshot()
-	heightUpdate = best.Height
-	blkHashUpdate = &best.Hash
+		// Update this peer's latest block height, for future
+		// potential sync node candidacy.
+		best := sm.chain.BestSnapshot()
+		heightUpdate = best.Height
+		blkHashUpdate = &best.Hash
 
-	// Clear the rejected transactions.
-	sm.rejectedTxns = make(map[chainhash.Hash]struct{})
-	//}
+		// Clear the rejected transactions.
+		sm.rejectedTxns = make(map[chainhash.Hash]struct{})
+	}
 
 	// 更新此对等点的块高度。
 	// 但是，只有当这是孤立的或我们的链是“当前的”时，才向服务器发送消息更新对等高度。如果我们从头开始同步链，这将避免发送垃圾数量的消息。
@@ -750,63 +685,37 @@ func (sm *SyncManager) handleBlockMsg(bmsg *blockMsg) {
 				peer)
 		}
 	}
+}
 
-	//如果我们不采取“头先上”的模式，就没什么可做的了。
-	// Nothing more to do if we aren't in headers-first mode.
-	if !sm.headersFirstMode {
+// handleBlockMsg处理同步块的信息
+// handleBlockMsg handles block messages from all peers.
+func (sm *SyncManager) handleSyncBLock(bmsg *drcutil.Block) {
+	blockHash := bmsg.Hash()
+
+	// 处理该块以包括验证、最佳链选择、孤儿处理等。
+	// Process the block to include validation, best chain selection, orphan
+	// handling, etc.
+	// 处理发块环节收到的块，
+	// 包括：验证签名，验证交易，验证weight，验证coinbase，
+	// 通过验证将块放入块池
+	// The block has passed all context independent checks and appears sane
+	// enough to potentially accept it into the block chain.
+	bo, err := sm.chain.ProcessSyncBlock(bmsg)
+	if err != nil || !bo {
+		if _, ok := err.(blockchain.RuleError); ok {
+			log.Infof("Rejected block %v: %v", blockHash, err)
+		} else {
+			log.Warnf("Failed to add incremental block %v", blockHash, err)
+		}
 		return
 	}
 
-	// This is headers-first mode, so if the block is not a checkpoint
-	// request more blocks using the header list when the request queue is
-	// getting short.
-	//if !isCheckpointBlock {
-	//	if sm.startHeader != nil &&
-	//		len(state.requestedBlocks) < minInFlightBlocks {
-	//		sm.fetchHeaderBlocks()
-	//	}
-	//	return
-	//}
+	log.Debugf("Accepted block %v", blockHash)
 
-	// This is headers-first mode and the block is a checkpoint.  When
-	// there is a next checkpoint, get the next round of headers by asking
-	// for headers starting from the block after this one up to the next
-	// checkpoint.
-	//prevHeight := sm.nextCheckpoint.Height
-	//prevHash := sm.nextCheckpoint.Hash
-	//sm.nextCheckpoint = sm.findNextHeaderCheckpoint(prevHeight)
-	//if sm.nextCheckpoint != nil {
-	//	locator := blockchain.BlockLocator([]*chainhash.Hash{prevHash})
-	//	err := peer.PushGetHeadersMsg(locator, sm.nextCheckpoint.Hash)
-	//	if err != nil {
-	//		log.Warnf("Failed to send getheaders message to "+
-	//			"peer %s: %v", peer.Addr(), err)
-	//		return
-	//	}
-	//	log.Infof("Downloading headers for blocks %d to %d from "+
-	//		"peer %s", prevHeight+1, sm.nextCheckpoint.Height,
-	//		sm.syncPeer.Addr())
-	//	return
-	//}
-
-	//这是head -first模式，这个块是一个检查点，并且没有更多的检查点，所以切换到正常模式，从这个块之后的块请求块，直到链的末尾(零散列)。
-	// This is headers-first mode, the block is a checkpoint, and there are
-	// no more checkpoints, so switch to normal mode by requesting blocks
-	// from the block after this one up to the end of the chain (zero hash).
-	sm.headersFirstMode = false
-	sm.headerList.Init()
-	log.Infof("Reached the final checkpoint -- switching to normal mode")
-	locator := blockchain.BlockLocator([]*chainhash.Hash{blockHash})
-	err = peer.PushGetBlocksMsg(locator, &zeroHash)
-	if err != nil {
-		log.Warnf("Failed to send getblocks message to peer %s: %v",
-			peer.Addr(), err)
-		return
-	}
 }
 
 // 处理发块阶段收到的块
-func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
+func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 	peer := bmsg.peer
 	_, exists := sm.peerStates[peer]
 	if !exists {
@@ -814,71 +723,89 @@ func (sm *SyncManager) handleCadidateMsg(bmsg *candidateMsg) {
 		return
 	}
 
-	// If we didn't ask for this block then the peer is misbehaving.
-	blockHash := bmsg.block.CandidateHash()
+	bestState := sm.chain.BestSnapshot()
+	height := bmsg.block.MsgCandidate().Sigwit.Height
+	vote.CurrentHeight = height
+	//fmt.Println("收到的msgCandidate高度为： ", height)
+	//fmt.Println("当前链上高度为： ", bestState.Height)
+	//fmt.Println("高度差值为： ", height-bestState.Height)
+	if height-bestState.Height == 2 { // 参与验证
+		// handling, etc.
+		// Process the block to include validation, best chain selection, orphan
+		// 处理该块
+		// 通过验证将该块放入块池和指向池
+		// 包括：验证签名，验证交易，验证weight，验证coinbase，
+		blockHash := bmsg.block.CandidateHash()
+		log.Info("收到新块,hash: ", blockHash)
+		behaviorFlags := blockchain.BFNone
+		v, b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
+		if err != nil || !b {
+			// When the error is a rule error, it means the block was simply
+			// rejected as opposed to something actually going wrong, so log
+			// it as such.  Otherwise, something really did go wrong, so log
+			// it as an actual error.
+			if _, ok := err.(blockchain.RuleError); ok {
+				log.Infof("Rejected block %v from %s: %v", blockHash,
+					peer, err)
+			} else {
+				log.Errorf("Failed to process block %v: %v",
+					blockHash, err)
+			}
+			if dbErr, ok := err.(database.Error); ok && dbErr.ErrorCode ==
+				database.ErrCorruption {
+				panic(dbErr)
+			}
 
-	//在heades -first模式下，如果块匹配正在获取的头列表中第一个头的哈希值，则可以减少验证，
-	// 因为头已经被验证为链接在一起，并且直到下一个检查点为止都是有效的。
-	// 此外，删除除检查点之外的所有块的列表条目，因为它需要正确地验证下一轮头文件链接。
-	// When in headers-first mode, if the block matches the hash of the
-	// first header in the list of headers that are being fetched, it's
-	// eligible for less validation since the headers have already been
-	// verified to link together and are valid up to the next checkpoint.
-	// Also, remove the list entry for all blocks except the checkpoint
-	// since it is needed to verify the next round of headers links
-	// properly.
-	behaviorFlags := blockchain.BFNone
-
-	// 处理该块
-	// 包括：验证签名，验证交易，验证weight，验证coinbase，
-	// 通过验证将该块放入块池和指向池
-	// Process the block to include validation, best chain selection, orphan
-	// handling, etc.
-	b, err := sm.chain.ProcessCandidate(bmsg.block, behaviorFlags)
-	if err != nil || !b {
-		// When the error is a rule error, it means the block was simply
-		// rejected as opposed to something actually going wrong, so log
-		// it as such.  Otherwise, something really did go wrong, so log
-		// it as an actual error.
-		if _, ok := err.(blockchain.RuleError); ok {
-			log.Infof("Rejected block %v from %s: %v", blockHash,
-				peer, err)
-		} else {
-			log.Errorf("Failed to process block %v: %v",
-				blockHash, err)
-		}
-		if dbErr, ok := err.(database.Error); ok && dbErr.ErrorCode ==
-			database.ErrCorruption {
-			panic(dbErr)
+			return
 		}
 
+		// 清除被拒绝的事务。
+		// Clear the rejected transactions.
+		sm.rejectedTxns = make(map[chainhash.Hash]struct{})
+
+		log.Info("转发块信息")
+		// 转发块信息
+		bo, err := sm.SendBlock(bmsg.block)
+		if err != nil || !bo {
+			log.Errorf("Failed to send block message: %v", err)
+			return
+		}
+
+		// 对收到的块做投票处理
+		if v && vote.VoteBool {
+			log.Info("对 ", bmsg.block.Hash(), " 进行投票")
+			bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
+		}
+
+		// 当前轮高度-链上最后一个块高度>2,请求增量块，并写入map，同步软状态，并记录当前轮块
+	} else if height-bestState.Height > 2 {
+		// 当前轮不收增量块
+		if vote.StartHeight == height {
+			log.Infof("The current wheel does not accept fast increments")
+			return
+		}
+		if _, ok := incrementBlock[height]; !ok {
+			// 请求增量块
+			var zero chainhash.Hash
+			candidate := bmsg.block.MsgCandidate()
+			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-2, 1, zero), nil)
+			// 请求软状态
+			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-1, 2, candidate.Header.PrevBlock), nil)
+
+			// 加入当前块池和指向池
+			blockchain.CurrentCandidatePool[candidate.BlockHash()] = candidate
+			points := blockchain.CurrentPointPool[candidate.Header.PrevBlock]
+			points = append(points, candidate)
+			blockchain.CurrentPointPool[candidate.Header.PrevBlock] = points
+
+			// 防止重复请求
+			incrementBlock[height] = struct{}{}
+		}
+		// 不符合规则
+	} else {
+		log.Infof("Received block with height exception,hash: ", bmsg.block.CandidateHash())
 		return
 	}
-
-	//向发送孤儿块的对等方请求父方。当块不是孤立块时，记录有关它的信息并更新链状态。
-	// Request the parents for the orphan block from the peer that sent it.
-	// When the block is not an orphan, log information about it and
-	// update the chain state.
-	//sm.progressLogger.LogBlockHeight(bmsg.block)
-
-	// 清除被拒绝的事务。
-	// Clear the rejected transactions.
-	sm.rejectedTxns = make(map[chainhash.Hash]struct{})
-
-	//如果我们不采取“头先上”的模式，就没什么可做的了。
-	// Nothing more to do if we aren't in headers-first mode.
-	if !sm.headersFirstMode {
-		return
-	}
-
-	// 转发块信息
-	bo, err := sm.SendBlock(bmsg.block)
-	if err != nil || !bo {
-		log.Errorf("Failed to send block message: %v", err)
-	}
-
-	// 对收到的块做投票处理
-	bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
 }
 
 // 处理签名队列里的签名
@@ -896,7 +823,6 @@ func (sm *SyncManager) handleSignMsg(msg *signMsg) {
 
 	blockPool := blockchain.CurrentCandidatePool
 	if headerBlock, exist := blockPool[msg.sign.BlockHeaderHash]; exist {
-
 		// 验证和保存签名,帮助传播签名
 		// Process and save signatures
 		sm.CollectVotes(msg.sign, headerBlock)
@@ -913,16 +839,15 @@ func (sm *SyncManager) CollectVotes(sign *wire.MsgSign, candidate *wire.MsgCandi
 
 		// 验证签名
 		// Verify the signature
-		signature, err := btcec.ParseSignature(sign.Signature.CloneBytes(), btcec.S256())
-		if err != nil {
-			log.Errorf("Parse error: %s", err)
-		}
+		signBytes := sign.Signature.CloneBytes()
+
 		pubKey, err := btcec.ParsePubKey(sign.PublicKey.CloneBytes(), btcec.S256())
 		if err != nil {
 			log.Errorf("Parse error: %s", err)
 		}
 		hash := sign.BlockHeaderHash.CloneBytes()
-		if signature.Verify(hash, pubKey) {
+
+		if btcec.GetSignature(signBytes).Verify(hash, pubKey) {
 
 			// 查看weight是否符合
 			// Check whether weight is consistent
@@ -945,9 +870,7 @@ func (sm *SyncManager) CollectVotes(sign *wire.MsgSign, candidate *wire.MsgCandi
 				// 收到的投票的前置块hash值跟本节点的前置hash值一样，传播该投票信息
 				// The leading block hash value for the poll received is the same as the leading hash value for the node, and the poll is propagated
 				lastCandidate := sm.chain.BestLastCandidate()
-
-				if candidate.Header.PrevBlock == lastCandidate.Hash {
-
+				if lastCandidate != nil && candidate.Header.PrevBlock == lastCandidate.Hash {
 					bo, err := sm.SendSign(sign)
 					if err != nil || !bo {
 						log.Errorf("Failed to send sign message: %v", err)
@@ -977,6 +900,57 @@ func preventRepeatSign(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash3
 		}
 	}
 	return true
+}
+
+// 处理GetBlock信息，发送增量同步块或者软状态块
+func (sm *SyncManager) handleGetBlockMsg(msg *getBlockMsg) {
+	peer := msg.peer
+	_, exists := sm.peerStates[peer]
+	if !exists {
+		log.Warnf("Received block message from unknown peer %s", peer)
+		return
+	}
+
+	getBlock := msg.getBlock
+	// 根据getBlock的type，处理发送的结果
+	if getBlock.TypeParameter == 1 {
+		// TypeParameter为1，请求增量同步块
+		block, _ := sm.chain.BlockByHeight(getBlock.Height)
+		candidate := wire.MsgCandidate{
+			Header:       block.MsgBlock().Header,
+			Transactions: block.MsgBlock().Transactions,
+		}
+		candidate.Sigwit = wire.MsgSigwit{
+			Height: getBlock.Height,
+		}
+
+		peer.QueueMessage(wire.NewMsgSyncBlock(1, candidate), nil)
+	} else if getBlock.TypeParameter == 2 {
+		// TypeParameter为2，请求软状态块
+		candidate := blockchain.PrevCandidatePool[getBlock.BlockHash]
+		peer.QueueMessage(wire.NewMsgSyncBlock(2, *candidate), nil)
+	}
+}
+
+// 处理syncBlockMsg信息，保存增量同步块或者软状态块
+func (sm *SyncManager) handleSyncBlockMsg(msg *syncBlockMsg) {
+	peer := msg.peer
+	_, exists := sm.peerStates[peer]
+	if !exists {
+		log.Warnf("Received block message from unknown peer %s", peer)
+		return
+	}
+
+	// 根据syncBlockMsg的type，处理接收到的数据
+	candidate := msg.syncBlockMsg.MsgCandidate
+	if msg.syncBlockMsg.TypeParameter == 1 {
+		// TypeParameter为1，保存增量同步块
+		sm.handleSyncBLock(drcutil.NewCandidate(drcutil.MsgCandidateToBlock(&candidate), &candidate))
+
+	} else if msg.syncBlockMsg.TypeParameter == 2 {
+		// TypeParameter为2，保存软状态块
+		blockchain.PrevCandidatePool[candidate.BlockHash()] = &candidate
+	}
 }
 
 // fetchHeaderBlocks创建一个请求，并向syncPeer发送一个请求，根据当前头列表下载下一个块列表。
@@ -1459,11 +1433,19 @@ out:
 				msg.reply <- struct{}{}
 
 			case *candidateMsg:
-				sm.handleCadidateMsg(msg)
+				sm.handleCandidateMsg(msg)
 				msg.reply <- struct{}{}
 
 			case *signMsg:
 				sm.handleSignMsg(msg)
+				msg.reply <- struct{}{}
+
+			case *getBlockMsg:
+				sm.handleGetBlockMsg(msg)
+				msg.reply <- struct{}{}
+
+			case *syncBlockMsg:
+				sm.handleSyncBlockMsg(msg)
 				msg.reply <- struct{}{}
 
 			case *invMsg:
@@ -1524,51 +1506,60 @@ out:
 // 处理投票结果，是个独立线程
 // Processing the poll result is a separate thread
 func (sm *SyncManager) VoteHandler() {
-	// 等待同步完成
-	// Wait for synchronization to complete
-	//openTime := time.NewTicker(time.Second)
-	//out:
-	//for {
-	//select {
-	//case <-openTime.C:
-	//
-	//case <-vote.Open:
-	//	openTime.Stop()
-	//	break out
-	//}
-	//}
-
 	// 初始化指向池、前项块池、当前块池
 	blockchain.CurrentCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
 	blockchain.PrevCandidatePool = make(map[chainhash.Hash]*wire.MsgCandidate)
 	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
+	incrementBlock = make(map[int32]struct{})
 
-	// 创世时间
-	// creation time
-	genesis := chaincfg.MainNetParams.GenesisBlock
-	creationTime := time.Now()
-	if sm.chain.BestLastCandidate() == nil {
-		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
+	if vote.FirstBLockTime != 0 {
+
+		//等待同步完成
+		//Wait for synchronization to complete
+
+		openTime := time.NewTicker(time.Second)
+	out:
+		for {
+			select {
+			// 同步的最新块
+			// the latest block time for synchronization
+			case <-openTime.C:
+
+				bestLastCandidate := sm.chain.BestSnapshot()
+				blockHeight := bestLastCandidate.Height
+				if vote.CurrentHeight-blockHeight == 2 {
+					fmt.Println("+——+——+——+——+——+——+——+——+——+——+——")
+					break out
+				}
+			}
+		}
+		openTime.Stop()
+
+		// 第一个块生成时间
+		// First block generation time
+		creationTime := time.Unix(vote.FirstBLockTime, 0)
+		// 根据最新块，计算10秒发块定时器启动的时间
+		laterTime := creationTime.Add(vote.BlockTimeInterval * time.Duration(vote.CurrentHeight))
+		nowTime := time.Now()
+		t := time.NewTimer(laterTime.Sub(nowTime))
+		<-t.C
+		t.Stop()
+
+		// 处理当前轮的写块和投票
+		// Handles write blocks and polls for the current round
+		sm.voteProcess()
+
+		// 通知开始新一轮挖块
+		// 必须把bestlastcandidate同步过来
+		//node := sm.chain.GetBlockIndex().LookupNode(&bestLastCandidate.Hash)
+		//if node != nil {
+		//	sm.chain.SetBestCandidate(bestLastCandidate.Hash, bestLastCandidate.Height, node.Header(), node.Votes)
+		//} else {
+		//	genesis := chaincfg.MainNetParams.GenesisBlock
+		//	sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
+		//}
 	}
-	// 同步的最新块时间
-	// the latest block time for synchronization
-	bestLastCandidate := sm.chain.BestSnapshot()
-	blockHeight := bestLastCandidate.Height
-
-	// 根据最新块，计算10秒发块定时器启动的时间
-	// According to the latest block, calculate the start time of the 10-second block timer
-	laterTime := creationTime.Add(vote.BlockTimeInterval*time.Duration(blockHeight) + vote.SyncTimeInterval)
-	nowTime := time.Now()
-	t := time.NewTimer(laterTime.Sub(nowTime))
-	<-t.C
-	t.Stop()
-
-	// 处理当前轮的写块和投票
-	// Handles write blocks and polls for the current round
-	//sm.voteProcess()
-	// 通知开始新一轮挖块
-	vote.Work = true
-
+	vote.VoteBool = true
 	// 10秒处理一波投票结果
 	// Process one wave of voting results 10 second
 	handlingTime := time.NewTicker(vote.BlockTimeInterval)
@@ -1588,20 +1579,38 @@ func (sm *SyncManager) voteProcess() {
 
 	// 获取票数最多的区块
 	// get the block with the most votes
+	fmt.Println("票池： ", vote.GetTicketPool())
+	for a, b := range vote.GetTicketPool() {
+		fmt.Println(a, len(b))
+	}
+
 	blockHeaderHash, votes := cpuminer.GetMaxVotes()
 	msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
 
 	// 写入最佳候选块，做为下轮发块的依据
 	// write the best candidate block, as the basis for the next round of block
-	sm.chain.SetBestCandidate(blockHeaderHash, sm.chain.BestLastCandidate().Height+1, msgCandidate.Header, votes)
+	if len(blockchain.CurrentCandidatePool) == 0 {
+		genesis := chaincfg.MainNetParams.GenesisBlock
+		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
+	} else {
+
+		//如果获胜区块获得的票数小于总票数的三分之二，写空块.
+		if cpuminer.IsEnough(votes, msgCandidate.Header.Scale) {
+			sm.chain.SetBestCandidate(blockHeaderHash, msgCandidate.Sigwit.Height, msgCandidate.Header, votes)
+		} else {
+			// 所以区块都没有获得理想的票数，写入空块
+			genesis := chaincfg.MainNetParams.GenesisBlock
+			sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, msgCandidate.Sigwit.Height, genesis.Header, votes)
+		}
+	}
 
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
 	// write the Hash of the previous round of blocks, most of which are pointed to in this round of block pool, into the blockChain
 	hash := blockchain.GetBestPointBlockH()
-	fmt.Println("当前指向池的hash: ", hash)
+	//fmt.Println("当前指向池的hash: ", hash)
 
 	prevCandidate := blockchain.PrevCandidatePool[hash]
-	fmt.Println("prevCandidate: ", prevCandidate)
+	//fmt.Println("prevCandidate: ", prevCandidate)
 	// 清空当前指向池
 	blockchain.CurrentPointPool = make(map[chainhash.Hash][]*wire.MsgCandidate)
 
@@ -1611,7 +1620,6 @@ func (sm *SyncManager) voteProcess() {
 		msgBlock := drcutil.MsgCandidateToBlock(prevCandidate)
 		block := drcutil.NewBlockFromBlockAndBytes(msgBlock, nil)
 		block.Votes = votes
-		fmt.Println("开始执行上链")
 		sm.chain.ProcessBlock(block, blockchain.BFNone)
 
 	}
@@ -1785,6 +1793,26 @@ func (sm *SyncManager) QueueSign(msg *wire.MsgSign, peer *peerpkg.Peer, done cha
 	}
 
 	sm.msgChan <- &signMsg{sign: msg, peer: peer, reply: done}
+}
+
+func (sm *SyncManager) QueueGetBlock(msg *wire.MsgGetBlock, peer *peerpkg.Peer, done chan struct{}) {
+	// Don't accept more blocks if we're shutting down.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		done <- struct{}{}
+		return
+	}
+
+	sm.msgChan <- &getBlockMsg{getBlock: msg, peer: peer, reply: done}
+}
+
+func (sm *SyncManager) QueueSyncBlock(msg *wire.MsgSyncBlock, peer *peerpkg.Peer, done chan struct{}) {
+	// Don't accept more blocks if we're shutting down.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		done <- struct{}{}
+		return
+	}
+
+	sm.msgChan <- &syncBlockMsg{syncBlockMsg: msg, peer: peer, reply: done}
 }
 
 // QueueInv将传递的inv消息和对等点添加到块处理队列中。

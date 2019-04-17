@@ -37,6 +37,7 @@ const (
 	CmdGetData      = "getdata"
 	CmdNotFound     = "notfound"
 	CmdBlock        = "block"
+	CmdCandidate    = "candidate"
 	CmdTx           = "tx"
 	CmdGetHeaders   = "getheaders"
 	CmdHeaders      = "headers"
@@ -58,6 +59,8 @@ const (
 	CmdCFHeaders    = "cfheaders"
 	CmdCFCheckpt    = "cfcheckpt"
 	CmdSign         = "sign"
+	CmdGetBlock     = "getblock"
+	CmdSyncBlock    = "syncblock"
 )
 
 // MessageEncoding 表示要使用的有线消息编码格式。
@@ -114,6 +117,9 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdBlock:
 		msg = &MsgBlock{}
+
+	case CmdCandidate:
+		msg = &MsgCandidate{}
 
 	case CmdInv:
 		msg = &MsgInv{}
@@ -183,6 +189,15 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdCFCheckpt:
 		msg = &MsgCFCheckpt{}
+
+	case CmdSign:
+		msg = &MsgSign{}
+
+	case CmdGetBlock:
+		msg = &MsgGetBlock{}
+
+	case CmdSyncBlock:
+		msg = &MsgSyncBlock{}
 
 	default:
 		return nil, fmt.Errorf("unhandled command [%s]", command)
@@ -371,6 +386,7 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet BitcoinNet,
 		return totalBytes, nil, nil, messageError("ReadMessage", str)
 	}
 
+	// 根据命令创建适当消息类型的结构。
 	// Create struct of appropriate message type based on the command.
 	msg, err := makeEmptyMessage(command)
 	if err != nil {
@@ -411,6 +427,9 @@ func ReadMessageWithEncodingN(r io.Reader, pver uint32, btcnet BitcoinNet,
 	// Unmarshal message.  NOTE: This must be a *bytes.Buffer since the
 	// MsgVersion BtcDecode function requires it.
 	pr := bytes.NewBuffer(payload)
+	//if pr!=nil {
+	//	fmt.Println("readMssage: ", pr.Bytes())
+	//}
 	err = msg.BtcDecode(pr, pver, enc)
 	if err != nil {
 		return totalBytes, nil, nil, err

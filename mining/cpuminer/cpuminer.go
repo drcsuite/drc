@@ -349,18 +349,20 @@ out:
 			time.Sleep(time.Second)
 			continue
 		}
-		fmt.Println("开始发块")
-		curHeight := m.g.BestCandidate().Height
+		log.Info("开始发块")
+		best := m.g.BestCandidate()
+		curHeight := best.Height
 		if curHeight != 0 && !m.cfg.IsCurrent() {
 			m.submitBlockLock.Unlock()
 			time.Sleep(time.Second)
 			continue
 		}
-		preHeader := m.g.BestCandidate().Header
 
-		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<π
+		// 前10个块的票数和估算值
+		// 计算前十个块平均规模和weight
+		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<pi
+		preHeader := best.Header
 		signature, err := m.privKey.Sign64(chainhash.DoubleHashB(preHeader.Signature.CloneBytes()))
-		//fmt.Printf("cpuminer sign: %x \n", signature)
 		if err != nil {
 			m.submitBlockLock.Unlock()
 			errStr := fmt.Sprintf("Failed to signature prevate seed: %v", err)
@@ -369,44 +371,32 @@ out:
 			continue
 		}
 		weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signature))
-
-		// 前10个块的票数和估算值
 		votes, scales := make([]uint16, 0), make([]uint16, 0)
-
-		// 如果前项池为空，按链上最后一个块进行挖矿
-		if len(blockchain.PrevCandidatePool) != 0 {
-			candidate := blockchain.PrevCandidatePool[m.g.BestCandidate().Hash]
-			scales = append(scales, candidate.Header.Scale)
-			votes = append(votes, m.g.BestCandidate().Votes)
-			for i := 0; i < 9; i++ {
+		scales = append(scales, preHeader.Scale)
+		votes = append(votes, best.Votes)
+		prevNode := m.chain.GetBlockIndex().LookupNode(&preHeader.PrevBlock)
+		if prevNode != nil {
+			for i := 0; i < vote.PrevScaleNum; i++ {
 				// 添加每个节点实际收到的票数和当时估算值
-				prevNode := m.chain.GetBlockIndex().LookupNode(&candidate.Header.PrevBlock)
-				scales = append(scales, prevNode.Header().Scale)
-				votes = append(votes, prevNode.Votes)
-				prevNode = prevNode.Ancestor(1)
 				if prevNode == nil {
 					break
 				}
+				//prevNode = prevNode.Ancestor(1)
+				scales = append(scales, prevNode.Header().Scale)
+				votes = append(votes, prevNode.Votes)
+				hashes := prevNode.Header().PrevBlock
+				prevNode = m.chain.GetBlockIndex().LookupNode(&hashes)
 			}
-		} else {
-			beststate := m.g.BestCandidate()
-			scales = append(scales, beststate.Header.Scale)
-			votes = append(votes, beststate.Votes)
 		}
-
-		// 计算前十个块平均规模和weight
+		fmt.Println("前10块投票数为: ", votes)
 		scale := vote.EstimateScale(votes, scales)
 		Pi := vote.BlockVerge(scale)
-		//fmt.Println("scale: ", scale)
-		//fmt.Println("Pi: ", Pi)
-
 		// 如果不符合规则，等待下一轮
 		if weight.Cmp(Pi) >= 0 {
 			vote.Work = false
 			time.Sleep(time.Second)
 			continue
 		}
-
 		// 当weight符合规则，发块
 		// Choose a payment address at random.
 		rand.Seed(time.Now().UnixNano())
@@ -431,7 +421,7 @@ out:
 			vote.Work = false
 			continue
 		}
-		template, err := m.g.NewBlockTemplate(payToAddr, pubKey, signHash, scale, 0)
+		template, err := m.g.NewBlockTemplate(payToAddr, pubKey, signHash, scale, 0, best.Height+1)
 		m.submitBlockLock.Unlock()
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
@@ -449,17 +439,30 @@ out:
 
 			// 加入当前块池
 			block := drcutil.NewCandidate(template.Block, template.Candidate)
-			blockchain.CurrentCandidatePool[*block.Hash()] = block.MsgCandidate()
-			fmt.Println("new block hash: ", block.MsgCandidate().BlockHash())
+			log.Info("发现新块")
+			log.Info("前项块: ", block.MsgCandidate().Header.PrevBlock)
+			log.Info("高度: ", block.MsgCandidate().Sigwit.Height)
+			log.Info("version: ", block.MsgCandidate().Header.Version)
+			log.Info("scale: ", block.MsgCandidate().Header.Scale)
+			log.Info("timestamp: ", block.MsgCandidate().Header.Timestamp.Unix())
+			log.Info("blockhash: ", block.MsgCandidate().BlockHash())
+
 			// 加入当前指向池
-			points := blockchain.CurrentPointPool[m.g.BestCandidate().Hash]
+			blockchain.CurrentCandidatePool[*block.CandidateHash()] = block.MsgCandidate()
+			points := blockchain.CurrentPointPool[best.Hash]
 			points = append(points, block.MsgCandidate())
-			blockchain.CurrentPointPool[m.g.BestCandidate().Hash] = points
-			fmt.Println("当前指向池大小： ", len(blockchain.CurrentPointPool))
+			blockchain.CurrentPointPool[best.Hash] = points
+			log.Info("块池大小为: ", len(blockchain.CurrentCandidatePool))
+			log.Info("指向池大小为: ", len(blockchain.CurrentPointPool[best.Hash]))
+
 			// 将块信息提交给对等点
+			t := time.NewTimer(vote.SendBlockWait * time.Second)
+			<-t.C
+			t.Stop()
 			bo := m.submitBlock(block)
 			if bo {
 				vote.Work = false
+				// 验证投票
 				m.BlockVote(block.MsgCandidate())
 			}
 		}

@@ -26,6 +26,9 @@ const MaxBlocksPerMsg = 500
 // After Segregated Witness, the max block payload has been raised to 4MB.
 const MaxBlockPayload = 4000000
 
+// 最大投票长度
+const MaxVotePayload = 200
+
 // maxTxPerBlock is the maximum number of transactions that could
 // possibly fit into a block.
 const maxTxPerBlock = (MaxBlockPayload / minTxPayload) + 1

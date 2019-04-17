@@ -458,19 +458,14 @@ func CountP2SHSigOps(tx *drcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
-func checkBlockHeaderSanity(header *wire.BlockHeader, seed *chainhash.Hash, pi *big.Int, timeSource MedianTimeSource) error {
-	// Ensure the proof of work bits in the block header is in min/max range
-	// and the block hash is less than the target value described by the
-	// bits.
-	//err := checkProofOfWork(header, powLimit, flags)
-	//if err != nil {
-	//	return err
-	//}
+func checkBlockHeaderSanity(header *wire.BlockHeader, seed *chainhash.Hash, pi *big.Int, timeSource MedianTimeSource) (bool, error) {
+	vb := false
+
 	// 公钥必须符合标准格式
 	pubKey, err := btcec.ParsePubKey(header.PublicKey.CloneBytes(), btcec.S256())
 	if err != nil {
 		str := fmt.Sprintf("The public key is incorrect of %v", header.PublicKey)
-		return ruleError(ErrInvalidTime, str)
+		return vb, ruleError(ErrInvalidTime, str)
 	}
 
 	// 签名是否同源
@@ -478,14 +473,20 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, seed *chainhash.Hash, pi *
 	b := btcec.GetSignature(signBytes).Verify(seed.CloneBytes(), pubKey)
 	if !b {
 		str := fmt.Sprintf("Signature verification failed: %v", header.Signature)
-		return ruleError(ErrInvalidTime, str)
+		return vb, ruleError(ErrInvalidTime, str)
 	}
 
 	// weight必须小于全网估算规模数
 	weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signBytes))
 	if weight.Cmp(pi) >= 0 {
 		str := fmt.Sprintf("No send block permissions: %v", weight)
-		return ruleError(ErrInvalidTime, str)
+		return vb, ruleError(ErrInvalidTime, str)
+	}
+
+	//如果weight小于块池中最小块的weight，进行投票
+	_, w := GetMinWeightBlock()
+	if weight.Cmp(w) < 0 {
+		vb = true
 	}
 
 	//块时间戳的精度不能超过1秒。这个检查是必要的，时间值支持纳秒精度，而一致规则只适用于秒，处理标准Go时间值比在任何地方都转换成秒要好得多。
@@ -497,18 +498,18 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, seed *chainhash.Hash, pi *
 	if !header.Timestamp.Equal(time.Unix(header.Timestamp.Unix(), 0)) {
 		str := fmt.Sprintf("block timestamp of %v has a higher "+
 			"precision than one second", header.Timestamp)
-		return ruleError(ErrInvalidTime, str)
+		return false, ruleError(ErrInvalidTime, str)
 	}
 
 	// 时间验证，确保区块时间不会太长。
 	// Ensure the block time is not too far in the future.
-	maxTimestamp := timeSource.AdjustedTime()
-	if header.Timestamp.After(maxTimestamp) {
-		str := fmt.Sprintf("block timestamp of %v is too far in the current time: ", header.Timestamp)
-		return ruleError(ErrTimeTooNew, str)
-	}
+	//maxTimestamp := timeSource.AdjustedTime()
+	//if header.Timestamp.After(maxTimestamp) {
+	//	str := fmt.Sprintf("block timestamp of %v is too far in the current time: ", header.Timestamp)
+	//	return false, ruleError(ErrTimeTooNew, str)
+	//}
 
-	return nil
+	return vb, nil
 }
 
 // checkBlockSanity在继续进行块处理之前，对一个块执行一些初步检查，以确保它是健全的。
@@ -520,7 +521,7 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, seed *chainhash.Hash, pi *
 func checkBlockSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.Int, timeSource MedianTimeSource) error {
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
-	err := checkBlockHeaderSanity(header, seed, pi, timeSource) // 对块头的一些检查
+	_, err := checkBlockHeaderSanity(header, seed, pi, timeSource) // 对块头的一些检查
 	if err != nil {
 		return err
 	}
@@ -635,19 +636,19 @@ func checkBlockSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.Int, t
 	return nil
 }
 
-func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.Int, timeSource MedianTimeSource) error {
+func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.Int, timeSource MedianTimeSource) (bool, error) {
 	msgCandidate := block.MsgCandidate()
 	header := &msgCandidate.Header
-	err := checkBlockHeaderSanity(header, seed, pi, timeSource) // 对块头的一些检查
+	vb, err := checkBlockHeaderSanity(header, seed, pi, timeSource) // 对块头的一些检查
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// A block must have at least one transaction.
 	// 至少包含一个交易
 	numTx := len(msgCandidate.Transactions)
 	if numTx == 0 {
-		return ruleError(ErrNoTransactions, "block does not contain "+
+		return false, ruleError(ErrNoTransactions, "block does not contain "+
 			"any transactions")
 	}
 
@@ -657,7 +658,7 @@ func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.In
 	if numTx > MaxBlockBaseSize {
 		str := fmt.Sprintf("block contains too many transactions - "+
 			"got %d, max %d", numTx, MaxBlockBaseSize)
-		return ruleError(ErrBlockTooBig, str)
+		return false, ruleError(ErrBlockTooBig, str)
 	}
 
 	// 一个块在序列化时不能超过允许的最大块有效负载。
@@ -667,14 +668,14 @@ func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.In
 	if serializedSize > MaxBlockBaseSize {
 		str := fmt.Sprintf("serialized block is too big - got %d, "+
 			"max %d", serializedSize, MaxBlockBaseSize)
-		return ruleError(ErrBlockTooBig, str)
+		return false, ruleError(ErrBlockTooBig, str)
 	}
 
 	//块中的第一个事务必须是一个coinbase。
 	// The first transaction in a block must be a coinbase.
 	transactions := block.Transactions()
 	if !IsCoinBase(transactions[0]) {
-		return ruleError(ErrFirstTxNotCoinbase, "first transaction in "+
+		return false, ruleError(ErrFirstTxNotCoinbase, "first transaction in "+
 			"block is not a coinbase")
 	}
 
@@ -684,7 +685,7 @@ func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.In
 		if IsCoinBase(tx) {
 			str := fmt.Sprintf("block contains second coinbase at "+
 				"index %d", i+1)
-			return ruleError(ErrMultipleCoinbases, str)
+			return false, ruleError(ErrMultipleCoinbases, str)
 		}
 	}
 
@@ -694,7 +695,7 @@ func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.In
 	for _, tx := range transactions {
 		err := CheckTransactionSanity(tx)
 		if err != nil {
-			return err
+			return false, err
 		}
 	}
 
@@ -713,7 +714,7 @@ func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.In
 		str := fmt.Sprintf("block merkle root is invalid - block "+
 			"header indicates %v, but calculated value is %v",
 			header.MerkleRoot, calculatedMerkleRoot)
-		return ruleError(ErrBadMerkleRoot, str)
+		return false, ruleError(ErrBadMerkleRoot, str)
 	}
 
 	// 检查重复的交易。这个检查将相当快，因为事务散列已经缓存，因为上面构建了merkle树。
@@ -726,7 +727,7 @@ func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.In
 		if _, exists := existingTxHashes[*hash]; exists {
 			str := fmt.Sprintf("block contains duplicate "+
 				"transaction %v", hash)
-			return ruleError(ErrDuplicateTx, str)
+			return false, ruleError(ErrDuplicateTx, str)
 		}
 		existingTxHashes[*hash] = struct{}{}
 	}
@@ -744,13 +745,13 @@ func checkCandidateSanity(block *drcutil.Block, seed *chainhash.Hash, pi *big.In
 			str := fmt.Sprintf("block contains too many signature "+
 				"operations - got %v, max %v", totalSigOps,
 				MaxBlockSigOpsCost)
-			return ruleError(ErrTooManySigOps, str)
+			return false, ruleError(ErrTooManySigOps, str)
 		}
 	}
 
 	// 验证块尾的签名是否有效
 
-	return nil
+	return vb, nil
 }
 
 // CheckBlockSanity在继续进行块处理之前，对一个块执行一些初步检查，以确保它是健全的。
@@ -1199,14 +1200,13 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	// an error now.
 	if node.hash.IsEqual(b.chainParams.GenesisHash) {
 		str := "the coinbase for the genesis block is not spendable"
-		fmt.Println("报错3")
 		return ruleError(ErrMissingTxOut, str)
 	}
 
 	// Ensure the view is for the node being checked.
 	parentHash := &block.MsgBlock().Header.PrevBlock
 	if !view.BestHash().IsEqual(parentHash) {
-		fmt.Println("报错4")
+		//fmt.Println("报错4")
 		return AssertError(fmt.Sprintf("inconsistent view when "+
 			"checking block connection: best hash is %v instead "+
 			"of expected %v", view.BestHash(), parentHash))
@@ -1231,7 +1231,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	if !isBIP0030Node(node) && (node.height < b.chainParams.BIP0034Height) {
 		err := b.checkBIP0030(node, block, view)
 		if err != nil {
-			fmt.Println("报错5")
+			//fmt.Println("报错5")
 			return err
 		}
 	}
@@ -1243,7 +1243,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 	// transaction inputs, counting pay-to-script-hashes, and scripts.
 	err := view.fetchInputUtxos(b.db, block)
 	if err != nil {
-		fmt.Println("报错7")
+		//fmt.Println("报错7")
 		return err
 	}
 
@@ -1293,7 +1293,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 			str := fmt.Sprintf("block contains too many "+
 				"signature operations - got %v, max %v",
 				totalSigOpCost, MaxBlockSigOpsCost)
-			fmt.Println("报错8")
+			//fmt.Println("报错8")
 			return ruleError(ErrTooManySigOps, str)
 		}
 	}
@@ -1318,7 +1318,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		lastTotalFees := totalFees
 		totalFees += txFee
 		if totalFees < lastTotalFees {
-			fmt.Println("报错9")
+			//fmt.Println("报错9")
 			return ruleError(ErrBadFees, "total fees for block "+
 				"overflows accumulator")
 		}
@@ -1329,7 +1329,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		// spent txout in the order each transaction spends them.
 		err = view.connectTransaction(tx, node.height, stxos)
 		if err != nil {
-			fmt.Println("报错10")
+			//fmt.Println("报错10")
 			return err
 		}
 	}
@@ -1349,7 +1349,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		str := fmt.Sprintf("coinbase transaction for block pays %v "+
 			"which is more than expected value of %v",
 			totalSatoshiOut, expectedSatoshiOut)
-		fmt.Println("报错11")
+		//fmt.Println("报错11")
 		return ruleError(ErrBadCoinbaseValue, str)
 	}
 
@@ -1414,7 +1414,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		sequenceLock, err := b.calcSequenceLock(node, tx, view,
 			false)
 		if err != nil {
-			fmt.Println("报错12")
+			//fmt.Println("报错12")
 			return err
 		}
 		if !SequenceLockActive(sequenceLock, node.height,
@@ -1422,7 +1422,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 			str := fmt.Sprintf("block contains " +
 				"transaction whose input sequence " +
 				"locks are not met")
-			fmt.Println("报错13")
+			//fmt.Println("报错13")
 			return ruleError(ErrUnfinalizedTx, str)
 		}
 	}
@@ -1443,7 +1443,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *drcutil.Block, vi
 		err := checkBlockScripts(block, view, scriptFlags, b.sigCache,
 			b.hashCache)
 		if err != nil {
-			fmt.Println("报错14")
+			//fmt.Println("报错14")
 			return err
 		}
 	}
@@ -1476,13 +1476,13 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chain
 	if lastCandidate.Hash != header.PrevBlock {
 		str := fmt.Sprintf("previous block must be the current chain tip %v, "+
 			"instead got %v", lastCandidate.Hash, header.PrevBlock)
-		fmt.Println("报错1")
+		//fmt.Println("报错1")
 		return ruleError(ErrPrevBlockNotBest, str)
 	}
 
-	err := checkCandidateSanity(block, seed, pi, b.timeSource)
+	_, err := checkCandidateSanity(block, seed, pi, b.timeSource)
 	if err != nil {
-		fmt.Println("报错2")
+		//fmt.Println("报错2")
 		return err
 	}
 
@@ -1498,8 +1498,8 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *drcutil.Block, seed *chain
 	view.SetBestHash(&lastCandidate.Hash)
 
 	parent := newBlockNode(&lastCandidate.Header, b.index.LookupNode(&lastCandidate.Header.PrevBlock), 0)
-	fmt.Println("parentNode: ", parent)
+	//fmt.Println("parentNode: ", parent)
 	newNode := newBlockNode(&header, parent, 0)
-	fmt.Println("currentNode: ", newNode)
+	//fmt.Println("currentNode: ", newNode)
 	return b.checkConnectBlock(newNode, block, view, nil)
 }

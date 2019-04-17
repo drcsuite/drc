@@ -26,6 +26,7 @@ func maxNetAddressPayload(pver uint32) uint32 {
 	return plen
 }
 
+// NetAddress定义了关于网络上对等点的信息，包括它最后一次出现的时间、它支持的服务、它的IP地址和端口
 // NetAddress defines information about a peer on the network including the time
 // it was last seen, the services it supports, its IP address, and port.
 type NetAddress struct {
@@ -63,6 +64,7 @@ func NewNetAddressIPPort(ip net.IP, port uint16, services ServiceFlag) *NetAddre
 	return NewNetAddressTimestamp(time.Now(), services, ip, port)
 }
 
+// NewNetAddressTimestamp使用提供的时间戳、IP、端口和支持的服务返回一个新的网络地址。时间戳四舍五入为单秒精度。
 // NewNetAddressTimestamp returns a new NetAddress using the provided
 // timestamp, IP, port, and supported services. The timestamp is rounded to
 // single second precision.

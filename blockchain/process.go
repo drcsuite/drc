@@ -11,6 +11,7 @@ import (
 	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
+	"math/big"
 )
 
 // behavior flags是一个位掩码，它定义了在执行链处理和一致规则检查时对正常行为的调整。
@@ -98,6 +99,7 @@ func (b *BlockChain) blockExists(hash *chainhash.Hash) (bool, error) {
 	return exists, err
 }
 
+// 前一轮块池是否存在该hash
 func (b *BlockChain) PrevCandidateExists(hash *chainhash.Hash) bool {
 	// Check in the database.
 	exist := PrevCandidatePool[*hash]
@@ -107,6 +109,7 @@ func (b *BlockChain) PrevCandidateExists(hash *chainhash.Hash) bool {
 	return false
 }
 
+// 当前轮块池是否存在该hash
 func (b *BlockChain) CandidateExists(hash *chainhash.Hash) bool {
 	// Check in the database.
 	exist := CurrentCandidatePool[*hash]
@@ -114,6 +117,22 @@ func (b *BlockChain) CandidateExists(hash *chainhash.Hash) bool {
 		return true
 	}
 	return false
+}
+
+// 选出块池中weight最小的块和weight
+func GetMinWeightBlock() (*wire.MsgCandidate, *big.Int) {
+	min, _ := new(big.Int).SetString("10000000000000000000000000000000000000000000000000000000000000000", 16)
+	var minCandidate *wire.MsgCandidate
+	if CurrentCandidatePool != nil {
+		for _, v := range CurrentCandidatePool {
+			weight := new(big.Int).SetBytes(chainhash.DoubleHashB(v.Header.Signature.CloneBytes()))
+			if weight.Cmp(min) < 0 {
+				min = weight
+				minCandidate = v
+			}
+		}
+	}
+	return minCandidate, min
 }
 
 //确定是否存在依赖于传递的块散列的孤子(如果为真，则不再是孤子)，并可能接受它们。
@@ -195,7 +214,6 @@ func (b *BlockChain) processOrphans(hash *chainhash.Hash, flags BehaviorFlags) e
 func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bool, bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
-	//fastAdd := flags&BFFastAdd == BFFastAdd
 
 	blockHash := block.Hash()
 	log.Tracef("Processing block %v", blockHash)
@@ -218,12 +236,6 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 		return false, false, ruleError(ErrDuplicateBlock, str)
 	}
 
-	// Find the previous checkpoint and perform some additional checks based
-	// on the checkpoint.  This provides a few nice properties such as
-	// preventing old side chain blocks before the last checkpoint,
-	// rejecting easy to mine, but otherwise bogus, blocks that could be
-	// used to eat memory, and ensuring expected (versus claimed) proof of
-	// work requirements since the previous checkpoint are met.
 	blockHeader := &block.MsgBlock().Header
 	// Handle orphan blocks.
 	prevHash := &blockHeader.PrevBlock
@@ -248,7 +260,6 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 		return false, false, err
 	}
 
-	fmt.Println("开始执行 processblock")
 	// The block has passed all context independent checks and appears sane
 	// enough to potentially accept it into the block chain.
 	isMainChain, err := b.maybeAcceptBlock(block, flags)
@@ -262,29 +273,30 @@ func (b *BlockChain) ProcessBlock(block *drcutil.Block, flags BehaviorFlags) (bo
 	// Accept any orphan blocks that depend on this block (they are
 	// no longer orphans) and repeat for those accepted blocks until
 	// there are no more.
-	//err = b.processOrphans(blockHash, flags)
-	//if err != nil {
-	//	return false, false, err
-	//}
+	err = b.processOrphans(blockHash, flags)
+	if err != nil {
+		return false, false, err
+	}
 
 	log.Debugf("Accepted block %v", blockHash)
 
 	return isMainChain, false, nil
 }
 
-// 处理发块阶段收到的块，并将该块放入块池和指向池
-func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags) (bool, error) {
+// 处理同步增量块
+func (b *BlockChain) ProcessSyncBlock(block *drcutil.Block) (bool, error) {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
-	//fastAdd := flags&BFFastAdd == BFFastAdd
-
-	blockHash := block.CandidateHash()
+	blockHash := block.Hash()
 	log.Tracef("Processing block %v", blockHash)
 
-	// 该块不能已经存在于块池中
+	// 该块不能已经存在于主链或侧链中。
 	// The block must not already exist in the main chain or side chains.
-	exists := b.CandidateExists(blockHash)
+	exists, err := b.blockExists(blockHash)
+	if err != nil {
+		return false, err
+	}
 	if exists {
 		str := fmt.Sprintf("already have block %v", blockHash)
 		return false, ruleError(ErrDuplicateBlock, str)
@@ -297,30 +309,104 @@ func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags)
 		return false, ruleError(ErrDuplicateBlock, str)
 	}
 
-	//对块及其事务执行初步的完整性检查。
-	// Perform preliminary sanity checks on the block and its transactions.
-	seed := chainhash.DoubleHashH(b.BestLastCandidate().Header.Signature.CloneBytes())
-	// 计算Pi,阈值规模
-	votes, scales := make([]uint16, 0), make([]uint16, 0)
-	candidate := PrevCandidatePool[b.BestLastCandidate().Hash]
-	scales = append(scales, candidate.Header.Scale)
-	votes = append(votes, b.BestLastCandidate().Votes)
-	for i := 0; i < 9; i++ {
-		// 添加每个节点实际收到的票数和当时估算值
-		prevNode := b.GetBlockIndex().LookupNode(&candidate.Header.PrevBlock)
-		scales = append(scales, prevNode.Header().Scale)
-		votes = append(votes, prevNode.Votes)
-		prevNode = prevNode.Ancestor(1)
-		if prevNode == nil {
-			break
-		}
+	prevHash := &block.MsgBlock().Header.PrevBlock
+	prevHashExists, err := b.blockExists(prevHash)
+	if err != nil {
+		return false, nil
 	}
-	// 计算前十个块平均规模和weight
-	scale := vote.EstimateScale(votes, scales)
-	Pi := vote.BlockVerge(scale)
-	err := checkCandidateSanity(block, &seed, Pi, b.timeSource) // seed pi
+	if !prevHashExists {
+		log.Infof("Adding orphan block %v with parent %v", blockHash, prevHash)
+		// 添加入孤块池
+		b.addOrphanBlock(block)
+
+		return true, nil
+	}
+
+	// The block has passed all context independent checks and appears sane
+	// enough to potentially accept it into the block chain.
+	_, err = b.maybeAcceptBlock(block, BFNone)
 	if err != nil {
 		return false, err
+	}
+
+	// 接受任何依赖于此块的孤立块(它们确实如此)
+	// 不再是孤儿)，并重复这些接受街区，直到
+	// 没有了。
+	// Accept any orphan blocks that depend on this block (they are
+	// no longer orphans) and repeat for those accepted blocks until
+	// there are no more.
+	err = b.processOrphans(blockHash, BFNone)
+	if err != nil {
+		return false, err
+	}
+
+	log.Debugf("Accepted sync block %v", blockHash)
+
+	return true, nil
+}
+
+// 处理发块阶段收到的块，并将该块放入块池和指向池
+// 是否投票，块是否符合规则，错误信息
+func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags) (bool, bool, error) {
+	b.chainLock.Lock()
+	defer b.chainLock.Unlock()
+
+	// 复制msgcandidate
+	block.SetMsgBlock(&wire.MsgBlock{
+		Header:       block.MsgCandidate().Header,
+		Transactions: block.MsgCandidate().Transactions,
+	})
+
+	//fastAdd := flags&BFFastAdd == BFFastAdd
+	blockHash := block.CandidateHash()
+	log.Tracef("Processing block %v", blockHash)
+
+	// 该块不能已经存在于块池中
+	// The block must not already exist in the main chain or side chains.
+	exists := b.CandidateExists(blockHash)
+	if exists {
+		str := fmt.Sprintf("already have block %v", blockHash)
+		return false, false, ruleError(ErrDuplicateBlock, str)
+	}
+
+	//该块不能作为孤儿存在。
+	// The block must not already exist as an orphan.
+	if _, exists := b.orphans[*blockHash]; exists {
+		str := fmt.Sprintf("already have block (orphan) %v", blockHash)
+		return false, false, ruleError(ErrDuplicateBlock, str)
+	}
+
+	// 发块阶段收到的块BestLastCandidate不能为空
+	best := b.BestLastCandidate()
+
+	//对块及其事务执行初步的完整性检查。
+	// Perform preliminary sanity checks on the block and its transactions.
+	// 计算Pi,阈值规模
+
+	seed := chainhash.DoubleHashH(best.Header.Signature.CloneBytes())
+	votes, scales := make([]uint16, 0), make([]uint16, 0)
+	scales = append(scales, best.Header.Scale)
+	votes = append(votes, best.Votes)
+	node := b.GetBlockIndex().LookupNode(&best.Header.PrevBlock)
+	if node != nil {
+		for i := 0; i < vote.PrevScaleNum; i++ {
+			// 添加每个节点实际收到的票数和当时估算值
+			if node == nil {
+				break
+			}
+			scales = append(scales, node.Header().Scale)
+			votes = append(votes, node.Votes)
+			hashes := node.Header().PrevBlock
+			node = b.GetBlockIndex().LookupNode(&hashes)
+		}
+	}
+	scale := vote.EstimateScale(votes, scales)
+	Pi := vote.BlockVerge(scale)
+
+	// 完整性检查
+	vb, err := checkCandidateSanity(block, &seed, Pi, b.timeSource) // seed pi
+	if err != nil {
+		return false, false, err
 	}
 
 	// Find the previous checkpoint and perform some additional checks based
@@ -336,18 +422,15 @@ func (b *BlockChain) ProcessCandidate(block *drcutil.Block, flags BehaviorFlags)
 	prevHashExists := b.PrevCandidateExists(prevHash)
 	if !prevHashExists {
 		str := fmt.Sprintf("The preceding block of this block does not exist: %v", blockHash)
-		return false, ruleError(ErrDuplicateBlock, str)
+		return false, false, ruleError(ErrDuplicateBlock, str)
 	}
 
 	// 加入指向池 和 当前块池
 	CurrentCandidatePool[*blockHash] = block.MsgCandidate()
-	points := CurrentPointPool[b.BestLastCandidate().Hash]
+	points := CurrentPointPool[best.Hash]
 	points = append(points, block.MsgCandidate())
-	CurrentPointPool[b.BestLastCandidate().Hash] = points
-	//points := CurrentPointPool[*blockHash]
-	//points = append(points, block.MsgCandidate())
-	//CurrentPointPool[*blockHash] = points
+	CurrentPointPool[best.Hash] = points
 	log.Debugf("Accepted block %v", blockHash)
 
-	return true, nil
+	return vb, true, nil
 }

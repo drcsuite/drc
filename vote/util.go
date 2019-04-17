@@ -2,6 +2,7 @@ package vote
 
 import (
 	"github.com/drcsuite/drc/chaincfg/chainhash"
+	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -20,15 +21,16 @@ const (
 	// Block time interval
 	BlockTimeInterval = 10 * time.Second
 
-	// 为同步到最新的发块时间所需的时间间隔
-	// the time interval required to synchronize to the latest block time
-	SyncTimeInterval = 5 * time.Second
+	// The number of items in the preceding paragraph that scale looks for
+	// 计算scale时寻找的前项数量=1+PrevScaleNum
+	PrevScaleNum = 9
+
+	// 发送区块等待时间
+	SendBlockWait = 3
 )
 
 var (
 	Work bool
-	Open = make(chan bool)
-
 	// 读写锁
 	// Read-write lock
 	RWSyncMutex = new(sync.RWMutex)
@@ -39,6 +41,17 @@ var (
 	// 前一区块的签名票池
 	// The signature ticket pool for the previous block
 	prevTicketPool = make(map[chainhash.Hash][]SignAndKey)
+
+	CurrentHeight int32 // 当前轮高度
+
+	StartHeight int32 // 项目启动时高度
+
+	// 第一个块生成时间
+	// （当前时间-第一个块时间）/10 +1 = 当前轮高度
+	// 第一个节点设置为0
+	FirstBLockTime int64 = 0
+
+	VoteBool = false
 )
 
 // 具有投票权的节点对区块的签名值和验证时用的公钥
@@ -126,7 +139,7 @@ func mean(values []uint16) (meanValue uint16) {
 	for _, value := range values {
 		totalValue = totalValue + value
 	}
-	meanValue = totalValue / uint16(len(values))
+	meanValue = uint16(math.Ceil(float64(totalValue) / float64(len(values))))
 	return
 }
 
