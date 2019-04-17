@@ -1587,21 +1587,21 @@ func (sm *SyncManager) voteProcess() {
 	blockHeaderHash, votes := cpuminer.GetMaxVotes()
 	msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
 
-	//如果获胜区块获得的票数小于总票数的三分之二，写空块.
-	if cpuminer.IsEnough(votes, msgCandidate.Header.Scale) {
-
-		// 写入最佳候选块，做为下轮发块的依据
-		// write the best candidate block, as the basis for the next round of block
-		if len(blockchain.CurrentCandidatePool) == 0 {
-			genesis := chaincfg.MainNetParams.GenesisBlock
-			sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
-		} else {
-			sm.chain.SetBestCandidate(blockHeaderHash, msgCandidate.Sigwit.Height, msgCandidate.Header, votes)
-		}
-	} else {
-		// 所以区块都没有获得理想的票数，写入空块
+	// 写入最佳候选块，做为下轮发块的依据
+	// write the best candidate block, as the basis for the next round of block
+	if len(blockchain.CurrentCandidatePool) == 0 {
 		genesis := chaincfg.MainNetParams.GenesisBlock
-		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, msgCandidate.Sigwit.Height, genesis.Header, votes)
+		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
+	} else {
+
+		//如果获胜区块获得的票数小于总票数的三分之二，写空块.
+		if cpuminer.IsEnough(votes, msgCandidate.Header.Scale) {
+			sm.chain.SetBestCandidate(blockHeaderHash, msgCandidate.Sigwit.Height, msgCandidate.Header, votes)
+		} else {
+			// 所以区块都没有获得理想的票数，写入空块
+			genesis := chaincfg.MainNetParams.GenesisBlock
+			sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, msgCandidate.Sigwit.Height, genesis.Header, votes)
+		}
 	}
 
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中
