@@ -21,14 +21,11 @@ const (
 	// Block time interval
 	BlockTimeInterval = 10 * time.Second
 
-	// 为同步到最新的发块时间所需的时间间隔
-	// the time interval required to synchronize to the latest block time
-	SyncTimeInterval = 20 * time.Second
-
 	// The number of items in the preceding paragraph that scale looks for
 	// 计算scale时寻找的前项数量=1+PrevScaleNum
 	PrevScaleNum = 9
 
+	// 发送区块等待时间
 	SendBlockWait = 3
 )
 
@@ -52,7 +49,7 @@ var (
 	// 第一个块生成时间
 	// （当前时间-第一个块时间）/10 +1 = 当前轮高度
 	// 第一个节点设置为0
-	FirstBLockTime int64 = 1555469407
+	FirstBLockTime int64 = 0
 
 	VoteBool = false
 )

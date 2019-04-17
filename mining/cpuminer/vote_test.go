@@ -49,3 +49,19 @@ func TestDi(t *testing.T) {
 	wifKey, address, _ := GenerateBTC()
 	fmt.Println(address, wifKey)
 }
+
+func TestIsEnough(t *testing.T) {
+	fmt.Println(IsEnough(1, 1))
+	fmt.Println(IsEnough(2, 2))
+	fmt.Println(IsEnough(2, 3))
+	fmt.Println(IsEnough(3, 4))
+	fmt.Println(IsEnough(4, 5))
+	fmt.Println(IsEnough(133, 200))
+	fmt.Println(IsEnough(134, 200))
+
+	fmt.Println("_____________________________________")
+	fmt.Println(IsEnough(199, 500))
+	fmt.Println(IsEnough(200, 500))
+	fmt.Println(IsEnough(201, 500))
+
+}
