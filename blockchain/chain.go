@@ -69,7 +69,7 @@ type BestState struct {
 	NumTxns     uint64         // The number of txns in the block.
 	TotalTxns   uint64         // The total number of txns in the chain.
 	MedianTime  time.Time      // Median time as per CalcPastMedianTime.
-	PubKey      chainhash.Hash33
+	PubKey      chainhash.Hash
 	Signature   chainhash.Hash64
 	Scale       uint16
 	Reserved    uint16
@@ -113,7 +113,7 @@ func (b *BlockChain) setBlock(hash *chainhash.Hash, block *wire.MsgBlock) bool {
 // newBestState为给定的参数返回一个新的best stats实例。
 // newBestState returns a new best stats instance for the given parameters.
 func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
-	totalTxns uint64, signature chainhash.Hash64, pubKey chainhash.Hash33,
+	totalTxns uint64, signature chainhash.Hash64, pubKey chainhash.Hash,
 	scale uint16, reserved uint16, medianTime time.Time, votes uint16) *BestState {
 
 	return &BestState{

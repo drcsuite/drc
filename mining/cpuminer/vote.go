@@ -5,6 +5,7 @@ import (
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/vote"
 	"github.com/drcsuite/drc/wire"
+	"github.com/golang/crypto/ed25519"
 	"math/big"
 )
 
@@ -27,7 +28,6 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 	// 获取本节点公私钥
 	// Gets the node's public key and private key
 	privateKey := m.privKey
-	publicKey := privateKey.PubKey()
 	// 散列两次区块内容
 	// Hash the contents of the block twice
 	headerHash := msg.Header.BlockHash()
@@ -36,18 +36,23 @@ func (m *CPUMiner) BlockVote(msg *wire.MsgCandidate) {
 	// Determine whether the block is eligible to be voted on
 	if isAdvantage(headerHash) {
 
-		pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
+		//pubKey, err := chainhash.NewHash33(publicKey.SerializeCompressed())
+		//if err != nil {
+		//	log.Errorf("Format conversion error: %s", err)
+		//}
+		pubKey, err := chainhash.NewHash(privateKey.Public().(ed25519.PublicKey))
 		if err != nil {
 			log.Errorf("Format conversion error: %s", err)
 		}
 
 		// 用自己的私钥签名区块
 		// Sign the block with your own private key
-		headerSign, err := privateKey.Sign64(headerHash.CloneBytes())
+		headerSign := ed25519.Sign(privateKey, headerHash.CloneBytes())
+		//headerSign, err := privateKey.Sign64(headerHash.CloneBytes())
 		//fmt.Printf("headersign： %x\n", headerSign)
-		if err != nil {
-			log.Errorf("Signature error: %s", err)
-		}
+		//if err != nil {
+		//	log.Errorf("Signature error: %s", err)
+		//}
 		// 计算本节点的投票weight
 		//The voting weight of this node is calculated
 		weight := chainhash.DoubleHashB(headerSign)

@@ -11,7 +11,7 @@ type MsgSign struct {
 	// 投票节点签名
 	Signature chainhash.Hash64
 	// 投票节点公钥
-	PublicKey chainhash.Hash33
+	PublicKey chainhash.Hash
 }
 
 func (msg *MsgSign) BtcDecode(r io.Reader, pver uint32, enc MessageEncoding) error {

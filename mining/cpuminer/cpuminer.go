@@ -7,8 +7,8 @@ package cpuminer
 import (
 	"errors"
 	"fmt"
-	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/vote"
+	"github.com/golang/crypto/ed25519"
 	"math/big"
 	"math/rand"
 	"runtime"
@@ -114,7 +114,7 @@ type CPUMiner struct {
 	updateHashes      chan uint64
 	speedMonitorQuit  chan struct{}
 	quit              chan struct{}
-	privKey           *btcec.PrivateKey
+	privKey           ed25519.PrivateKey
 }
 
 // speedMonitor handles tracking the number of hashes per second the mining
@@ -362,14 +362,15 @@ out:
 		// 计算前十个块平均规模和weight
 		// 根据生成的签名，计算weight=hash(sign(sign i-1)),weight<pi
 		preHeader := best.Header
-		signature, err := m.privKey.Sign64(chainhash.DoubleHashB(preHeader.Signature.CloneBytes()))
-		if err != nil {
-			m.submitBlockLock.Unlock()
-			errStr := fmt.Sprintf("Failed to signature prevate seed: %v", err)
-			log.Errorf(errStr)
-			vote.Work = false
-			continue
-		}
+		signature := ed25519.Sign(m.privKey, chainhash.DoubleHashB(preHeader.Signature.CloneBytes()))
+		//signature, err := m.privKey.Sign64()
+		//if err != nil {
+		//	m.submitBlockLock.Unlock()
+		//	errStr := fmt.Sprintf("Failed to signature prevate seed: %v", err)
+		//	log.Errorf(errStr)
+		//	vote.Work = false
+		//	continue
+		//}
 		weight := new(big.Int).SetBytes(chainhash.DoubleHashB(signature))
 		votes, scales := make([]uint16, 0), make([]uint16, 0)
 		scales = append(scales, preHeader.Scale)
@@ -405,8 +406,9 @@ out:
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
 		// include in the block.
-		pk := (btcec.PublicKey)(m.privKey.PublicKey)
-		pubKey, err := chainhash.NewHash33(pk.SerializeCompressed())
+		pubKey, err := chainhash.NewHash(m.privKey.Public().(ed25519.PublicKey))
+		//pk := (btcec.PublicKey)(m.privKey.PublicKey)
+		//pubKey, err := chainhash.NewHash33(pk.SerializeCompressed())
 		if err != nil {
 			errStr := fmt.Sprintf("Failed to create new block "+
 				"template: %v", err)
@@ -720,7 +722,8 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 func New(cfg *Config) *CPUMiner {
 	wire.ChangeCode("NewCpuMiner")
 	// 生成公私钥，放入cpuminer
-	privKey, err := btcec.NewPrivateKey(btcec.S256())
+	_, privKey, err := ed25519.GenerateKey(nil)
+	//privKey, err := btcec.NewPrivateKey(btcec.S256())
 	if err != nil {
 		log.Errorf("private key generation error: %s", err)
 		return nil

@@ -957,7 +957,7 @@ type bestChainState struct {
 	reserved  uint16
 	votes     uint16
 	signature chainhash.Hash64
-	pubKey    chainhash.Hash33
+	pubKey    chainhash.Hash
 }
 
 // serializeBestChainState返回所传递的块best chain状态的序列化。
@@ -1064,6 +1064,8 @@ func (b *BlockChain) createChainState() error {
 	genesisBlock.SetHeight(0)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, nil, 1)
+	fmt.Println("nodeHash: ", node.hash)
+	//node.hash = *chaincfg.MainNetParams.GenesisHash
 	node.status = statusDataStored | statusValid
 	b.bestChain.SetTip(node)
 

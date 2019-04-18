@@ -7,8 +7,8 @@ package blockchain
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/vote"
+	"github.com/golang/crypto/ed25519"
 	"math"
 	"math/big"
 	"time"
@@ -460,17 +460,10 @@ func CountP2SHSigOps(tx *drcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 // are needed to pass along to checkProofOfWork.
 func checkBlockHeaderSanity(header *wire.BlockHeader, seed *chainhash.Hash, pi *big.Int, timeSource MedianTimeSource) (bool, error) {
 	vb := false
-
-	// 公钥必须符合标准格式
-	pubKey, err := btcec.ParsePubKey(header.PublicKey.CloneBytes(), btcec.S256())
-	if err != nil {
-		str := fmt.Sprintf("The public key is incorrect of %v", header.PublicKey)
-		return vb, ruleError(ErrInvalidTime, str)
-	}
-
 	// 签名是否同源
 	signBytes := header.Signature.CloneBytes()
-	b := btcec.GetSignature(signBytes).Verify(seed.CloneBytes(), pubKey)
+	b := ed25519.Verify(header.PublicKey.CloneBytes(), seed.CloneBytes(), signBytes)
+	//b := btcec.GetSignature(signBytes).Verify(seed.CloneBytes(), )
 	if !b {
 		str := fmt.Sprintf("Signature verification failed: %v", header.Signature)
 		return vb, ruleError(ErrInvalidTime, str)
@@ -836,12 +829,13 @@ func (b *BlockChain) checkBlockHeaderContext(header *wire.BlockHeader, prevNode 
 	prevSignB := prevNode.signature.CloneBytes()
 	seed := chainhash.DoubleHashB(prevSignB)
 	signB := header.Signature.CloneBytes()
-	signature := btcec.GetSignature(signB)
-	pubKey, err := btcec.ParsePubKey(header.PublicKey.CloneBytes(), btcec.S256())
-	if err != nil {
-		return err
-	}
-	if !signature.Verify(seed, pubKey) {
+
+	//pubKey, err := btcec.ParsePubKey(header.PublicKey.CloneBytes(), btcec.S256())
+	//if err != nil {
+	//	return err
+	//}
+	//if !signature.Verify(seed, pubKey) {
+	if !ed25519.Verify(header.PublicKey.CloneBytes(), seed, signB) {
 		str := "signature verify failed"
 		return ruleError(ErrUnexpectedDifficulty, str)
 	}

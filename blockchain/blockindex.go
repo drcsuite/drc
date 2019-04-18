@@ -107,7 +107,7 @@ type blockNode struct {
 	status blockStatus
 
 	signature chainhash.Hash64
-	publicKey chainhash.Hash33
+	publicKey chainhash.Hash
 	scale     uint16
 	reserved  uint16
 	Votes     uint16

@@ -59,7 +59,7 @@ var (
 type SignAndKey struct {
 	Signature chainhash.Hash64
 
-	PublicKey chainhash.Hash33
+	PublicKey chainhash.Hash
 }
 
 // 计算投票的∏值

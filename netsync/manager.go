@@ -7,9 +7,9 @@ package netsync
 import (
 	"container/list"
 	"fmt"
-	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/mining/cpuminer"
 	"github.com/drcsuite/drc/vote"
+	"github.com/golang/crypto/ed25519"
 	"math/big"
 
 	"sync"
@@ -840,14 +840,16 @@ func (sm *SyncManager) CollectVotes(sign *wire.MsgSign, candidate *wire.MsgCandi
 		// 验证签名
 		// Verify the signature
 		signBytes := sign.Signature.CloneBytes()
+		pubKey := sign.PublicKey.CloneBytes()
 
-		pubKey, err := btcec.ParsePubKey(sign.PublicKey.CloneBytes(), btcec.S256())
-		if err != nil {
-			log.Errorf("Parse error: %s", err)
-		}
+		//pubKey, err := btcec.ParsePubKey(sign.PublicKey.CloneBytes(), btcec.S256())
+		//if err != nil {
+		//	log.Errorf("Parse error: %s", err)
+		//}
 		hash := sign.BlockHeaderHash.CloneBytes()
 
-		if btcec.GetSignature(signBytes).Verify(hash, pubKey) {
+		//if btcec.GetSignature(signBytes).Verify(hash, pubKey) {
+		if ed25519.Verify(pubKey, hash, signBytes) {
 
 			// 查看weight是否符合
 			// Check whether weight is consistent
@@ -883,7 +885,7 @@ func (sm *SyncManager) CollectVotes(sign *wire.MsgSign, candidate *wire.MsgCandi
 
 // 避免重复收集投票，如果没有重复，返回true
 // Avoid duplicate voting or multiple records voting records, if no repeat, return true
-func preventRepeatSign(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash33) bool {
+func preventRepeatSign(blockHeaderHash chainhash.Hash, publicKey chainhash.Hash) bool {
 
 	// 查看签名池里是否有该投票节点的投票
 	// Check the signature pool for the vote node

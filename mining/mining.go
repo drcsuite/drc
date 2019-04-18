@@ -442,7 +442,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //  |  transactions (while block size   |   |
 //  |  <= policy.BlockMinSize)          |   |
 //   -----------------------------------  --
-func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress drcutil.Address, pubkey *chainhash.Hash33, signature *chainhash.Hash64,
+func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress drcutil.Address, pubkey *chainhash.Hash, signature *chainhash.Hash64,
 	scale uint16, reserved uint16, height int32) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestLastCandidate()
