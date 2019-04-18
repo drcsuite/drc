@@ -726,10 +726,12 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 	bestState := sm.chain.BestSnapshot()
 	height := bmsg.block.MsgCandidate().Sigwit.Height
 	vote.CurrentHeight = height
-	//fmt.Println("收到的msgCandidate高度为： ", height)
-	//fmt.Println("当前链上高度为： ", bestState.Height)
-	//fmt.Println("高度差值为： ", height-bestState.Height)
-	if height-bestState.Height == 2 { // 参与验证
+	fmt.Println("收到的msgCandidate高度为： ", height)
+	fmt.Println("收到的msgCandidate Hash为： ", bmsg.block.MsgCandidate().BlockHash())
+	fmt.Println("項目启动高度为： ", vote.StartHeight)
+	fmt.Println("当前链上高度为： ", bestState.Height)
+	fmt.Println("高度差值为： ", height-bestState.Height)
+	if vote.BlockBool && height-bestState.Height == 2 { // 参与验证
 		// handling, etc.
 		// Process the block to include validation, best chain selection, orphan
 		// 处理该块
@@ -772,7 +774,7 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 		}
 
 		// 对收到的块做投票处理
-		if v && vote.VoteBool {
+		if v {
 			log.Info("对 ", bmsg.block.Hash(), " 进行投票")
 			bmsg.cpuMiner.BlockVote(bmsg.block.MsgCandidate())
 		}
@@ -1561,7 +1563,7 @@ func (sm *SyncManager) VoteHandler() {
 		//	sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
 		//}
 	}
-	vote.VoteBool = true
+	vote.BlockBool = true
 	// 10秒处理一波投票结果
 	// Process one wave of voting results 10 second
 	handlingTime := time.NewTicker(vote.BlockTimeInterval)
@@ -1596,14 +1598,14 @@ func (sm *SyncManager) voteProcess() {
 		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
 	} else {
 
-		//如果获胜区块获得的票数小于总票数的三分之二，写空块.
-		if cpuminer.IsEnough(votes, msgCandidate.Header.Scale) {
-			sm.chain.SetBestCandidate(blockHeaderHash, msgCandidate.Sigwit.Height, msgCandidate.Header, votes)
-		} else {
-			// 所以区块都没有获得理想的票数，写入空块
-			genesis := chaincfg.MainNetParams.GenesisBlock
-			sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, msgCandidate.Sigwit.Height, genesis.Header, votes)
-		}
+		////如果获胜区块获得的票数小于总票数的三分之二，写空块.
+		//if cpuminer.IsEnough(votes, msgCandidate.Header.Scale) {
+		sm.chain.SetBestCandidate(blockHeaderHash, msgCandidate.Sigwit.Height, msgCandidate.Header, votes)
+		//} else {
+		//	// 所以区块都没有获得理想的票数，写入空块
+		//	genesis := chaincfg.MainNetParams.GenesisBlock
+		//	sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, msgCandidate.Sigwit.Height, genesis.Header, votes)
+		//}
 	}
 
 	// 把本轮块池中多数指向的前一轮块的Hash，写入区块链中

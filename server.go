@@ -2442,8 +2442,9 @@ func (s *server) Start() {
 
 	// Server startup time. Used for the uptime command for uptime calculation.
 	s.startupTime = time.Now().Unix()
+
 	if vote.FirstBLockTime != 0 {
-		vote.StartHeight = int32(s.startupTime-vote.FirstBLockTime)/10000 + 1
+		vote.StartHeight = int32(s.startupTime-vote.FirstBLockTime)/10 + 1
 	} else {
 		vote.StartHeight = 1
 	}
