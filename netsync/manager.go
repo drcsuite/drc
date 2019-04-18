@@ -731,7 +731,17 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 	fmt.Println("項目启动高度为： ", vote.StartHeight)
 	fmt.Println("当前链上高度为： ", bestState.Height)
 	fmt.Println("高度差值为： ", height-bestState.Height)
-	if vote.BlockBool && height-bestState.Height == 2 { // 参与验证
+	if height-bestState.Height == 2 { // 参与验证
+		if !vote.BlockBool {
+			candidate := bmsg.block.MsgCandidate()
+			// 请求软状态
+			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-1, 2, candidate.Header.PrevBlock), nil)
+			// 加入当前块池和指向池
+			blockchain.CurrentCandidatePool[candidate.BlockHash()] = candidate
+			points := blockchain.CurrentPointPool[candidate.Header.PrevBlock]
+			points = append(points, candidate)
+			blockchain.CurrentPointPool[candidate.Header.PrevBlock] = points
+		}
 		// handling, etc.
 		// Process the block to include validation, best chain selection, orphan
 		// 处理该块
@@ -786,23 +796,21 @@ func (sm *SyncManager) handleCandidateMsg(bmsg *candidateMsg) {
 			log.Infof("The current wheel does not accept fast increments")
 			return
 		}
+		candidate := bmsg.block.MsgCandidate()
 		if _, ok := incrementBlock[height]; !ok {
 			// 请求增量块
 			var zero chainhash.Hash
-			candidate := bmsg.block.MsgCandidate()
 			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-2, 1, zero), nil)
-			// 请求软状态
-			bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-1, 2, candidate.Header.PrevBlock), nil)
-
-			// 加入当前块池和指向池
-			blockchain.CurrentCandidatePool[candidate.BlockHash()] = candidate
-			points := blockchain.CurrentPointPool[candidate.Header.PrevBlock]
-			points = append(points, candidate)
-			blockchain.CurrentPointPool[candidate.Header.PrevBlock] = points
-
 			// 防止重复请求
 			incrementBlock[height] = struct{}{}
 		}
+		// 请求软状态
+		bmsg.peer.QueueMessage(wire.NewMsgGetBlock(height-1, 2, candidate.Header.PrevBlock), nil)
+		// 加入当前块池和指向池
+		blockchain.CurrentCandidatePool[candidate.BlockHash()] = candidate
+		points := blockchain.CurrentPointPool[candidate.Header.PrevBlock]
+		points = append(points, candidate)
+		blockchain.CurrentPointPool[candidate.Header.PrevBlock] = points
 		// 不符合规则
 	} else {
 		log.Infof("Received block with height exception,hash: ", bmsg.block.CandidateHash())
