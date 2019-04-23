@@ -1591,11 +1591,10 @@ func (sm *SyncManager) voteProcess() {
 
 	// 获取票数最多的区块
 	// get the block with the most votes
-	fmt.Println("票池： ", vote.GetTicketPool())
-	for a, b := range vote.GetTicketPool() {
-		fmt.Println(a, len(b))
-	}
-
+	//fmt.Println("票池： ", vote.GetTicketPool())
+	//for a, b := range vote.GetTicketPool() {
+	//	fmt.Println(a, len(b))
+	//}
 	blockHeaderHash, votes := cpuminer.GetMaxVotes()
 	msgCandidate := blockchain.CurrentCandidatePool[blockHeaderHash]
 
