@@ -417,6 +417,8 @@ func payToPubKeyScript(serializedPubKey []byte) ([]byte, error) {
 		AddOp(OP_CHECKSIG).Script()
 }
 
+// PayToAddrScript创建一个新脚本，将事务输出支付给
+// 指定地址。
 // PayToAddrScript creates a new script to pay a transaction output to a the
 // specified address.
 func PayToAddrScript(addr drcutil.Address) ([]byte, error) {

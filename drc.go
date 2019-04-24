@@ -8,32 +8,33 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/drcsuite/drc/btcec"
-	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/wire"
+	"github.com/golang/crypto/ed25519"
+	"math/big"
 	"time"
 )
 
-func GenerateBTC() (string, string, error) {
-	privKey, err := btcec.NewPrivateKey(btcec.S256())
-	if err != nil {
-		return "", "", err
-	}
+//func GenerateBTC() (string, string, error) {
+//privKey, err := btcec.NewPrivateKey(btcec.S256())
+//if err != nil {
+//	return "", "", err
+//}
+//
+//privKeyWif, err := drcutil.NewWIF(privKey, &chaincfg.MainNetParams, false)
+//if err != nil {
+//	return "", "", err
+//}
+//pubKeySerial := privKey.PubKey().SerializeUncompressed()
+//
+//pubKeyAddress, err := drcutil.NewAddressPubKey(pubKeySerial, &chaincfg.MainNetParams)
+//if err != nil {
+//	return "", "", err
+//}
 
-	privKeyWif, err := drcutil.NewWIF(privKey, &chaincfg.MainNetParams, false)
-	if err != nil {
-		return "", "", err
-	}
-	pubKeySerial := privKey.PubKey().SerializeUncompressed()
-
-	pubKeyAddress, err := drcutil.NewAddressPubKey(pubKeySerial, &chaincfg.MainNetParams)
-	if err != nil {
-		return "", "", err
-	}
-
-	return privKeyWif.String(), pubKeyAddress.EncodeAddress(), nil
-}
+//return privKeyWif.String(), pubKeyAddress.EncodeAddress(), nil
+//}
 
 //func main() {
 //	//wifKey, address, _ := GenerateBTCTest() // 测试地址
@@ -54,32 +55,32 @@ func NewPrivateKey(curve elliptic.Curve) (*btcec.PrivateKey, error) {
 
 func testCipherAndSign() {
 	// cipher
-	privKey, _ := btcec.NewPrivateKey(btcec.S256())
-	fmt.Println(privKey)
-	serialize := privKey.Serialize()
-	fmt.Println(len(serialize))
-	privateKey, publicKey := btcec.PrivKeyFromBytes(btcec.S256(), serialize)
-	fmt.Println("公钥序列化前： ", publicKey)
-	pkcomp := publicKey.SerializeCompressed()
-	fmt.Println("公钥压缩后长度： ", len(pkcomp))
-	pubKey, _ := btcec.ParsePubKey(pkcomp, btcec.S256())
-	fmt.Println("公钥反序列化后： ", pubKey)
+	//privKey, _ := btcec.NewPrivateKey(btcec.S256())
+	//fmt.Println(privKey)
+	//serialize := privKey.Serialize()
+	//fmt.Println(len(serialize))
+	//_, publicKey := btcec.PrivKeyFromBytes(btcec.S256(), serialize)
+	//fmt.Println("公钥序列化前： ", publicKey)
+	//pkcomp := publicKey.SerializeCompressed()
+	//fmt.Println("公钥压缩后长度： ", len(pkcomp))
+	//pubKey, _ := btcec.ParsePubKey(pkcomp, btcec.S256())
+	//fmt.Println("公钥反序列化后： ", pubKey)
 
 	// signature
-	hash := []byte{0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9}
-	bytes, _ := privateKey.Sign64(hash)
+	//hash := []byte{0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9}
+	//bytes, _ := privateKey.Sign64(hash)
 
 	// plan 1
-	fmt.Println("长度： ", len(bytes), "签名bytes： ", bytes)
-	derSignature := btcec.GetSignature(bytes)
+	//fmt.Println("长度： ", len(bytes), "签名bytes： ", bytes)
+	//derSignature := btcec.GetSignature(bytes)
 
 	// plan 2
 	//ss := signature.Serialize()
 	//fmt.Println("序列化签名为： ", signature, "长度： ", len(ss))
 	//derSignature, _ := btcec.ParseDERSignature(ss, btcec.S256())
 
-	verify := derSignature.Verify(hash, publicKey)
-	fmt.Println(verify)
+	//verify := derSignature.Verify(hash, publicKey)
+	//fmt.Println(verify)
 
 }
 
@@ -243,15 +244,57 @@ func genesisBLock() {
 	//}
 }
 
+// curve25519签名速度测试
+func signSpeed() {
+	msg := []byte{1, 2, 3, 4, 5, 6}
+	_, privateKeys, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+	ticker := time.NewTicker(1 * time.Second)
+	n, _ := new(big.Int).SetString("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551", 16)
+	i := 0
+speed:
+	for {
+		sign := ed25519.Sign(privateKeys, msg)
+		msg = chainhash.DoubleHashB(sign)
+		q := new(big.Int).SetBytes(msg)
+		if q.Cmp(n) >= 0 || q.Sign() <= 0 {
+			continue
+		}
+		i++
+		select {
+		case <-ticker.C:
+			break speed
+		default:
+			break
+		}
+	}
+	fmt.Println("一共生成", i, "个种子")
+}
+
+func ed25519test() {
+	_, privKey, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+	seed := privKey.Seed()
+	fromSeed := ed25519.NewKeyFromSeed(seed)
+	fmt.Println("privKey: ", privKey)
+	fmt.Println("seed: ", seed)
+	fmt.Println("fromSeed: ", fromSeed)
+}
+
 //func main() {
 //	//testCipherAndSign()
 //	//ptr()
 //	//ptrint()
 //	//GenesisBlock()
-//	genesisBLock()
-//
+//	//genesisBLock()
 //	//Array()
 //	//MapStruct()
 //	//IOREADER()
-//	fmt.Println(" Hello, DRC!")
+//	//fmt.Println(" Hello, DRC!")
+//	//signSpeed()
+//	ed25519test()
 //}

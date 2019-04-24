@@ -21,7 +21,6 @@ import (
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
-	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/drcutil/base58"
 )
 
@@ -138,6 +137,9 @@ func NewExtendedKey(version, key, chainCode, parentFP []byte, depth uint8,
 	}
 }
 
+// pubKeyBytes返回关联的序列化压缩公钥的字节
+//以一种包括记忆在内的有效方式使用这个扩展键
+//必要的。
 // pubKeyBytes returns bytes for the serialized compressed public key associated
 // with this extended key in an efficient manner including memoization as
 // necessary.
@@ -146,22 +148,22 @@ func NewExtendedKey(version, key, chainCode, parentFP []byte, depth uint8,
 // is since it's already in the correct form.  However, when the extended key is
 // a private key, the public key will be calculated and memoized so future
 // accesses can simply return the cached result.
-func (k *ExtendedKey) pubKeyBytes() []byte {
-	// Just return the key if it's already an extended public key.
-	if !k.isPrivate {
-		return k.key
-	}
-
-	// This is a private extended key, so calculate and memoize the public
-	// key if needed.
-	if len(k.pubKey) == 0 {
-		pkx, pky := btcec.S256().ScalarBaseMult(k.key)
-		pubKey := btcec.PublicKey{Curve: btcec.S256(), X: pkx, Y: pky}
-		k.pubKey = pubKey.SerializeCompressed()
-	}
-
-	return k.pubKey
-}
+//func (k *ExtendedKey) pubKeyBytes() []byte {
+//	// Just return the key if it's already an extended public key.
+//	if !k.isPrivate {
+//		return k.key
+//	}
+//
+//	// This is a private extended key, so calculate and memoize the public
+//	// key if needed.
+//	if len(k.pubKey) == 0 {
+//		pkx, pky := btcec.S256().ScalarBaseMult(k.key)
+//		pubKey := btcec.PublicKey{Curve: btcec.S256(), X: pkx, Y: pky}
+//		k.pubKey = pubKey.SerializeCompressed()
+//	}
+//
+//	return k.pubKey
+//}
 
 // IsPrivate returns whether or not the extended key is a private extended key.
 //
@@ -186,6 +188,10 @@ func (k *ExtendedKey) ParentFingerprint() uint32 {
 	return binary.BigEndian.Uint32(k.parentFP)
 }
 
+//在给定索引处返回派生子扩展键。当这个
+//扩展密钥是一个私有扩展密钥(由IsPrivate决定)
+//函数)，则会导出一个私有扩展密钥。否则,派生
+//扩展密钥也是一个公共扩展密钥。
 // Child returns a derived child extended key at the given index.  When this
 // extended key is a private extended key (as determined by the IsPrivate
 // function), a private extended key will be derived.  Otherwise, the derived
@@ -207,128 +213,128 @@ func (k *ExtendedKey) ParentFingerprint() uint32 {
 // index does not derive to a usable child.  The ErrInvalidChild error will be
 // returned if this should occur, and the caller is expected to ignore the
 // invalid child and simply increment to the next index.
-func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
-	// Prevent derivation of children beyond the max allowed depth.
-	if k.depth == maxUint8 {
-		return nil, ErrDeriveBeyondMaxDepth
-	}
-
-	// There are four scenarios that could happen here:
-	// 1) Private extended key -> Hardened child private extended key
-	// 2) Private extended key -> Non-hardened child private extended key
-	// 3) Public extended key -> Non-hardened child public extended key
-	// 4) Public extended key -> Hardened child public extended key (INVALID!)
-
-	// Case #4 is invalid, so error out early.
-	// A hardened child extended key may not be created from a public
-	// extended key.
-	isChildHardened := i >= HardenedKeyStart
-	if !k.isPrivate && isChildHardened {
-		return nil, ErrDeriveHardFromPublic
-	}
-
-	// The data used to derive the child key depends on whether or not the
-	// child is hardened per [BIP32].
-	//
-	// For hardened children:
-	//   0x00 || ser256(parentKey) || ser32(i)
-	//
-	// For normal children:
-	//   serP(parentPubKey) || ser32(i)
-	keyLen := 33
-	data := make([]byte, keyLen+4)
-	if isChildHardened {
-		// Case #1.
-		// When the child is a hardened child, the key is known to be a
-		// private key due to the above early return.  Pad it with a
-		// leading zero as required by [BIP32] for deriving the child.
-		copy(data[1:], k.key)
-	} else {
-		// Case #2 or #3.
-		// This is either a public or private extended key, but in
-		// either case, the data which is used to derive the child key
-		// starts with the secp256k1 compressed public key bytes.
-		copy(data, k.pubKeyBytes())
-	}
-	binary.BigEndian.PutUint32(data[keyLen:], i)
-
-	// Take the HMAC-SHA512 of the current key's chain code and the derived
-	// data:
-	//   I = HMAC-SHA512(Key = chainCode, Data = data)
-	hmac512 := hmac.New(sha512.New, k.chainCode)
-	hmac512.Write(data)
-	ilr := hmac512.Sum(nil)
-
-	// Split "I" into two 32-byte sequences Il and Ir where:
-	//   Il = intermediate key used to derive the child
-	//   Ir = child chain code
-	il := ilr[:len(ilr)/2]
-	childChainCode := ilr[len(ilr)/2:]
-
-	// Both derived public or private keys rely on treating the left 32-byte
-	// sequence calculated above (Il) as a 256-bit integer that must be
-	// within the valid range for a secp256k1 private key.  There is a small
-	// chance (< 1 in 2^127) this condition will not hold, and in that case,
-	// a child extended key can't be created for this index and the caller
-	// should simply increment to the next index.
-	ilNum := new(big.Int).SetBytes(il)
-	if ilNum.Cmp(btcec.S256().N) >= 0 || ilNum.Sign() == 0 {
-		return nil, ErrInvalidChild
-	}
-
-	// The algorithm used to derive the child key depends on whether or not
-	// a private or public child is being derived.
-	//
-	// For private children:
-	//   childKey = parse256(Il) + parentKey
-	//
-	// For public children:
-	//   childKey = serP(point(parse256(Il)) + parentKey)
-	var isPrivate bool
-	var childKey []byte
-	if k.isPrivate {
-		// Case #1 or #2.
-		// Add the parent private key to the intermediate private key to
-		// derive the final child key.
-		//
-		// childKey = parse256(Il) + parenKey
-		keyNum := new(big.Int).SetBytes(k.key)
-		ilNum.Add(ilNum, keyNum)
-		ilNum.Mod(ilNum, btcec.S256().N)
-		childKey = ilNum.Bytes()
-		isPrivate = true
-	} else {
-		// Case #3.
-		// Calculate the corresponding intermediate public key for
-		// intermediate private key.
-		ilx, ily := btcec.S256().ScalarBaseMult(il)
-		if ilx.Sign() == 0 || ily.Sign() == 0 {
-			return nil, ErrInvalidChild
-		}
-
-		// Convert the serialized compressed parent public key into X
-		// and Y coordinates so it can be added to the intermediate
-		// public key.
-		pubKey, err := btcec.ParsePubKey(k.key, btcec.S256())
-		if err != nil {
-			return nil, err
-		}
-
-		// Add the intermediate public key to the parent public key to
-		// derive the final child key.
-		//
-		// childKey = serP(point(parse256(Il)) + parentKey)
-		childX, childY := btcec.S256().Add(ilx, ily, pubKey.X, pubKey.Y)
-		pk := btcec.PublicKey{Curve: btcec.S256(), X: childX, Y: childY}
-		childKey = pk.SerializeCompressed()
-	}
-
-	// The fingerprint of the parent for the derived child is the first 4
-	// bytes of the RIPEMD160(SHA256(parentPubKey)).
-	parentFP := drcutil.Hash160(k.pubKeyBytes())[:4]
-	return NewExtendedKey(k.version, childKey, childChainCode, parentFP,
-		k.depth+1, i, isPrivate), nil
-}
+//func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
+//	// Prevent derivation of children beyond the max allowed depth.
+//	if k.depth == maxUint8 {
+//		return nil, ErrDeriveBeyondMaxDepth
+//	}
+//
+//	// There are four scenarios that could happen here:
+//	// 1) Private extended key -> Hardened child private extended key
+//	// 2) Private extended key -> Non-hardened child private extended key
+//	// 3) Public extended key -> Non-hardened child public extended key
+//	// 4) Public extended key -> Hardened child public extended key (INVALID!)
+//
+//	// Case #4 is invalid, so error out early.
+//	// A hardened child extended key may not be created from a public
+//	// extended key.
+//	isChildHardened := i >= HardenedKeyStart
+//	if !k.isPrivate && isChildHardened {
+//		return nil, ErrDeriveHardFromPublic
+//	}
+//
+//	// The data used to derive the child key depends on whether or not the
+//	// child is hardened per [BIP32].
+//	//
+//	// For hardened children:
+//	//   0x00 || ser256(parentKey) || ser32(i)
+//	//
+//	// For normal children:
+//	//   serP(parentPubKey) || ser32(i)
+//	keyLen := 33
+//	data := make([]byte, keyLen+4)
+//	if isChildHardened {
+//		// Case #1.
+//		// When the child is a hardened child, the key is known to be a
+//		// private key due to the above early return.  Pad it with a
+//		// leading zero as required by [BIP32] for deriving the child.
+//		copy(data[1:], k.key)
+//	} else {
+//		// Case #2 or #3.
+//		// This is either a public or private extended key, but in
+//		// either case, the data which is used to derive the child key
+//		// starts with the secp256k1 compressed public key bytes.
+//		copy(data, k.pubKeyBytes())
+//	}
+//	binary.BigEndian.PutUint32(data[keyLen:], i)
+//
+//	// Take the HMAC-SHA512 of the current key's chain code and the derived
+//	// data:
+//	//   I = HMAC-SHA512(Key = chainCode, Data = data)
+//	hmac512 := hmac.New(sha512.New, k.chainCode)
+//	hmac512.Write(data)
+//	ilr := hmac512.Sum(nil)
+//
+//	// Split "I" into two 32-byte sequences Il and Ir where:
+//	//   Il = intermediate key used to derive the child
+//	//   Ir = child chain code
+//	il := ilr[:len(ilr)/2]
+//	childChainCode := ilr[len(ilr)/2:]
+//
+//	// Both derived public or private keys rely on treating the left 32-byte
+//	// sequence calculated above (Il) as a 256-bit integer that must be
+//	// within the valid range for a secp256k1 private key.  There is a small
+//	// chance (< 1 in 2^127) this condition will not hold, and in that case,
+//	// a child extended key can't be created for this index and the caller
+//	// should simply increment to the next index.
+//	ilNum := new(big.Int).SetBytes(il)
+//	if ilNum.Cmp(btcec.S256().N) >= 0 || ilNum.Sign() == 0 {
+//		return nil, ErrInvalidChild
+//	}
+//
+//	// The algorithm used to derive the child key depends on whether or not
+//	// a private or public child is being derived.
+//	//
+//	// For private children:
+//	//   childKey = parse256(Il) + parentKey
+//	//
+//	// For public children:
+//	//   childKey = serP(point(parse256(Il)) + parentKey)
+//	var isPrivate bool
+//	var childKey []byte
+//	if k.isPrivate {
+//		// Case #1 or #2.
+//		// Add the parent private key to the intermediate private key to
+//		// derive the final child key.
+//		//
+//		// childKey = parse256(Il) + parenKey
+//		keyNum := new(big.Int).SetBytes(k.key)
+//		ilNum.Add(ilNum, keyNum)
+//		ilNum.Mod(ilNum, btcec.S256().N)
+//		childKey = ilNum.Bytes()
+//		isPrivate = true
+//	} else {
+//		// Case #3.
+//		// Calculate the corresponding intermediate public key for
+//		// intermediate private key.
+//		ilx, ily := btcec.S256().ScalarBaseMult(il)
+//		if ilx.Sign() == 0 || ily.Sign() == 0 {
+//			return nil, ErrInvalidChild
+//		}
+//
+//		// Convert the serialized compressed parent public key into X
+//		// and Y coordinates so it can be added to the intermediate
+//		// public key.
+//		pubKey, err := btcec.ParsePubKey(k.key, btcec.S256())
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		// Add the intermediate public key to the parent public key to
+//		// derive the final child key.
+//		//
+//		// childKey = serP(point(parse256(Il)) + parentKey)
+//		childX, childY := btcec.S256().Add(ilx, ily, pubKey.X, pubKey.Y)
+//		pk := btcec.PublicKey{Curve: btcec.S256(), X: childX, Y: childY}
+//		childKey = pk.SerializeCompressed()
+//	}
+//
+//	// The fingerprint of the parent for the derived child is the first 4
+//	// bytes of the RIPEMD160(SHA256(parentPubKey)).
+//	parentFP := drcutil.Hash160(k.pubKeyBytes())[:4]
+//	return NewExtendedKey(k.version, childKey, childChainCode, parentFP,
+//		k.depth+1, i, isPrivate), nil
+//}
 
 // Neuter returns a new extended public key from this extended private key.  The
 // same extended key will be returned unaltered if it is already an extended
@@ -338,50 +344,50 @@ func (k *ExtendedKey) Child(i uint32) (*ExtendedKey, error) {
 // private key, so it is not capable of signing transactions or deriving
 // child extended private keys.  However, it is capable of deriving further
 // child extended public keys.
-func (k *ExtendedKey) Neuter() (*ExtendedKey, error) {
-	// Already an extended public key.
-	if !k.isPrivate {
-		return k, nil
-	}
-
-	// Get the associated public extended key version bytes.
-	version, err := chaincfg.HDPrivateKeyToPublicKeyID(k.version)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert it to an extended public key.  The key for the new extended
-	// key will simply be the pubkey of the current extended private key.
-	//
-	// This is the function N((k,c)) -> (K, c) from [BIP32].
-	return NewExtendedKey(version, k.pubKeyBytes(), k.chainCode, k.parentFP,
-		k.depth, k.childNum, false), nil
-}
+//func (k *ExtendedKey) Neuter() (*ExtendedKey, error) {
+//	// Already an extended public key.
+//	if !k.isPrivate {
+//		return k, nil
+//	}
+//
+//	// Get the associated public extended key version bytes.
+//	version, err := chaincfg.HDPrivateKeyToPublicKeyID(k.version)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	// Convert it to an extended public key.  The key for the new extended
+//	// key will simply be the pubkey of the current extended private key.
+//	//
+//	// This is the function N((k,c)) -> (K, c) from [BIP32].
+//	return NewExtendedKey(version, k.pubKeyBytes(), k.chainCode, k.parentFP,
+//		k.depth, k.childNum, false), nil
+//}
 
 // ECPubKey converts the extended key to a btcec public key and returns it.
-func (k *ExtendedKey) ECPubKey() (*btcec.PublicKey, error) {
-	return btcec.ParsePubKey(k.pubKeyBytes(), btcec.S256())
-}
+//func (k *ExtendedKey) ECPubKey() (*btcec.PublicKey, error) {
+//	return btcec.ParsePubKey(k.pubKeyBytes(), btcec.S256())
+//}
 
 // ECPrivKey converts the extended key to a btcec private key and returns it.
 // As you might imagine this is only possible if the extended key is a private
 // extended key (as determined by the IsPrivate function).  The ErrNotPrivExtKey
 // error will be returned if this function is called on a public extended key.
-func (k *ExtendedKey) ECPrivKey() (*btcec.PrivateKey, error) {
-	if !k.isPrivate {
-		return nil, ErrNotPrivExtKey
-	}
-
-	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), k.key)
-	return privKey, nil
-}
-
-// Address converts the extended key to a standard bitcoin pay-to-pubkey-hash
-// address for the passed network.
-func (k *ExtendedKey) Address(net *chaincfg.Params) (*drcutil.AddressPubKeyHash, error) {
-	pkHash := drcutil.Hash160(k.pubKeyBytes())
-	return drcutil.NewAddressPubKeyHash(pkHash, net)
-}
+//func (k *ExtendedKey) ECPrivKey() (*btcec.PrivateKey, error) {
+//	if !k.isPrivate {
+//		return nil, ErrNotPrivExtKey
+//	}
+//
+//	privKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), k.key)
+//	return privKey, nil
+//}
+//
+//// Address converts the extended key to a standard bitcoin pay-to-pubkey-hash
+//// address for the passed network.
+//func (k *ExtendedKey) Address(net *chaincfg.Params) (*drcutil.AddressPubKeyHash, error) {
+//	pkHash := drcutil.Hash160(k.pubKeyBytes())
+//	return drcutil.NewAddressPubKeyHash(pkHash, net)
+//}
 
 // paddedAppend appends the src byte slice to dst, returning the new slice.
 // If the length of the source is smaller than the passed size, leading zero
@@ -415,7 +421,7 @@ func (k *ExtendedKey) String() string {
 		serializedBytes = append(serializedBytes, 0x00)
 		serializedBytes = paddedAppend(32, serializedBytes, k.key)
 	} else {
-		serializedBytes = append(serializedBytes, k.pubKeyBytes()...)
+		//serializedBytes = append(serializedBytes, k.pubKeyBytes()...)
 	}
 
 	checkSum := chainhash.DoubleHashB(serializedBytes)[:4]
@@ -507,57 +513,57 @@ func NewMaster(seed []byte, net *chaincfg.Params) (*ExtendedKey, error) {
 
 // NewKeyFromString returns a new extended key instance from a base58-encoded
 // extended key.
-func NewKeyFromString(key string) (*ExtendedKey, error) {
-	// The base58-decoded extended key must consist of a serialized payload
-	// plus an additional 4 bytes for the checksum.
-	decoded := base58.Decode(key)
-	if len(decoded) != serializedKeyLen+4 {
-		return nil, ErrInvalidKeyLen
-	}
-
-	// The serialized format is:
-	//   version (4) || depth (1) || parent fingerprint (4)) ||
-	//   child num (4) || chain code (32) || key data (33) || checksum (4)
-
-	// Split the payload and checksum up and ensure the checksum matches.
-	payload := decoded[:len(decoded)-4]
-	checkSum := decoded[len(decoded)-4:]
-	expectedCheckSum := chainhash.DoubleHashB(payload)[:4]
-	if !bytes.Equal(checkSum, expectedCheckSum) {
-		return nil, ErrBadChecksum
-	}
-
-	// Deserialize each of the payload fields.
-	version := payload[:4]
-	depth := payload[4:5][0]
-	parentFP := payload[5:9]
-	childNum := binary.BigEndian.Uint32(payload[9:13])
-	chainCode := payload[13:45]
-	keyData := payload[45:78]
-
-	// The key data is a private key if it starts with 0x00.  Serialized
-	// compressed pubkeys either start with 0x02 or 0x03.
-	isPrivate := keyData[0] == 0x00
-	if isPrivate {
-		// Ensure the private key is valid.  It must be within the range
-		// of the order of the secp256k1 curve and not be 0.
-		keyData = keyData[1:]
-		keyNum := new(big.Int).SetBytes(keyData)
-		if keyNum.Cmp(btcec.S256().N) >= 0 || keyNum.Sign() == 0 {
-			return nil, ErrUnusableSeed
-		}
-	} else {
-		// Ensure the public key parses correctly and is actually on the
-		// secp256k1 curve.
-		_, err := btcec.ParsePubKey(keyData, btcec.S256())
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return NewExtendedKey(version, keyData, chainCode, parentFP, depth,
-		childNum, isPrivate), nil
-}
+//func NewKeyFromString(key string) (*ExtendedKey, error) {
+//	// The base58-decoded extended key must consist of a serialized payload
+//	// plus an additional 4 bytes for the checksum.
+//	decoded := base58.Decode(key)
+//	if len(decoded) != serializedKeyLen+4 {
+//		return nil, ErrInvalidKeyLen
+//	}
+//
+//	// The serialized format is:
+//	//   version (4) || depth (1) || parent fingerprint (4)) ||
+//	//   child num (4) || chain code (32) || key data (33) || checksum (4)
+//
+//	// Split the payload and checksum up and ensure the checksum matches.
+//	payload := decoded[:len(decoded)-4]
+//	checkSum := decoded[len(decoded)-4:]
+//	expectedCheckSum := chainhash.DoubleHashB(payload)[:4]
+//	if !bytes.Equal(checkSum, expectedCheckSum) {
+//		return nil, ErrBadChecksum
+//	}
+//
+//	// Deserialize each of the payload fields.
+//	version := payload[:4]
+//	depth := payload[4:5][0]
+//	parentFP := payload[5:9]
+//	childNum := binary.BigEndian.Uint32(payload[9:13])
+//	chainCode := payload[13:45]
+//	keyData := payload[45:78]
+//
+//	// The key data is a private key if it starts with 0x00.  Serialized
+//	// compressed pubkeys either start with 0x02 or 0x03.
+//	isPrivate := keyData[0] == 0x00
+//	if isPrivate {
+//		// Ensure the private key is valid.  It must be within the range
+//		// of the order of the secp256k1 curve and not be 0.
+//		keyData = keyData[1:]
+//		keyNum := new(big.Int).SetBytes(keyData)
+//		if keyNum.Cmp(btcec.S256().N) >= 0 || keyNum.Sign() == 0 {
+//			return nil, ErrUnusableSeed
+//		}
+//	} else {
+//		// Ensure the public key parses correctly and is actually on the
+//		// secp256k1 curve.
+//		_, err := btcec.ParsePubKey(keyData, btcec.S256())
+//		if err != nil {
+//			return nil, err
+//		}
+//	}
+//
+//	return NewExtendedKey(version, keyData, chainCode, parentFP, depth,
+//		childNum, isPrivate), nil
+//}
 
 // GenerateSeed returns a cryptographically secure random seed that can be used
 // as the input for the NewMaster function to generate a new master node.

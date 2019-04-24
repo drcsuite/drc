@@ -6,8 +6,6 @@ package rpctest
 
 import (
 	"bytes"
-	"encoding/binary"
-	"fmt"
 	"sync"
 
 	"github.com/drcsuite/drc/blockchain"
@@ -17,7 +15,6 @@ import (
 	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/drcutil/hdkeychain"
 	"github.com/drcsuite/drc/rpcclient"
-	"github.com/drcsuite/drc/txscript"
 	"github.com/drcsuite/drc/wire"
 )
 
@@ -110,51 +107,51 @@ type memWallet struct {
 
 // newMemWallet creates and returns a fully initialized instance of the
 // memWallet given a particular blockchain's parameters.
-func newMemWallet(net *chaincfg.Params, harnessID uint32) (*memWallet, error) {
-	// The wallet's final HD seed is: hdSeed || harnessID. This method
-	// ensures that each harness instance uses a deterministic root seed
-	// based on its harness ID.
-	var harnessHDSeed [chainhash.HashSize + 4]byte
-	copy(harnessHDSeed[:], hdSeed[:])
-	binary.BigEndian.PutUint32(harnessHDSeed[:chainhash.HashSize], harnessID)
-
-	hdRoot, err := hdkeychain.NewMaster(harnessHDSeed[:], net)
-	if err != nil {
-		return nil, nil
-	}
-
-	// The first child key from the hd root is reserved as the coinbase
-	// generation address.
-	coinbaseChild, err := hdRoot.Child(0)
-	if err != nil {
-		return nil, err
-	}
-	coinbaseKey, err := coinbaseChild.ECPrivKey()
-	if err != nil {
-		return nil, err
-	}
-	coinbaseAddr, err := keyToAddr(coinbaseKey, net)
-	if err != nil {
-		return nil, err
-	}
-
-	// Track the coinbase generation address to ensure we properly track
-	// newly generated bitcoin we can spend.
-	addrs := make(map[uint32]drcutil.Address)
-	addrs[0] = coinbaseAddr
-
-	return &memWallet{
-		net:               net,
-		coinbaseKey:       coinbaseKey,
-		coinbaseAddr:      coinbaseAddr,
-		hdIndex:           1,
-		hdRoot:            hdRoot,
-		addrs:             addrs,
-		utxos:             make(map[wire.OutPoint]*utxo),
-		chainUpdateSignal: make(chan struct{}),
-		reorgJournal:      make(map[int32]*undoEntry),
-	}, nil
-}
+//func newMemWallet(net *chaincfg.Params, harnessID uint32) (*memWallet, error) {
+//	// The wallet's final HD seed is: hdSeed || harnessID. This method
+//	// ensures that each harness instance uses a deterministic root seed
+//	// based on its harness ID.
+//	var harnessHDSeed [chainhash.HashSize + 4]byte
+//	copy(harnessHDSeed[:], hdSeed[:])
+//	binary.BigEndian.PutUint32(harnessHDSeed[:chainhash.HashSize], harnessID)
+//
+//	hdRoot, err := hdkeychain.NewMaster(harnessHDSeed[:], net)
+//	if err != nil {
+//		return nil, nil
+//	}
+//
+//	// The first child key from the hd root is reserved as the coinbase
+//	// generation address.
+//	coinbaseChild, err := hdRoot.Child(0)
+//	if err != nil {
+//		return nil, err
+//	}
+//	coinbaseKey, err := coinbaseChild.ECPrivKey()
+//	if err != nil {
+//		return nil, err
+//	}
+//	coinbaseAddr, err := keyToAddr(coinbaseKey, net)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	// Track the coinbase generation address to ensure we properly track
+//	// newly generated bitcoin we can spend.
+//	addrs := make(map[uint32]drcutil.Address)
+//	addrs[0] = coinbaseAddr
+//
+//	return &memWallet{
+//		net:               net,
+//		coinbaseKey:       coinbaseKey,
+//		coinbaseAddr:      coinbaseAddr,
+//		hdIndex:           1,
+//		hdRoot:            hdRoot,
+//		addrs:             addrs,
+//		utxos:             make(map[wire.OutPoint]*utxo),
+//		chainUpdateSignal: make(chan struct{}),
+//		reorgJournal:      make(map[int32]*undoEntry),
+//	}, nil
+//}
 
 // Start launches all goroutines required for the wallet to function properly.
 func (m *memWallet) Start() {
@@ -334,44 +331,44 @@ func (m *memWallet) unwindBlock(update *chainUpdate) {
 // newAddress returns a new address from the wallet's hd key chain.  It also
 // loads the address into the RPC client's transaction filter to ensure any
 // transactions that involve it are delivered via the notifications.
-func (m *memWallet) newAddress() (drcutil.Address, error) {
-	index := m.hdIndex
-
-	childKey, err := m.hdRoot.Child(index)
-	if err != nil {
-		return nil, err
-	}
-	privKey, err := childKey.ECPrivKey()
-	if err != nil {
-		return nil, err
-	}
-
-	addr, err := keyToAddr(privKey, m.net)
-	if err != nil {
-		return nil, err
-	}
-
-	err = m.rpc.LoadTxFilter(false, []drcutil.Address{addr}, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	m.addrs[index] = addr
-
-	m.hdIndex++
-
-	return addr, nil
-}
+//func (m *memWallet) newAddress() (drcutil.Address, error) {
+//	index := m.hdIndex
+//
+//	childKey, err := m.hdRoot.Child(index)
+//	if err != nil {
+//		return nil, err
+//	}
+//	privKey, err := childKey.ECPrivKey()
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	addr, err := keyToAddr(privKey, m.net)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	err = m.rpc.LoadTxFilter(false, []drcutil.Address{addr}, nil)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	m.addrs[index] = addr
+//
+//	m.hdIndex++
+//
+//	return addr, nil
+//}
 
 // NewAddress returns a fresh address spendable by the wallet.
 //
 // This function is safe for concurrent access.
-func (m *memWallet) NewAddress() (drcutil.Address, error) {
-	m.Lock()
-	defer m.Unlock()
-
-	return m.newAddress()
-}
+//func (m *memWallet) NewAddress() (drcutil.Address, error) {
+//	m.Lock()
+//	defer m.Unlock()
+//
+//	return m.newAddress()
+//}
 
 // fundTx attempts to fund a transaction sending amt bitcoin. The coins are
 // selected such that the final amount spent pays enough fees as dictated by the
@@ -380,99 +377,99 @@ func (m *memWallet) NewAddress() (drcutil.Address, error) {
 // change output indicated by the change boolean.
 //
 // NOTE: The memWallet's mutex must be held when this function is called.
-func (m *memWallet) fundTx(tx *wire.MsgTx, amt drcutil.Amount,
-	feeRate drcutil.Amount, change bool) error {
-
-	const (
-		// spendSize is the largest number of bytes of a sigScript
-		// which spends a p2pkh output: OP_DATA_73 <sig> OP_DATA_33 <pubkey>
-		spendSize = 1 + 73 + 1 + 33
-	)
-
-	var (
-		amtSelected drcutil.Amount
-		txSize      int
-	)
-
-	for outPoint, utxo := range m.utxos {
-		// Skip any outputs that are still currently immature or are
-		// currently locked.
-		if !utxo.isMature(m.currentHeight) || utxo.isLocked {
-			continue
-		}
-
-		amtSelected += utxo.value
-
-		// Add the selected output to the transaction, updating the
-		// current tx size while accounting for the size of the future
-		// sigScript.
-		tx.AddTxIn(wire.NewTxIn(&outPoint, nil, nil))
-		txSize = tx.SerializeSize() + spendSize*len(tx.TxIn)
-
-		// Calculate the fee required for the txn at this point
-		// observing the specified fee rate. If we don't have enough
-		// coins from he current amount selected to pay the fee, then
-		// continue to grab more coins.
-		reqFee := drcutil.Amount(txSize * int(feeRate))
-		if amtSelected-reqFee < amt {
-			continue
-		}
-
-		// If we have any change left over and we should create a change
-		// output, then add an additional output to the transaction
-		// reserved for it.
-		changeVal := amtSelected - amt - reqFee
-		if changeVal > 0 && change {
-			addr, err := m.newAddress()
-			if err != nil {
-				return err
-			}
-			pkScript, err := txscript.PayToAddrScript(addr)
-			if err != nil {
-				return err
-			}
-			changeOutput := &wire.TxOut{
-				Value:    int64(changeVal),
-				PkScript: pkScript,
-			}
-			tx.AddTxOut(changeOutput)
-		}
-
-		return nil
-	}
-
-	// If we've reached this point, then coin selection failed due to an
-	// insufficient amount of coins.
-	return fmt.Errorf("not enough funds for coin selection")
-}
+//func (m *memWallet) fundTx(tx *wire.MsgTx, amt drcutil.Amount,
+//	feeRate drcutil.Amount, change bool) error {
+//
+//	const (
+//		// spendSize is the largest number of bytes of a sigScript
+//		// which spends a p2pkh output: OP_DATA_73 <sig> OP_DATA_33 <pubkey>
+//		spendSize = 1 + 73 + 1 + 33
+//	)
+//
+//	var (
+//		amtSelected drcutil.Amount
+//		txSize      int
+//	)
+//
+//	for outPoint, utxo := range m.utxos {
+//		// Skip any outputs that are still currently immature or are
+//		// currently locked.
+//		if !utxo.isMature(m.currentHeight) || utxo.isLocked {
+//			continue
+//		}
+//
+//		amtSelected += utxo.value
+//
+//		// Add the selected output to the transaction, updating the
+//		// current tx size while accounting for the size of the future
+//		// sigScript.
+//		tx.AddTxIn(wire.NewTxIn(&outPoint, nil, nil))
+//		txSize = tx.SerializeSize() + spendSize*len(tx.TxIn)
+//
+//		// Calculate the fee required for the txn at this point
+//		// observing the specified fee rate. If we don't have enough
+//		// coins from he current amount selected to pay the fee, then
+//		// continue to grab more coins.
+//		reqFee := drcutil.Amount(txSize * int(feeRate))
+//		if amtSelected-reqFee < amt {
+//			continue
+//		}
+//
+//		// If we have any change left over and we should create a change
+//		// output, then add an additional output to the transaction
+//		// reserved for it.
+//		changeVal := amtSelected - amt - reqFee
+//		if changeVal > 0 && change {
+//			addr, err := m.newAddress()
+//			if err != nil {
+//				return err
+//			}
+//			pkScript, err := txscript.PayToAddrScript(addr)
+//			if err != nil {
+//				return err
+//			}
+//			changeOutput := &wire.TxOut{
+//				Value:    int64(changeVal),
+//				PkScript: pkScript,
+//			}
+//			tx.AddTxOut(changeOutput)
+//		}
+//
+//		return nil
+//	}
+//
+//	// If we've reached this point, then coin selection failed due to an
+//	// insufficient amount of coins.
+//	return fmt.Errorf("not enough funds for coin selection")
+//}
 
 // SendOutputs creates, then sends a transaction paying to the specified output
 // while observing the passed fee rate. The passed fee rate should be expressed
 // in satoshis-per-byte.
-func (m *memWallet) SendOutputs(outputs []*wire.TxOut,
-	feeRate drcutil.Amount) (*chainhash.Hash, error) {
-
-	tx, err := m.CreateTransaction(outputs, feeRate, true)
-	if err != nil {
-		return nil, err
-	}
-
-	return m.rpc.SendRawTransaction(tx, true)
-}
+//func (m *memWallet) SendOutputs(outputs []*wire.TxOut,
+//	feeRate drcutil.Amount) (*chainhash.Hash, error) {
+//
+//	tx, err := m.CreateTransaction(outputs, feeRate, true)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return m.rpc.SendRawTransaction(tx, true)
+//}
 
 // SendOutputsWithoutChange creates and sends a transaction that pays to the
 // specified outputs while observing the passed fee rate and ignoring a change
 // output. The passed fee rate should be expressed in sat/b.
-func (m *memWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
-	feeRate drcutil.Amount) (*chainhash.Hash, error) {
-
-	tx, err := m.CreateTransaction(outputs, feeRate, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return m.rpc.SendRawTransaction(tx, true)
-}
+//func (m *memWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
+//	feeRate drcutil.Amount) (*chainhash.Hash, error) {
+//
+//	tx, err := m.CreateTransaction(outputs, feeRate, false)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return m.rpc.SendRawTransaction(tx, true)
+//}
 
 // CreateTransaction returns a fully signed transaction paying to the specified
 // outputs while observing the desired fee rate. The passed fee rate should be
@@ -480,66 +477,67 @@ func (m *memWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
 // include a change output indicated by the change boolean.
 //
 // This function is safe for concurrent access.
-func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
-	feeRate drcutil.Amount, change bool) (*wire.MsgTx, error) {
-
-	m.Lock()
-	defer m.Unlock()
-
-	tx := wire.NewMsgTx(wire.TxVersion)
-
-	// Tally up the total amount to be sent in order to perform coin
-	// selection shortly below.
-	var outputAmt drcutil.Amount
-	for _, output := range outputs {
-		outputAmt += drcutil.Amount(output.Value)
-		tx.AddTxOut(output)
-	}
-
-	// Attempt to fund the transaction with spendable utxos.
-	if err := m.fundTx(tx, outputAmt, feeRate, change); err != nil {
-		return nil, err
-	}
-
-	// Populate all the selected inputs with valid sigScript for spending.
-	// Along the way record all outputs being spent in order to avoid a
-	// potential double spend.
-	spentOutputs := make([]*utxo, 0, len(tx.TxIn))
-	for i, txIn := range tx.TxIn {
-		outPoint := txIn.PreviousOutPoint
-		utxo := m.utxos[outPoint]
-
-		extendedKey, err := m.hdRoot.Child(utxo.keyIndex)
-		if err != nil {
-			return nil, err
-		}
-
-		privKey, err := extendedKey.ECPrivKey()
-		if err != nil {
-			return nil, err
-		}
-
-		sigScript, err := txscript.SignatureScript(tx, i, utxo.pkScript,
-			txscript.SigHashAll, privKey, true)
-		if err != nil {
-			return nil, err
-		}
-
-		txIn.SignatureScript = sigScript
-
-		spentOutputs = append(spentOutputs, utxo)
-	}
-
-	// As these outputs are now being spent by this newly created
-	// transaction, mark the outputs are "locked". This action ensures
-	// these outputs won't be double spent by any subsequent transactions.
-	// These locked outputs can be freed via a call to UnlockOutputs.
-	for _, utxo := range spentOutputs {
-		utxo.isLocked = true
-	}
-
-	return tx, nil
-}
+//func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
+//	feeRate drcutil.Amount, change bool) (*wire.MsgTx, error) {
+//
+//	m.Lock()
+//	defer m.Unlock()
+//
+//	tx := wire.NewMsgTx(wire.TxVersion)
+//
+//	// Tally up the total amount to be sent in order to perform coin
+//	// selection shortly below.
+//	var outputAmt drcutil.Amount
+//	for _, output := range outputs {
+//		outputAmt += drcutil.Amount(output.Value)
+//		tx.AddTxOut(output)
+//	}
+//
+//	// Attempt to fund the transaction with spendable utxos.
+//	if err := m.fundTx(tx, outputAmt, feeRate, change); err != nil {
+//		return nil, err
+//	}
+//
+//	// Populate all the selected inputs with valid sigScript for spending.
+//	// Along the way record all outputs being spent in order to avoid a
+//	// potential double spend.
+//	spentOutputs := make([]*utxo, 0, len(tx.TxIn))
+//	for i, txIn := range tx.TxIn {
+//		outPoint := txIn.PreviousOutPoint
+//		utxo := m.utxos[outPoint]
+//
+//		//extendedKey, err := m.hdRoot.Child(utxo.keyIndex)
+//		//if err != nil {
+//		//	return nil, err
+//		//}
+//
+//		_, privKey, err := ed25519.GenerateKey(nil)
+//		//privKey, err := extendedKey.ECPrivKey()
+//		//if err != nil {
+//		//	return nil, err
+//		//}
+//
+//		sigScript, err := txscript.SignatureScript(tx, i, utxo.pkScript,
+//			txscript.SigHashAll, privKey)
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		txIn.SignatureScript = sigScript
+//
+//		spentOutputs = append(spentOutputs, utxo)
+//	}
+//
+//	// As these outputs are now being spent by this newly created
+//	// transaction, mark the outputs are "locked". This action ensures
+//	// these outputs won't be double spent by any subsequent transactions.
+//	// These locked outputs can be freed via a call to UnlockOutputs.
+//	for _, utxo := range spentOutputs {
+//		utxo.isLocked = true
+//	}
+//
+//	return tx, nil
+//}
 
 // UnlockOutputs unlocks any outputs which were previously locked due to
 // being selected to fund a transaction via the CreateTransaction method.
@@ -581,11 +579,11 @@ func (m *memWallet) ConfirmedBalance() drcutil.Amount {
 }
 
 // keyToAddr maps the passed private to corresponding p2pkh address.
-func keyToAddr(key *btcec.PrivateKey, net *chaincfg.Params) (drcutil.Address, error) {
-	serializedKey := key.PubKey().SerializeCompressed()
-	pubKeyAddr, err := drcutil.NewAddressPubKey(serializedKey, net)
-	if err != nil {
-		return nil, err
-	}
-	return pubKeyAddr.AddressPubKeyHash(), nil
-}
+//func keyToAddr(key *btcec.PrivateKey, net *chaincfg.Params) (drcutil.Address, error) {
+//	serializedKey := key.PubKey().SerializeCompressed()
+//	pubKeyAddr, err := drcutil.NewAddressPubKey(serializedKey, net)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return pubKeyAddr.AddressPubKeyHash(), nil
+//}

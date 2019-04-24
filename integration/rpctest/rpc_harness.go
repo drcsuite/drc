@@ -6,7 +6,6 @@ package rpctest
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -16,7 +15,6 @@ import (
 	"time"
 
 	"github.com/drcsuite/drc/chaincfg"
-	"github.com/drcsuite/drc/chaincfg/chainhash"
 	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/rpcclient"
 	"github.com/drcsuite/drc/wire"
@@ -97,114 +95,114 @@ type Harness struct {
 // used.
 //
 // NOTE: This function is safe for concurrent access.
-func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
-	extraArgs []string) (*Harness, error) {
-
-	harnessStateMtx.Lock()
-	defer harnessStateMtx.Unlock()
-
-	// Add a flag for the appropriate network type based on the provided
-	// chain params.
-	switch activeNet.Net {
-	case wire.MainNet:
-		// No extra flags since mainnet is the default
-	case wire.TestNet3:
-		extraArgs = append(extraArgs, "--testnet")
-	case wire.TestNet:
-		extraArgs = append(extraArgs, "--regtest")
-	case wire.SimNet:
-		extraArgs = append(extraArgs, "--simnet")
-	default:
-		return nil, fmt.Errorf("rpctest.New must be called with one " +
-			"of the supported chain networks")
-	}
-
-	testDir, err := baseDir()
-	if err != nil {
-		return nil, err
-	}
-
-	harnessID := strconv.Itoa(numTestInstances)
-	nodeTestData, err := ioutil.TempDir(testDir, "harness-"+harnessID)
-	if err != nil {
-		return nil, err
-	}
-
-	certFile := filepath.Join(nodeTestData, "rpc.cert")
-	keyFile := filepath.Join(nodeTestData, "rpc.key")
-	if err := genCertPair(certFile, keyFile); err != nil {
-		return nil, err
-	}
-
-	wallet, err := newMemWallet(activeNet, uint32(numTestInstances))
-	if err != nil {
-		return nil, err
-	}
-
-	miningAddr := fmt.Sprintf("--miningaddr=%s", wallet.coinbaseAddr)
-	extraArgs = append(extraArgs, miningAddr)
-
-	config, err := newConfig("rpctest", certFile, keyFile, extraArgs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Generate p2p+rpc listening addresses.
-	config.listen, config.rpcListen = generateListeningAddresses()
-
-	// Create the testing node bounded to the simnet.
-	node, err := newNode(config, nodeTestData)
-	if err != nil {
-		return nil, err
-	}
-
-	nodeNum := numTestInstances
-	numTestInstances++
-
-	if handlers == nil {
-		handlers = &rpcclient.NotificationHandlers{}
-	}
-
-	// If a handler for the OnFilteredBlock{Connected,Disconnected} callback
-	// callback has already been set, then create a wrapper callback which
-	// executes both the currently registered callback and the mem wallet's
-	// callback.
-	if handlers.OnFilteredBlockConnected != nil {
-		obc := handlers.OnFilteredBlockConnected
-		handlers.OnFilteredBlockConnected = func(height int32, header *wire.BlockHeader, filteredTxns []*drcutil.Tx) {
-			wallet.IngestBlock(height, header, filteredTxns)
-			obc(height, header, filteredTxns)
-		}
-	} else {
-		// Otherwise, we can claim the callback ourselves.
-		handlers.OnFilteredBlockConnected = wallet.IngestBlock
-	}
-	if handlers.OnFilteredBlockDisconnected != nil {
-		obd := handlers.OnFilteredBlockDisconnected
-		handlers.OnFilteredBlockDisconnected = func(height int32, header *wire.BlockHeader) {
-			wallet.UnwindBlock(height, header)
-			obd(height, header)
-		}
-	} else {
-		handlers.OnFilteredBlockDisconnected = wallet.UnwindBlock
-	}
-
-	h := &Harness{
-		handlers:       handlers,
-		node:           node,
-		maxConnRetries: 20,
-		testNodeDir:    nodeTestData,
-		ActiveNet:      activeNet,
-		nodeNum:        nodeNum,
-		wallet:         wallet,
-	}
-
-	// Track this newly created test instance within the package level
-	// global map of all active test instances.
-	testInstances[h.testNodeDir] = h
-
-	return h, nil
-}
+//func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
+//	extraArgs []string) (*Harness, error) {
+//
+//	harnessStateMtx.Lock()
+//	defer harnessStateMtx.Unlock()
+//
+//	// Add a flag for the appropriate network type based on the provided
+//	// chain params.
+//	switch activeNet.Net {
+//	case wire.MainNet:
+//		// No extra flags since mainnet is the default
+//	case wire.TestNet3:
+//		extraArgs = append(extraArgs, "--testnet")
+//	case wire.TestNet:
+//		extraArgs = append(extraArgs, "--regtest")
+//	case wire.SimNet:
+//		extraArgs = append(extraArgs, "--simnet")
+//	default:
+//		return nil, fmt.Errorf("rpctest.New must be called with one " +
+//			"of the supported chain networks")
+//	}
+//
+//	testDir, err := baseDir()
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	harnessID := strconv.Itoa(numTestInstances)
+//	nodeTestData, err := ioutil.TempDir(testDir, "harness-"+harnessID)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	certFile := filepath.Join(nodeTestData, "rpc.cert")
+//	keyFile := filepath.Join(nodeTestData, "rpc.key")
+//	if err := genCertPair(certFile, keyFile); err != nil {
+//		return nil, err
+//	}
+//
+//	wallet, err := newMemWallet(activeNet, uint32(numTestInstances))
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	miningAddr := fmt.Sprintf("--miningaddr=%s", wallet.coinbaseAddr)
+//	extraArgs = append(extraArgs, miningAddr)
+//
+//	config, err := newConfig("rpctest", certFile, keyFile, extraArgs)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	// Generate p2p+rpc listening addresses.
+//	config.listen, config.rpcListen = generateListeningAddresses()
+//
+//	// Create the testing node bounded to the simnet.
+//	node, err := newNode(config, nodeTestData)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	nodeNum := numTestInstances
+//	numTestInstances++
+//
+//	if handlers == nil {
+//		handlers = &rpcclient.NotificationHandlers{}
+//	}
+//
+//	// If a handler for the OnFilteredBlock{Connected,Disconnected} callback
+//	// callback has already been set, then create a wrapper callback which
+//	// executes both the currently registered callback and the mem wallet's
+//	// callback.
+//	if handlers.OnFilteredBlockConnected != nil {
+//		obc := handlers.OnFilteredBlockConnected
+//		handlers.OnFilteredBlockConnected = func(height int32, header *wire.BlockHeader, filteredTxns []*drcutil.Tx) {
+//			wallet.IngestBlock(height, header, filteredTxns)
+//			obc(height, header, filteredTxns)
+//		}
+//	} else {
+//		// Otherwise, we can claim the callback ourselves.
+//		handlers.OnFilteredBlockConnected = wallet.IngestBlock
+//	}
+//	if handlers.OnFilteredBlockDisconnected != nil {
+//		obd := handlers.OnFilteredBlockDisconnected
+//		handlers.OnFilteredBlockDisconnected = func(height int32, header *wire.BlockHeader) {
+//			wallet.UnwindBlock(height, header)
+//			obd(height, header)
+//		}
+//	} else {
+//		handlers.OnFilteredBlockDisconnected = wallet.UnwindBlock
+//	}
+//
+//	h := &Harness{
+//		handlers:       handlers,
+//		node:           node,
+//		maxConnRetries: 20,
+//		testNodeDir:    nodeTestData,
+//		ActiveNet:      activeNet,
+//		nodeNum:        nodeNum,
+//		wallet:         wallet,
+//	}
+//
+//	// Track this newly created test instance within the package level
+//	// global map of all active test instances.
+//	testInstances[h.testNodeDir] = h
+//
+//	return h, nil
+//}
 
 // SetUp initializes the rpc test state. Initialization includes: starting up a
 // simnet node, creating a websockets client and connecting to the started
@@ -333,9 +331,9 @@ func (h *Harness) connectRPCClient() error {
 // wallet.
 //
 // This function is safe for concurrent access.
-func (h *Harness) NewAddress() (drcutil.Address, error) {
-	return h.wallet.NewAddress()
-}
+//func (h *Harness) NewAddress() (drcutil.Address, error) {
+//	return h.wallet.NewAddress()
+//}
 
 // ConfirmedBalance returns the confirmed balance of the Harness' internal
 // wallet.
@@ -350,22 +348,22 @@ func (h *Harness) ConfirmedBalance() drcutil.Amount {
 // according to targetOutputs.
 //
 // This function is safe for concurrent access.
-func (h *Harness) SendOutputs(targetOutputs []*wire.TxOut,
-	feeRate drcutil.Amount) (*chainhash.Hash, error) {
-
-	return h.wallet.SendOutputs(targetOutputs, feeRate)
-}
+//func (h *Harness) SendOutputs(targetOutputs []*wire.TxOut,
+//	feeRate drcutil.Amount) (*chainhash.Hash, error) {
+//
+//	return h.wallet.SendOutputs(targetOutputs, feeRate)
+//}
 
 // SendOutputsWithoutChange creates and sends a transaction that pays to the
 // specified outputs while observing the passed fee rate and ignoring a change
 // output. The passed fee rate should be expressed in sat/b.
 //
 // This function is safe for concurrent access.
-func (h *Harness) SendOutputsWithoutChange(targetOutputs []*wire.TxOut,
-	feeRate drcutil.Amount) (*chainhash.Hash, error) {
-
-	return h.wallet.SendOutputsWithoutChange(targetOutputs, feeRate)
-}
+//func (h *Harness) SendOutputsWithoutChange(targetOutputs []*wire.TxOut,
+//	feeRate drcutil.Amount) (*chainhash.Hash, error) {
+//
+//	return h.wallet.SendOutputsWithoutChange(targetOutputs, feeRate)
+//}
 
 // CreateTransaction returns a fully signed transaction paying to the specified
 // outputs while observing the desired fee rate. The passed fee rate should be
@@ -378,11 +376,11 @@ func (h *Harness) SendOutputsWithoutChange(targetOutputs []*wire.TxOut,
 // returned to the pool of spendable outputs.
 //
 // This function is safe for concurrent access.
-func (h *Harness) CreateTransaction(targetOutputs []*wire.TxOut,
-	feeRate drcutil.Amount, change bool) (*wire.MsgTx, error) {
-
-	return h.wallet.CreateTransaction(targetOutputs, feeRate, change)
-}
+//func (h *Harness) CreateTransaction(targetOutputs []*wire.TxOut,
+//	feeRate drcutil.Amount, change bool) (*wire.MsgTx, error) {
+//
+//	return h.wallet.CreateTransaction(targetOutputs, feeRate, change)
+//}
 
 // UnlockOutputs unlocks any outputs which were previously marked as
 // unspendabe due to being selected to fund a transaction via the

@@ -707,6 +707,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *drcutil.Block,
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
 		err := dbPutBestState(dbTx, state)
+
 		if err != nil {
 			return err
 		}
@@ -1884,40 +1885,13 @@ func New(config *Config) (*BlockChain, error) {
 		return nil, AssertError("blockchain.New timesource is nil")
 	}
 
-	// Generate a checkpoint by height map from the provided checkpoints
-	// and assert the provided checkpoints are sorted by height as required.
-	//var checkpointsByHeight map[int32]*chaincfg.Checkpoint
-	wire.ChangeCode("NewBlockChain")
-	//var prevCheckpointHeight int32
-	//if len(config.Checkpoints) > 0 {
-	//	checkpointsByHeight = make(map[int32]*chaincfg.Checkpoint)
-	//	for i := range config.Checkpoints {
-	//		checkpoint := &config.Checkpoints[i]
-	//		if checkpoint.Height <= prevCheckpointHeight {
-	//			return nil, AssertError("blockchain.New " +
-	//				"checkpoints are not sorted by height")
-	//		}
-	//
-	//		checkpointsByHeight[checkpoint.Height] = checkpoint
-	//		prevCheckpointHeight = checkpoint.Height
-	//	}
-	//}
-
 	params := config.ChainParams
-	//targetTimespan := int64(params.TargetTimespan / time.Second)
-	//targetTimePerBlock := int64(params.TargetTimePerBlock / time.Second)
-	//adjustmentFactor := params.RetargetAdjustmentFactor
 	b := BlockChain{
-		//checkpoints:         config.Checkpoints,
-		//checkpointsByHeight: checkpointsByHeight,
-		db:           config.DB,
-		chainParams:  params,
-		timeSource:   config.TimeSource,
-		sigCache:     config.SigCache,
-		indexManager: config.IndexManager,
-		//minRetargetTimespan: targetTimespan / adjustmentFactor,
-		//maxRetargetTimespan: targetTimespan * adjustmentFactor,
-		//blocksPerRetarget:   int32(targetTimespan / targetTimePerBlock),
+		db:               config.DB,
+		chainParams:      params,
+		timeSource:       config.TimeSource,
+		sigCache:         config.SigCache,
+		indexManager:     config.IndexManager,
 		index:            newBlockIndex(config.DB, params),
 		hashCache:        config.HashCache,
 		bestChain:        newChainView(nil),
@@ -1927,6 +1901,7 @@ func New(config *Config) (*BlockChain, error) {
 		deploymentCaches: newThresholdCaches(chaincfg.DefinedDeployments),
 	}
 
+	// 从传递的数据库初始化链状态。当db还不包含任何链状态时，它和链状态都将初始化为只包含genesis块。
 	// Initialize the chain state from the passed database.  When the db
 	// does not yet contain any chain state, both it and the chain state
 	// will be initialized to contain only the genesis block.

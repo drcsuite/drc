@@ -29,7 +29,6 @@ import (
 
 	"github.com/drcsuite/drc/blockchain"
 	"github.com/drcsuite/drc/blockchain/indexers"
-	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/btcjson"
 	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/chaincfg/chainhash"
@@ -171,8 +170,8 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"uptime":                handleUptime,
 	"validateaddress":       handleValidateAddress,
 	"verifychain":           handleVerifyChain,
-	"verifymessage":         handleVerifyMessage,
-	"version":               handleVersion,
+	//"verifymessage":         handleVerifyMessage,
+	"version": handleVersion,
 }
 
 // list of commands that we recognize, but for which btcd has no support because
@@ -3525,67 +3524,67 @@ func handleVerifyChain(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 }
 
 // handleVerifyMessage implements the verifymessage command.
-func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
-	c := cmd.(*btcjson.VerifyMessageCmd)
-
-	// Decode the provided address.
-	params := s.cfg.ChainParams
-	addr, err := drcutil.DecodeAddress(c.Address, params)
-	if err != nil {
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCInvalidAddressOrKey,
-			Message: "Invalid address or key: " + err.Error(),
-		}
-	}
-
-	// Only P2PKH addresses are valid for signing.
-	if _, ok := addr.(*drcutil.AddressPubKeyHash); !ok {
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCType,
-			Message: "Address is not a pay-to-pubkey-hash address",
-		}
-	}
-
-	// Decode base64 signature.
-	sig, err := base64.StdEncoding.DecodeString(c.Signature)
-	if err != nil {
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCParse.Code,
-			Message: "Malformed base64 encoding: " + err.Error(),
-		}
-	}
-
-	// Validate the signature - this just shows that it was valid at all.
-	// we will compare it with the key next.
-	var buf bytes.Buffer
-	wire.WriteVarString(&buf, 0, "Bitcoin Signed Message:\n")
-	wire.WriteVarString(&buf, 0, c.Message)
-	expectedMessageHash := chainhash.DoubleHashB(buf.Bytes())
-	pk, wasCompressed, err := btcec.RecoverCompact(btcec.S256(), sig,
-		expectedMessageHash)
-	if err != nil {
-		// Mirror Bitcoin Core behavior, which treats error in
-		// RecoverCompact as invalid signature.
-		return false, nil
-	}
-
-	// Reconstruct the pubkey hash.
-	var serializedPK []byte
-	if wasCompressed {
-		serializedPK = pk.SerializeCompressed()
-	} else {
-		serializedPK = pk.SerializeUncompressed()
-	}
-	address, err := drcutil.NewAddressPubKey(serializedPK, params)
-	if err != nil {
-		// Again mirror Bitcoin Core behavior, which treats error in public key
-		// reconstruction as invalid signature.
-		return false, nil
-	}
-
-	// Return boolean if addresses match.
-	return address.EncodeAddress() == c.Address, nil
-}
+//func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+//	c := cmd.(*btcjson.VerifyMessageCmd)
+//
+//	// Decode the provided address.
+//	params := s.cfg.ChainParams
+//	addr, err := drcutil.DecodeAddress(c.Address, params)
+//	if err != nil {
+//		return nil, &btcjson.RPCError{
+//			Code:    btcjson.ErrRPCInvalidAddressOrKey,
+//			Message: "Invalid address or key: " + err.Error(),
+//		}
+//	}
+//
+//	// Only P2PKH addresses are valid for signing.
+//	if _, ok := addr.(*drcutil.AddressPubKeyHash); !ok {
+//		return nil, &btcjson.RPCError{
+//			Code:    btcjson.ErrRPCType,
+//			Message: "Address is not a pay-to-pubkey-hash address",
+//		}
+//	}
+//
+//	// Decode base64 signature.
+//	sig, err := base64.StdEncoding.DecodeString(c.Signature)
+//	if err != nil {
+//		return nil, &btcjson.RPCError{
+//			Code:    btcjson.ErrRPCParse.Code,
+//			Message: "Malformed base64 encoding: " + err.Error(),
+//		}
+//	}
+//
+//	// Validate the signature - this just shows that it was valid at all.
+//	// we will compare it with the key next.
+//	var buf bytes.Buffer
+//	wire.WriteVarString(&buf, 0, "Bitcoin Signed Message:\n")
+//	wire.WriteVarString(&buf, 0, c.Message)
+//	expectedMessageHash := chainhash.DoubleHashB(buf.Bytes())
+//	pk, wasCompressed, err := btcec.RecoverCompact(btcec.S256(), sig,
+//		expectedMessageHash)
+//	if err != nil {
+//		// Mirror Bitcoin Core behavior, which treats error in
+//		// RecoverCompact as invalid signature.
+//		return false, nil
+//	}
+//
+//	// Reconstruct the pubkey hash.
+//	var serializedPK []byte
+//	if wasCompressed {
+//		serializedPK = pk.SerializeCompressed()
+//	} else {
+//		serializedPK = pk.SerializeUncompressed()
+//	}
+//	address, err := drcutil.NewAddressPubKey(serializedPK, params)
+//	if err != nil {
+//		// Again mirror Bitcoin Core behavior, which treats error in public key
+//		// reconstruction as invalid signature.
+//		return false, nil
+//	}
+//
+//	// Return boolean if addresses match.
+//	return address.EncodeAddress() == c.Address, nil
+//}
 
 // handleVersion implements the version command.
 //

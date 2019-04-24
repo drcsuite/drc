@@ -7,83 +7,89 @@ package txscript
 import (
 	"errors"
 	"fmt"
-
 	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/chaincfg"
 	"github.com/drcsuite/drc/drcutil"
 	"github.com/drcsuite/drc/wire"
+	"github.com/golang/crypto/ed25519"
 )
 
+// rawtxinwitness签名返回输入的序列化ECDA签名
+// 指定事务的idx，并附加hashType。这
+// 函数与RawTxInSignature相同，但是生成的签名不同
+// 在BIP0143中定义了一个新的sighash摘要
 // RawTxInWitnessSignature returns the serialized ECDA signature for the input
 // idx of the given transaction, with the hashType appended to it. This
 // function is identical to RawTxInSignature, however the signature generated
 // signs a new sighash digest defined in BIP0143.
-func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
-	amt int64, subScript []byte, hashType SigHashType,
-	key *btcec.PrivateKey) ([]byte, error) {
-
-	parsedScript, err := parseScript(subScript)
-	if err != nil {
-		return nil, fmt.Errorf("cannot parse output script: %v", err)
-	}
-
-	hash, err := calcWitnessSignatureHash(parsedScript, sigHashes, hashType, tx,
-		idx, amt)
-	if err != nil {
-		return nil, err
-	}
-
-	signature, err := key.Sign(hash)
-	if err != nil {
-		return nil, fmt.Errorf("cannot sign tx input: %s", err)
-	}
-
-	return append(signature.Serialize(), byte(hashType)), nil
-}
+//func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
+//	amt int64, subScript []byte, hashType SigHashType,
+//	key *btcec.PrivateKey) ([]byte, error) {
+//
+//	parsedScript, err := parseScript(subScript)
+//	if err != nil {
+//		return nil, fmt.Errorf("cannot parse output script: %v", err)
+//	}
+//
+//	hash, err := calcWitnessSignatureHash(parsedScript, sigHashes, hashType, tx,
+//		idx, amt)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	signature, err := key.Sign(hash)
+//	if err != nil {
+//		return nil, fmt.Errorf("cannot sign tx input: %s", err)
+//	}
+//
+//	return append(signature.Serialize(), byte(hashType)), nil
+//}
 
 // WitnessSignature creates an input witness stack for tx to spend BTC sent
 // from a previous output to the owner of privKey using the p2wkh script
 // template. The passed transaction must contain all the inputs and outputs as
 // dictated by the passed hashType. The signature generated observes the new
 // transaction digest algorithm defined within BIP0143.
-func WitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int, amt int64,
-	subscript []byte, hashType SigHashType, privKey *btcec.PrivateKey,
-	compress bool) (wire.TxWitness, error) {
-
-	sig, err := RawTxInWitnessSignature(tx, sigHashes, idx, amt, subscript,
-		hashType, privKey)
-	if err != nil {
-		return nil, err
-	}
-
-	pk := (*btcec.PublicKey)(&privKey.PublicKey)
-	var pkData []byte
-	if compress {
-		pkData = pk.SerializeCompressed()
-	} else {
-		pkData = pk.SerializeUncompressed()
-	}
-
-	// A witness script is actually a stack, so we return an array of byte
-	// slices here, rather than a single byte slice.
-	return wire.TxWitness{sig, pkData}, nil
-}
+//func WitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int, amt int64,
+//	subscript []byte, hashType SigHashType, privKey *btcec.PrivateKey,
+//	compress bool) (wire.TxWitness, error) {
+//
+//	sig, err := RawTxInWitnessSignature(tx, sigHashes, idx, amt, subscript,
+//		hashType, privKey)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	pk := (*btcec.PublicKey)(&privKey.PublicKey)
+//	var pkData []byte
+//	if compress {
+//		pkData = pk.SerializeCompressed()
+//	} else {
+//		pkData = pk.SerializeUncompressed()
+//	}
+//
+//	// A witness script is actually a stack, so we return an array of byte
+//	// slices here, rather than a single byte slice.
+//	return wire.TxWitness{sig, pkData}, nil
+//}
 
 // RawTxInSignature returns the serialized ECDSA signature for the input idx of
 // the given transaction, with hashType appended to it.
 func RawTxInSignature(tx *wire.MsgTx, idx int, subScript []byte,
-	hashType SigHashType, key *btcec.PrivateKey) ([]byte, error) {
+	hashType SigHashType, key ed25519.PrivateKey) ([]byte, error) {
 
 	hash, err := CalcSignatureHash(subScript, hashType, tx, idx)
 	if err != nil {
 		return nil, err
 	}
-	signature, err := key.Sign(hash)
+	signature := ed25519.Sign(key, hash)
+	//signature, err := key.Sign(hash)
 	if err != nil {
 		return nil, fmt.Errorf("cannot sign tx input: %s", err)
 	}
 
-	return append(signature.Serialize(), byte(hashType)), nil
+	//return append(signature.Serialize(), byte(hashType)), nil
+	return signature, nil
 }
 
 // SignatureScript creates an input signature script for tx to spend BTC sent
@@ -94,24 +100,24 @@ func RawTxInSignature(tx *wire.MsgTx, idx int, subScript []byte,
 // as the idx'th input. privKey is serialized in either a compressed or
 // uncompressed format based on compress. This format must match the same format
 // used to generate the payment address, or the script validation will fail.
-func SignatureScript(tx *wire.MsgTx, idx int, subscript []byte, hashType SigHashType, privKey *btcec.PrivateKey, compress bool) ([]byte, error) {
+func SignatureScript(tx *wire.MsgTx, idx int, subscript []byte, hashType SigHashType, privKey ed25519.PrivateKey) ([]byte, error) {
 	sig, err := RawTxInSignature(tx, idx, subscript, hashType, privKey)
 	if err != nil {
 		return nil, err
 	}
 
-	pk := (*btcec.PublicKey)(&privKey.PublicKey)
-	var pkData []byte
-	if compress {
-		pkData = pk.SerializeCompressed()
-	} else {
-		pkData = pk.SerializeUncompressed()
-	}
+	pk := privKey.Public().(ed25519.PublicKey)
+	//var pkData []byte
+	//if compress {
+	//	pkData = pk.SerializeCompressed()
+	//} else {
+	//	pkData = pk.SerializeUncompressed()
+	//}
 
-	return NewScriptBuilder().AddData(sig).AddData(pkData).Script()
+	return NewScriptBuilder().AddData(sig).AddData(pk).Script()
 }
 
-func p2pkSignatureScript(tx *wire.MsgTx, idx int, subScript []byte, hashType SigHashType, privKey *btcec.PrivateKey) ([]byte, error) {
+func p2pkSignatureScript(tx *wire.MsgTx, idx int, subScript []byte, hashType SigHashType, privKey ed25519.PrivateKey) ([]byte, error) {
 	sig, err := RawTxInSignature(tx, idx, subScript, hashType, privKey)
 	if err != nil {
 		return nil, err
@@ -180,13 +186,13 @@ func sign(chainParams *chaincfg.Params, tx *wire.MsgTx, idx int,
 		return script, class, addresses, nrequired, nil
 	case PubKeyHashTy:
 		// look up key for address
-		key, compressed, err := kdb.GetKey(addresses[0])
+		key, _, err := kdb.GetKey(addresses[0])
 		if err != nil {
 			return nil, class, nil, 0, err
 		}
 
 		script, err := SignatureScript(tx, idx, subScript, hashType,
-			key, compressed)
+			key)
 		if err != nil {
 			return nil, class, nil, 0, err
 		}
@@ -335,7 +341,7 @@ sigLoop:
 		tSig := sig[:len(sig)-1]
 		hashType := SigHashType(sig[len(sig)-1])
 
-		pSig, err := btcec.ParseDERSignature(tSig, btcec.S256())
+		pSig, err := btcec.ParseDERSignature(tSig)
 		if err != nil {
 			continue
 		}
@@ -397,14 +403,14 @@ sigLoop:
 // KeyDB is an interface type provided to SignTxOutput, it encapsulates
 // any user state required to get the private keys for an address.
 type KeyDB interface {
-	GetKey(drcutil.Address) (*btcec.PrivateKey, bool, error)
+	GetKey(drcutil.Address) (ed25519.PrivateKey, bool, error)
 }
 
 // KeyClosure implements KeyDB with a closure.
-type KeyClosure func(drcutil.Address) (*btcec.PrivateKey, bool, error)
+type KeyClosure func(drcutil.Address) (ed25519.PrivateKey, bool, error)
 
 // GetKey implements KeyDB by returning the result of calling the closure.
-func (kc KeyClosure) GetKey(address drcutil.Address) (*btcec.PrivateKey,
+func (kc KeyClosure) GetKey(address drcutil.Address) (ed25519.PrivateKey,
 	bool, error) {
 	return kc(address)
 }
@@ -423,6 +429,13 @@ func (sc ScriptClosure) GetScript(address drcutil.Address) ([]byte, error) {
 	return sc(address)
 }
 
+// SignTxOutput符号输出idx的给定tx来解析给定的脚本
+// 带有hashType签名类型的pkScript。任何需要的钥匙都可以
+// 使用给定地址的字符串调用getKey()来查找。
+// 任何付费到脚本的散列签名都将类似地通过调用来查找
+// getScript。如果提供了previousScript，则会得到previousScript中的结果
+// 将以与新生成的类型相关的方式合并。
+// 签名脚本。
 // SignTxOutput signs output idx of the given tx to resolve the script given in
 // pkScript with a signature type of hashType. Any keys required will be
 // looked up by calling getKey() with the string of the given address.

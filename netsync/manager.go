@@ -1602,8 +1602,13 @@ func (sm *SyncManager) voteProcess() {
 	// 写入最佳候选块，做为下轮发块的依据
 	// write the best candidate block, as the basis for the next round of block
 	if len(blockchain.CurrentCandidatePool) == 0 {
-		genesis := chaincfg.MainNetParams.GenesisBlock
-		sm.chain.SetBestCandidate(*chaincfg.MainNetParams.GenesisHash, 0, genesis.Header, 1)
+		snapshot := sm.chain.BestSnapshot()
+		block, _ := sm.chain.BlockByHeight(snapshot.Height)
+		header := block.MsgBlock().Header
+		//fmt.Println("hash: ", snapshot.Hash)
+		//fmt.Println("votes: ", snapshot.Votes)
+		//fmt.Println("header: ", header)
+		sm.chain.SetBestCandidate(snapshot.Hash, snapshot.Height, header, snapshot.Votes)
 	} else {
 
 		////如果获胜区块获得的票数小于总票数的三分之二，写空块.

@@ -2799,10 +2799,9 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	// Create a new block chain instance with the appropriate configuration.
 	var err error
 	s.chain, err = blockchain.New(&blockchain.Config{
-		DB:          s.db,
-		Interrupt:   interrupt,
-		ChainParams: s.chainParams,
-		//Checkpoints:  checkpoints,
+		DB:           s.db,
+		Interrupt:    interrupt,
+		ChainParams:  s.chainParams,
 		TimeSource:   s.timeSource,
 		SigCache:     s.sigCache,
 		IndexManager: indexManager,

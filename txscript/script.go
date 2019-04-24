@@ -22,6 +22,7 @@ var Bip16Activation = time.Unix(1333238400, 0)
 // SigHashType represents hash type bits at the end of a signature.
 type SigHashType uint32
 
+// SigHashType表示签名末尾的散列类型位。
 // Hash type bits from the end of a signature.
 const (
 	SigHashOld          SigHashType = 0x0
@@ -593,6 +594,9 @@ func CalcSignatureHash(script []byte, hashType SigHashType, tx *wire.MsgTx, idx 
 	return calcSignatureHash(parsedScript, hashType, tx, idx), nil
 }
 
+// calcSignatureHash将为当前脚本提供一个脚本和哈希类型
+// engine实例，计算用于签名和的签名散列
+// 验证。
 // calcSignatureHash will, given a script and hash type for the current script
 // engine instance, calculate the signature hash to be used for signing and
 // verification.

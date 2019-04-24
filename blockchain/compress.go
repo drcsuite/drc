@@ -5,7 +5,6 @@
 package blockchain
 
 import (
-	"github.com/drcsuite/drc/btcec"
 	"github.com/drcsuite/drc/txscript"
 )
 
@@ -89,6 +88,9 @@ func putVLQ(target []byte, n uint64) int {
 	return offset + 1
 }
 
+//反序列化evlq根据
+//采用上述格式。它还返回字节数
+//反序列化。
 // deserializeVLQ deserializes the provided variable-length quantity according
 // to the format described above.  It also returns the number of bytes
 // deserialized.
@@ -210,36 +212,30 @@ func isScriptHash(script []byte) (bool, []byte) {
 // pay-to-pubkey script that pays to a valid compressed or uncompressed public
 // key along with the serialized pubkey it is paying to if it is.
 //
-// NOTE: This function ensures the public key is actually valid since the
-// compression algorithm requires valid pubkeys.  It does not support hybrid
-// pubkeys.  This means that even if the script has the correct form for a
-// pay-to-pubkey script, this function will only return true when it is paying
-// to a valid compressed or uncompressed pubkey.
 func isPubKey(script []byte) (bool, []byte) {
 	// Pay-to-compressed-pubkey script.
-	if len(script) == 35 && script[0] == txscript.OP_DATA_33 &&
-		script[34] == txscript.OP_CHECKSIG && (script[1] == 0x02 ||
-		script[1] == 0x03) {
+	if len(script) == 34 && script[0] == txscript.OP_DATA_32 &&
+		script[33] == txscript.OP_CHECKSIG {
 
 		// Ensure the public key is valid.
-		serializedPubKey := script[1:34]
-		_, err := btcec.ParsePubKey(serializedPubKey, btcec.S256())
-		if err == nil {
-			return true, serializedPubKey
-		}
+		serializedPubKey := script[1:33]
+		//_, err := btcec.ParsePubKey(serializedPubKey, btcec.S256())
+		//if err == nil {
+		return true, serializedPubKey
+		//}
 	}
 
 	// Pay-to-uncompressed-pubkey script.
-	if len(script) == 67 && script[0] == txscript.OP_DATA_65 &&
-		script[66] == txscript.OP_CHECKSIG && script[1] == 0x04 {
-
-		// Ensure the public key is valid.
-		serializedPubKey := script[1:66]
-		_, err := btcec.ParsePubKey(serializedPubKey, btcec.S256())
-		if err == nil {
-			return true, serializedPubKey
-		}
-	}
+	//if len(script) == 67 && script[0] == txscript.OP_DATA_65 &&
+	//	script[66] == txscript.OP_CHECKSIG && script[1] == 0x04 {
+	//
+	//	// Ensure the public key is valid.
+	//	serializedPubKey := script[1:66]
+	//	_, err := btcec.ParsePubKey(serializedPubKey, btcec.S256())
+	//	if err == nil {
+	//		return true, serializedPubKey
+	//	}
+	//}
 
 	return false, nil
 }
@@ -389,33 +385,33 @@ func decompressScript(compressedPkScript []byte) []byte {
 
 	// Pay-to-compressed-pubkey script.  The resulting script is:
 	// <OP_DATA_33><33 byte compressed pubkey><OP_CHECKSIG>
-	case cstPayToPubKeyComp2, cstPayToPubKeyComp3:
-		pkScript := make([]byte, 35)
-		pkScript[0] = txscript.OP_DATA_33
-		pkScript[1] = byte(encodedScriptSize)
-		copy(pkScript[2:], compressedPkScript[bytesRead:bytesRead+32])
-		pkScript[34] = txscript.OP_CHECKSIG
-		return pkScript
+	//case cstPayToPubKeyComp2, cstPayToPubKeyComp3:
+	//	pkScript := make([]byte, 35)
+	//	pkScript[0] = txscript.OP_DATA_33
+	//	pkScript[1] = byte(encodedScriptSize)
+	//	copy(pkScript[2:], compressedPkScript[bytesRead:bytesRead+32])
+	//	pkScript[34] = txscript.OP_CHECKSIG
+	//	return pkScript
 
 	// Pay-to-uncompressed-pubkey script.  The resulting script is:
 	// <OP_DATA_65><65 byte uncompressed pubkey><OP_CHECKSIG>
-	case cstPayToPubKeyUncomp4, cstPayToPubKeyUncomp5:
+	case cstPayToPubKeyComp2, cstPayToPubKeyComp3, cstPayToPubKeyUncomp4, cstPayToPubKeyUncomp5:
 		// Change the leading byte to the appropriate compressed pubkey
 		// identifier (0x02 or 0x03) so it can be decoded as a
 		// compressed pubkey.  This really should never fail since the
 		// encoding ensures it is valid before compressing to this type.
-		compressedKey := make([]byte, 33)
-		compressedKey[0] = byte(encodedScriptSize - 2)
-		copy(compressedKey[1:], compressedPkScript[1:])
-		key, err := btcec.ParsePubKey(compressedKey, btcec.S256())
-		if err != nil {
-			return nil
-		}
+		compressedKey := make([]byte, 32)
+		//compressedKey[0] = byte(encodedScriptSize - 2)
+		copy(compressedKey[:], compressedPkScript[1:])
+		//key, err := btcec.ParsePubKey(compressedKey, btcec.S256())
+		//if err != nil {
+		//	return nil
+		//}
 
-		pkScript := make([]byte, 67)
-		pkScript[0] = txscript.OP_DATA_65
-		copy(pkScript[1:], key.SerializeUncompressed())
-		pkScript[66] = txscript.OP_CHECKSIG
+		pkScript := make([]byte, 34)
+		pkScript[0] = txscript.OP_DATA_32
+		copy(pkScript[1:], compressedKey)
+		pkScript[33] = txscript.OP_CHECKSIG
 		return pkScript
 	}
 

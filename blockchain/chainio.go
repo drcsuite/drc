@@ -1064,7 +1064,7 @@ func (b *BlockChain) createChainState() error {
 	genesisBlock.SetHeight(0)
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, nil, 1)
-	fmt.Println("nodeHash: ", node.hash)
+	//fmt.Println("nodeHash: ", node.hash)
 	//node.hash = *chaincfg.MainNetParams.GenesisHash
 	node.status = statusDataStored | statusValid
 	b.bestChain.SetTip(node)
@@ -1180,7 +1180,6 @@ func (b *BlockChain) initChainState() error {
 	if err != nil {
 		return err
 	}
-
 	if !initialized {
 		// 此时数据库还没有初始化，所以要将它和链状态初始化到genesis块。
 		// At this point the database has not already been initialized, so

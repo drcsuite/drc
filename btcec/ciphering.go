@@ -7,13 +7,7 @@ package btcec
 import (
 	"bytes"
 	"crypto/aes"
-	"crypto/cipher"
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/sha256"
-	"crypto/sha512"
 	"errors"
-	"io"
 )
 
 var (
@@ -67,133 +61,133 @@ func GenerateSharedSecret(privkey *PrivateKey, pubkey *PublicKey) []byte {
 //
 // The primary aim is to ensure byte compatibility with Pyelliptic.  Also, refer
 // to section 5.8.1 of ANSI X9.63 for rationale on this format.
-func Encrypt(pubkey *PublicKey, in []byte) ([]byte, error) {
-	ephemeral, err := NewPrivateKey(S256())
-	if err != nil {
-		return nil, err
-	}
-	ecdhKey := GenerateSharedSecret(ephemeral, pubkey)
-	derivedKey := sha512.Sum512(ecdhKey)
-	keyE := derivedKey[:32]
-	keyM := derivedKey[32:]
-
-	paddedIn := addPKCSPadding(in)
-	// IV + Curve params/X/Y + padded plaintext/ciphertext + HMAC-256
-	out := make([]byte, aes.BlockSize+70+len(paddedIn)+sha256.Size)
-	iv := out[:aes.BlockSize]
-	if _, err = io.ReadFull(rand.Reader, iv); err != nil {
-		return nil, err
-	}
-	// start writing public key
-	pb := ephemeral.PubKey().SerializeUncompressed()
-	offset := aes.BlockSize
-
-	// curve and X length
-	copy(out[offset:offset+4], append(ciphCurveBytes[:], ciphCoordLength[:]...))
-	offset += 4
-	// X
-	copy(out[offset:offset+32], pb[1:33])
-	offset += 32
-	// Y length
-	copy(out[offset:offset+2], ciphCoordLength[:])
-	offset += 2
-	// Y
-	copy(out[offset:offset+32], pb[33:])
-	offset += 32
-
-	// start encryption
-	block, err := aes.NewCipher(keyE)
-	if err != nil {
-		return nil, err
-	}
-	mode := cipher.NewCBCEncrypter(block, iv)
-	mode.CryptBlocks(out[offset:len(out)-sha256.Size], paddedIn)
-
-	// start HMAC-SHA-256
-	hm := hmac.New(sha256.New, keyM)
-	hm.Write(out[:len(out)-sha256.Size])          // everything is hashed
-	copy(out[len(out)-sha256.Size:], hm.Sum(nil)) // write checksum
-
-	return out, nil
-}
+//func Encrypt(pubkey *PublicKey, in []byte) ([]byte, error) {
+//	ephemeral, err := NewPrivateKey(S256())
+//	if err != nil {
+//		return nil, err
+//	}
+//	ecdhKey := GenerateSharedSecret(ephemeral, pubkey)
+//	derivedKey := sha512.Sum512(ecdhKey)
+//	keyE := derivedKey[:32]
+//	keyM := derivedKey[32:]
+//
+//	paddedIn := addPKCSPadding(in)
+//	// IV + Curve params/X/Y + padded plaintext/ciphertext + HMAC-256
+//	out := make([]byte, aes.BlockSize+70+len(paddedIn)+sha256.Size)
+//	iv := out[:aes.BlockSize]
+//	if _, err = io.ReadFull(rand.Reader, iv); err != nil {
+//		return nil, err
+//	}
+//	// start writing public key
+//	pb := ephemeral.PubKey().SerializeUncompressed()
+//	offset := aes.BlockSize
+//
+//	// curve and X length
+//	copy(out[offset:offset+4], append(ciphCurveBytes[:], ciphCoordLength[:]...))
+//	offset += 4
+//	// X
+//	copy(out[offset:offset+32], pb[1:33])
+//	offset += 32
+//	// Y length
+//	copy(out[offset:offset+2], ciphCoordLength[:])
+//	offset += 2
+//	// Y
+//	copy(out[offset:offset+32], pb[33:])
+//	offset += 32
+//
+//	// start encryption
+//	block, err := aes.NewCipher(keyE)
+//	if err != nil {
+//		return nil, err
+//	}
+//	mode := cipher.NewCBCEncrypter(block, iv)
+//	mode.CryptBlocks(out[offset:len(out)-sha256.Size], paddedIn)
+//
+//	// start HMAC-SHA-256
+//	hm := hmac.New(sha256.New, keyM)
+//	hm.Write(out[:len(out)-sha256.Size])          // everything is hashed
+//	copy(out[len(out)-sha256.Size:], hm.Sum(nil)) // write checksum
+//
+//	return out, nil
+//}
 
 // Decrypt decrypts data that was encrypted using the Encrypt function.
-func Decrypt(priv *PrivateKey, in []byte) ([]byte, error) {
-	// IV + Curve params/X/Y + 1 block + HMAC-256
-	if len(in) < aes.BlockSize+70+aes.BlockSize+sha256.Size {
-		return nil, errInputTooShort
-	}
-
-	// read iv
-	iv := in[:aes.BlockSize]
-	offset := aes.BlockSize
-
-	// start reading pubkey
-	if !bytes.Equal(in[offset:offset+2], ciphCurveBytes[:]) {
-		return nil, errUnsupportedCurve
-	}
-	offset += 2
-
-	if !bytes.Equal(in[offset:offset+2], ciphCoordLength[:]) {
-		return nil, errInvalidXLength
-	}
-	offset += 2
-
-	xBytes := in[offset : offset+32]
-	offset += 32
-
-	if !bytes.Equal(in[offset:offset+2], ciphCoordLength[:]) {
-		return nil, errInvalidYLength
-	}
-	offset += 2
-
-	yBytes := in[offset : offset+32]
-	offset += 32
-
-	pb := make([]byte, 65)
-	pb[0] = byte(0x04) // uncompressed
-	copy(pb[1:33], xBytes)
-	copy(pb[33:], yBytes)
-	// check if (X, Y) lies on the curve and create a Pubkey if it does
-	pubkey, err := ParsePubKey(pb, S256())
-	if err != nil {
-		return nil, err
-	}
-
-	// check for cipher text length
-	if (len(in)-aes.BlockSize-offset-sha256.Size)%aes.BlockSize != 0 {
-		return nil, errInvalidPadding // not padded to 16 bytes
-	}
-
-	// read hmac
-	messageMAC := in[len(in)-sha256.Size:]
-
-	// generate shared secret
-	ecdhKey := GenerateSharedSecret(priv, pubkey)
-	derivedKey := sha512.Sum512(ecdhKey)
-	keyE := derivedKey[:32]
-	keyM := derivedKey[32:]
-
-	// verify mac
-	hm := hmac.New(sha256.New, keyM)
-	hm.Write(in[:len(in)-sha256.Size]) // everything is hashed
-	expectedMAC := hm.Sum(nil)
-	if !hmac.Equal(messageMAC, expectedMAC) {
-		return nil, ErrInvalidMAC
-	}
-
-	// start decryption
-	block, err := aes.NewCipher(keyE)
-	if err != nil {
-		return nil, err
-	}
-	mode := cipher.NewCBCDecrypter(block, iv)
-	// same length as ciphertext
-	plaintext := make([]byte, len(in)-offset-sha256.Size)
-	mode.CryptBlocks(plaintext, in[offset:len(in)-sha256.Size])
-
-	return removePKCSPadding(plaintext)
-}
+//func Decrypt(priv *PrivateKey, in []byte) ([]byte, error) {
+//	// IV + Curve params/X/Y + 1 block + HMAC-256
+//	if len(in) < aes.BlockSize+70+aes.BlockSize+sha256.Size {
+//		return nil, errInputTooShort
+//	}
+//
+//	// read iv
+//	iv := in[:aes.BlockSize]
+//	offset := aes.BlockSize
+//
+//	// start reading pubkey
+//	if !bytes.Equal(in[offset:offset+2], ciphCurveBytes[:]) {
+//		return nil, errUnsupportedCurve
+//	}
+//	offset += 2
+//
+//	if !bytes.Equal(in[offset:offset+2], ciphCoordLength[:]) {
+//		return nil, errInvalidXLength
+//	}
+//	offset += 2
+//
+//	xBytes := in[offset : offset+32]
+//	offset += 32
+//
+//	if !bytes.Equal(in[offset:offset+2], ciphCoordLength[:]) {
+//		return nil, errInvalidYLength
+//	}
+//	offset += 2
+//
+//	yBytes := in[offset : offset+32]
+//	offset += 32
+//
+//	pb := make([]byte, 65)
+//	pb[0] = byte(0x04) // uncompressed
+//	copy(pb[1:33], xBytes)
+//	copy(pb[33:], yBytes)
+//	// check if (X, Y) lies on the curve and create a Pubkey if it does
+//	//pubkey, err := ParsePubKey(pb, S256())
+//	//if err != nil {
+//	//	return nil, err
+//	//}
+//
+//	// check for cipher text length
+//	if (len(in)-aes.BlockSize-offset-sha256.Size)%aes.BlockSize != 0 {
+//		return nil, errInvalidPadding // not padded to 16 bytes
+//	}
+//
+//	// read hmac
+//	messageMAC := in[len(in)-sha256.Size:]
+//
+//	// generate shared secret
+//	ecdhKey := GenerateSharedSecret(priv, pb)
+//	derivedKey := sha512.Sum512(ecdhKey)
+//	keyE := derivedKey[:32]
+//	keyM := derivedKey[32:]
+//
+//	// verify mac
+//	hm := hmac.New(sha256.New, keyM)
+//	hm.Write(in[:len(in)-sha256.Size]) // everything is hashed
+//	expectedMAC := hm.Sum(nil)
+//	if !hmac.Equal(messageMAC, expectedMAC) {
+//		return nil, ErrInvalidMAC
+//	}
+//
+//	// start decryption
+//	block, err := aes.NewCipher(keyE)
+//	if err != nil {
+//		return nil, err
+//	}
+//	mode := cipher.NewCBCDecrypter(block, iv)
+//	// same length as ciphertext
+//	plaintext := make([]byte, len(in)-offset-sha256.Size)
+//	mode.CryptBlocks(plaintext, in[offset:len(in)-sha256.Size])
+//
+//	return removePKCSPadding(plaintext)
+//}
 
 // Implement PKCS#7 padding with block size of 16 (AES block size).
 

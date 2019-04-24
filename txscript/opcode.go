@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"github.com/golang/crypto/ed25519"
 	"hash"
 
 	"golang.org/x/crypto/ripemd160"
@@ -2028,6 +2029,9 @@ func opcodeCodeSeparator(op *parsedOpcode, vm *Engine) error {
 	return nil
 }
 
+// opcodeCheckSig将堆栈上的前两项作为公钥和a处理
+// 签名，并用bool替换它们，bool指示签名是否为
+// 成功验证。
 // opcodeCheckSig treats the top 2 items on the stack as a public key and a
 // signature and replaces them with a bool which indicates if the signature was
 // successfully verified.
@@ -2043,7 +2047,7 @@ func opcodeCodeSeparator(op *parsedOpcode, vm *Engine) error {
 //
 // Stack transformation: [... signature pubkey] -> [... bool]
 func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
-	pkBytes, err := vm.dstack.PopByteArray()
+	pubKey, err := vm.dstack.PopByteArray()
 	if err != nil {
 		return err
 	}
@@ -2081,9 +2085,9 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 	if err := vm.checkSignatureEncoding(sigBytes); err != nil {
 		return err
 	}
-	if err := vm.checkPubKeyEncoding(pkBytes); err != nil {
-		return err
-	}
+	//if err := vm.checkPubKeyEncoding(pkBytes); err != nil {
+	//	return err
+	//}
 
 	// Get script starting from the most recent OP_CODESEPARATOR.
 	subScript := vm.subScript()
@@ -2111,19 +2115,19 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		hash = calcSignatureHash(subScript, hashType, &vm.tx, vm.txIdx)
 	}
 
-	pubKey, err := btcec.ParsePubKey(pkBytes, btcec.S256())
-	if err != nil {
-		vm.dstack.PushBool(false)
-		return nil
-	}
+	//pubKey, err := btcec.ParsePubKey(pkBytes, btcec.S256())
+	//if err != nil {
+	//	vm.dstack.PushBool(false)
+	//	return nil
+	//}
 
 	var signature *btcec.Signature
 	if vm.hasFlag(ScriptVerifyStrictEncoding) ||
 		vm.hasFlag(ScriptVerifyDERSignatures) {
 
-		signature, err = btcec.ParseDERSignature(sigBytes, btcec.S256())
+		signature, err = btcec.ParseDERSignature(sigBytes)
 	} else {
-		signature, err = btcec.ParseSignature(sigBytes, btcec.S256())
+		signature, err = btcec.ParseSignature(sigBytes)
 	}
 	if err != nil {
 		vm.dstack.PushBool(false)
@@ -2136,8 +2140,8 @@ func opcodeCheckSig(op *parsedOpcode, vm *Engine) error {
 		copy(sigHash[:], hash)
 
 		valid = vm.sigCache.Exists(sigHash, signature, pubKey)
-		if !valid && signature.Verify(hash, pubKey) {
-			vm.sigCache.Add(sigHash, signature, pubKey)
+		if !valid && signature.Verify(hash, (ed25519.PublicKey)(pubKey[:])) {
+			vm.sigCache.Add(sigHash, *signature, pubKey)
 			valid = true
 		}
 	} else {
@@ -2330,11 +2334,9 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 			if vm.hasFlag(ScriptVerifyStrictEncoding) ||
 				vm.hasFlag(ScriptVerifyDERSignatures) {
 
-				parsedSig, err = btcec.ParseDERSignature(signature,
-					btcec.S256())
+				parsedSig, err = btcec.ParseDERSignature(signature)
 			} else {
-				parsedSig, err = btcec.ParseSignature(signature,
-					btcec.S256())
+				parsedSig, err = btcec.ParseSignature(signature)
 			}
 			sigInfo.parsed = true
 			if err != nil {
@@ -2351,15 +2353,15 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 			parsedSig = sigInfo.parsedSignature
 		}
 
-		if err := vm.checkPubKeyEncoding(pubKey); err != nil {
-			return err
-		}
+		//if err := vm.checkPubKeyEncoding(pubKey); err != nil {
+		//	return err
+		//}
 
 		// Parse the pubkey.
-		parsedPubKey, err := btcec.ParsePubKey(pubKey, btcec.S256())
-		if err != nil {
-			continue
-		}
+		//parsedPubKey, err := btcec.ParsePubKey(pubKey, btcec.S256())
+		//if err != nil {
+		//	continue
+		//}
 
 		// Generate the signature hash based on the signature hash type.
 		var hash []byte
@@ -2385,13 +2387,13 @@ func opcodeCheckMultiSig(op *parsedOpcode, vm *Engine) error {
 			var sigHash chainhash.Hash
 			copy(sigHash[:], hash)
 
-			valid = vm.sigCache.Exists(sigHash, parsedSig, parsedPubKey)
-			if !valid && parsedSig.Verify(hash, parsedPubKey) {
-				vm.sigCache.Add(sigHash, parsedSig, parsedPubKey)
+			valid = vm.sigCache.Exists(sigHash, parsedSig, pubKey)
+			if !valid && parsedSig.Verify(hash, pubKey) {
+				vm.sigCache.Add(sigHash, *parsedSig, pubKey)
 				valid = true
 			}
 		} else {
-			valid = parsedSig.Verify(hash, parsedPubKey)
+			valid = parsedSig.Verify(hash, pubKey)
 		}
 
 		if valid {

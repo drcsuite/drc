@@ -54,6 +54,10 @@ func (p *PrivateKey) ToECDSA() *ecdsa.PrivateKey {
 	return (*ecdsa.PrivateKey)(p)
 }
 
+// Sign为提供的散列生成ECDSA签名(应该是结果)
+// 使用私钥哈希较大的消息)。生成签名
+// 是确定的(相同的消息和键产生相同的签名)和规范的
+// 根据RFC6979和BIP0062。
 // Sign generates an ECDSA signature for the provided hash (which should be the result
 // of hashing a larger message) using the private key. Produced signature
 // is deterministic (same message and same key yield the same signature) and canonical
@@ -62,9 +66,9 @@ func (p *PrivateKey) Sign(hash []byte) (*Signature, error) {
 	return signRFC6979(p, hash)
 }
 
-func (p *PrivateKey) Sign64(hash []byte) ([]byte, error) {
-	return sign(p, hash)
-}
+//func (p *PrivateKey) Sign64(hash []byte) ([]byte, error) {
+//	return sign(p, hash)
+//}
 
 // PrivKeyBytesLen defines the length in bytes of a serialized private key.
 const PrivKeyBytesLen = 32

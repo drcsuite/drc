@@ -150,13 +150,13 @@ func (w *WIF) String() string {
 // SerializePubKey serializes the associated public key of the imported or
 // exported private key in either a compressed or uncompressed format.  The
 // serialization format chosen depends on the value of w.CompressPubKey.
-func (w *WIF) SerializePubKey() []byte {
-	pk := (*btcec.PublicKey)(&w.PrivKey.PublicKey)
-	if w.CompressPubKey {
-		return pk.SerializeCompressed()
-	}
-	return pk.SerializeUncompressed()
-}
+//func (w *WIF) SerializePubKey() []byte {
+//	pk := (*btcec.PublicKey)(&w.PrivKey.PublicKey)
+//	if w.CompressPubKey {
+//		return pk.SerializeCompressed()
+//	}
+//	return pk.SerializeUncompressed()
+//}
 
 // paddedAppend appends the src byte slice to dst, returning the new slice.
 // If the length of the source is smaller than the passed size, leading zero

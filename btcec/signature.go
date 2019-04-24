@@ -6,15 +6,14 @@ package btcec
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"github.com/golang/crypto/ed25519"
 	"hash"
 	"math/big"
-	"math/rand"
 )
 
 // Errors returned by canonicalPadding.
@@ -74,8 +73,9 @@ func (sig *Signature) Serialize() []byte {
 
 // Verify calls ecdsa.Verify to verify the signature of hash using the public
 // key.  It returns true if the signature is valid, false otherwise.
-func (sig *Signature) Verify(hash []byte, pubKey *PublicKey) bool {
-	return ecdsa.Verify(pubKey.ToECDSA(), hash, sig.R, sig.S)
+func (sig *Signature) Verify(hash []byte, pubKey ed25519.PublicKey) bool {
+	//return ecdsa.Verify(pubKey.ToECDSA(), hash, sig.R, sig.S)
+	return ed25519.Verify(pubKey, hash, sig.GenSignBytes())
 }
 
 // IsEqual compares this Signature instance to the one passed, returning true
@@ -91,7 +91,7 @@ func (sig *Signature) IsEqual(otherSig *Signature) bool {
 // 0x30 + <1-byte> + 0x02 + 0x01 + <byte> + 0x2 + 0x01 + <byte>
 const minSigLen = 8
 
-func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error) {
+func parseSig(sigStr []byte, der bool) (*Signature, error) {
 	// Originally this code used encoding/asn1 in order to parse the
 	// signature, but a number of problems were found with this approach.
 	// Despite the fact that signatures are stored as DER, the difference
@@ -196,12 +196,12 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 	if signature.S.Sign() != 1 {
 		return nil, errors.New("signature S isn't 1 or more")
 	}
-	if signature.R.Cmp(curve.Params().N) >= 0 {
-		return nil, errors.New("signature R is >= curve.N")
-	}
-	if signature.S.Cmp(curve.Params().N) >= 0 {
-		return nil, errors.New("signature S is >= curve.N")
-	}
+	//if signature.R.Cmp(curve.Params().N) >= 0 {
+	//	return nil, errors.New("signature R is >= curve.N")
+	//}
+	//if signature.S.Cmp(curve.Params().N) >= 0 {
+	//	return nil, errors.New("signature S is >= curve.N")
+	//}
 
 	return signature, nil
 }
@@ -209,15 +209,15 @@ func parseSig(sigStr []byte, curve elliptic.Curve, der bool) (*Signature, error)
 // ParseSignature parses a signature in BER format for the curve type `curve'
 // into a Signature type, perfoming some basic sanity checks.  If parsing
 // according to the more strict DER format is needed, use ParseDERSignature.
-func ParseSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
-	return parseSig(sigStr, curve, false)
+func ParseSignature(sigStr []byte) (*Signature, error) {
+	return parseSig(sigStr, false)
 }
 
 // ParseDERSignature parses a signature in DER format for the curve type
 // `curve` into a Signature type.  If parsing according to the less strict
 // BER format is needed, use ParseSignature.
-func ParseDERSignature(sigStr []byte, curve elliptic.Curve) (*Signature, error) {
-	return parseSig(sigStr, curve, true)
+func ParseDERSignature(sigStr []byte) (*Signature, error) {
+	return parseSig(sigStr, true)
 }
 
 // canonicalizeInt returns the bytes for the passed big integer adjusted as
@@ -342,6 +342,11 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 	}, nil
 }
 
+// SignCompact使用给定的散列生成数据的紧凑签名
+// 给定koblitz曲线上的私钥。iscompression参数应该
+// 用于指定签名是否引用压缩后的签名
+// 是否使用公钥。如果成功，紧凑签名的字节数将是
+// 以以下格式返回:
 // SignCompact produces a compact signature of the data in hash with the given
 // private key on the given koblitz curve. The isCompressed  parameter should
 // be used to detail if the given signature should reference a compressed
@@ -349,8 +354,7 @@ func recoverKeyFromSignature(curve *KoblitzCurve, sig *Signature, msg []byte,
 // returned in the format:
 // <(byte of 27+public key solution)+4 if compressed >< padded bytes for signature R><padded bytes for signature S>
 // where the R and S parameters are padde up to the bitlengh of the curve.
-func SignCompact(curve *KoblitzCurve, key *PrivateKey,
-	hash []byte, isCompressedKey bool) ([]byte, error) {
+func SignCompact(curve *KoblitzCurve, key *PrivateKey, hash []byte, isCompressedKey bool) ([]byte, error) {
 	sig, err := key.Sign(hash)
 	if err != nil {
 		return nil, err
@@ -396,8 +400,7 @@ func SignCompact(curve *KoblitzCurve, key *PrivateKey,
 // Koblitz curve in "curve". If the signature matches then the recovered public
 // key will be returned as well as a boolen if the original key was compressed
 // or not, else an error will be returned.
-func RecoverCompact(curve *KoblitzCurve, signature,
-	hash []byte) (*PublicKey, bool, error) {
+func RecoverCompact(curve *KoblitzCurve, signature, hash []byte) (*PublicKey, bool, error) {
 	bitlen := (curve.BitSize + 7) / 8
 	if len(signature) != 1+bitlen*2 {
 		return nil, false, errors.New("invalid compact signature size")
@@ -419,22 +422,23 @@ func RecoverCompact(curve *KoblitzCurve, signature,
 	return key, ((signature[0] - 27) & 4) == 4, nil
 }
 
-func sign(privateKey *PrivateKey, hash []byte) ([]byte, error) {
-	b := make([]byte, 32)
-	rand.Read(b)
-	r, s, err := ecdsa.Sign(bytes.NewReader(b[:]), privateKey.ToECDSA(), hash)
-	return bytes.Join([][]byte{generate32Bytes(r), generate32Bytes(s)}, nil), err
-}
+//func sign(privateKey *PrivateKey, hash []byte) ([]byte, error) {
+//	b := make([]byte, 32)
+//	rand.Read(b)
+//	r, s, err := ecdsa.Sign(bytes.NewReader(b[:]), privateKey.ToECDSA(), hash)
+//	return bytes.Join([][]byte{generate32Bytes(r), generate32Bytes(s)}, nil), err
+//}
 
-func generate32Bytes(i *big.Int) []byte {
-	b := i.Bytes()
-	if len(b) < 32 {
-		zero := make([]byte, 32-len(b))
-		b = bytes.Join([][]byte{zero, b}, nil)
-	}
-	return b
-}
+//func generate32Bytes(i *big.Int) []byte {
+//	b := i.Bytes()
+//	if len(b) < 32 {
+//		zero := make([]byte, 32-len(b))
+//		b = bytes.Join([][]byte{zero, b}, nil)
+//	}
+//	return b
+//}
 
+// signRFC6979根据RFC6979和BIP 62生成一个确定的ECDSA签名。
 // signRFC6979 generates a deterministic ECDSA signature according to RFC 6979 and BIP 62.
 func signRFC6979(privateKey *PrivateKey, hash []byte) (*Signature, error) {
 
@@ -465,6 +469,8 @@ func signRFC6979(privateKey *PrivateKey, hash []byte) (*Signature, error) {
 	return &Signature{R: r, S: s}, nil
 }
 
+// nonceRFC6979根据RFC6979确定性地生成ECDSA nonce (' k ')。
+// 它接受一个32字节的哈希作为输入，并返回32字节的nonce，以便在ECDSA算法中使用。
 // nonceRFC6979 generates an ECDSA nonce (`k`) deterministically according to RFC 6979.
 // It takes a 32-byte hash as an input and returns 32-byte nonce to be used in ECDSA algorithm.
 func nonceRFC6979(privkey *big.Int, hash []byte) *big.Int {
